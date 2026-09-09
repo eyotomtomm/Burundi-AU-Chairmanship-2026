@@ -61,9 +61,21 @@ ANDROID_SHA256_FINGERPRINTS = [
 ]
 
 
+def _publicly_cacheable(response, seconds=3600):
+    """Same bytes for every caller, so let a shared cache keep one copy.
+
+    Google and Apple fetch these two files on their own schedule and they never
+    differ by caller. Saying `public` is also what opts the response into
+    PublicCacheVaryMiddleware, which trims the `Vary: Cookie` the session
+    middleware would otherwise leave behind.
+    """
+    response['Cache-Control'] = f'public, max-age={seconds}'
+    return response
+
+
 def apple_app_site_association(request):
     """Claim /<kind>/<id>/share/ for the iOS app; the rest of the site stays web."""
-    return JsonResponse({
+    return _publicly_cacheable(JsonResponse({
         'applinks': {
             'details': [{
                 'appIDs': [APPLE_APP_ID],
@@ -73,19 +85,19 @@ def apple_app_site_association(request):
                 ],
             }],
         },
-    }, content_type='application/json')
+    }, content_type='application/json'))
 
 
 def android_assetlinks(request):
     """Same claim for Android App Links verification."""
-    return JsonResponse([{
+    return _publicly_cacheable(JsonResponse([{
         'relation': ['delegate_permission/common.handle_all_urls'],
         'target': {
             'namespace': 'android_app',
             'package_name': ANDROID_PACKAGE,
             'sha256_cert_fingerprints': ANDROID_SHA256_FINGERPRINTS,
         },
-    }], safe=False, content_type='application/json')
+    }], safe=False, content_type='application/json'))
 
 
 def handler500_view(request):

@@ -29,7 +29,7 @@ class AutoFetchScheduleTests(TestCase):
         )
 
     def _run(self):
-        with patch('core.news_scraper.fetch_source', return_value=(3, 0)) as fetch:
+        with patch('core.news_scraper.fetch_source', return_value=(3, 0, False)) as fetch:
             auto_fetch_news_sources()
         return fetch
 
@@ -64,7 +64,7 @@ class AutoFetchScheduleTests(TestCase):
             is_active=True, auto_fetch=True, auto_fetch_hour=self.hour,
         )
         with patch('core.news_scraper.fetch_source',
-                   side_effect=[ScrapeError('down'), (1, 0)]) as fetch:
+                   side_effect=[ScrapeError('down'), (1, 0, False)]) as fetch:
             auto_fetch_news_sources()
         self.assertEqual(fetch.call_count, 2)
         del other
@@ -466,3 +466,68 @@ class AiHeadlineTests(TestCase):
         import core.news_scraper as ns
         with _p.object(ns.django_settings, 'GEMINI_API_KEY', '', create=True):
             self.assertEqual(ns._ai_headline(self.body), '')
+
+
+class FetchTimeBudgetTests(TestCase):
+    """Cloudflare kills the admin's request at 100s, so a fetch behind the
+    button must stop early and stay resumable rather than time out."""
+
+    def setUp(self):
+        self.source = NewsSource.objects.create(
+            name='Slow', kind='x', target='BurundinAddis',
+        )
+
+    def _posts(self, n):
+        return [{
+            'external_id': f'p{i}', 'title': f'post {i}', 'title_derived': False,
+            'content': 'body', 'image_url': '', 'source_url': '',
+            'published_at': timezone.now(), 'media': [], 'raw': {},
+        } for i in range(n)]
+
+    def _run(self, posts, budget, clock):
+        from unittest.mock import patch as _p
+        from core.news_scraper import fetch_source
+        with _p.dict('core.news_scraper.ADAPTERS',
+                     {'x': lambda *a, **k: iter(posts)}), \
+                _p('core.news_scraper.time.monotonic', side_effect=clock):
+            return fetch_source(self.source, timezone.now() - timedelta(days=2),
+                                timezone.now(), time_budget=budget)
+
+    def test_stops_early_when_the_budget_runs_out(self):
+        # Clock jumps past the deadline after the first item.
+        clock = [0, 0, 0, 1, 500, 500, 500, 500, 500, 500]
+        created, _, truncated = self._run(self._posts(5), 70, clock)
+        self.assertTrue(truncated)
+        self.assertLess(created, 5)
+
+    def test_what_it_saved_before_stopping_is_kept(self):
+        clock = [0, 0, 0, 1, 500, 500, 500, 500, 500, 500]
+        created, _, _ = self._run(self._posts(5), 70, clock)
+        self.assertEqual(ScrapedItem.objects.count(), created)
+
+    def test_a_second_run_resumes_instead_of_restarting(self):
+        posts = self._posts(4)
+        self._run(posts, 70, [0, 0, 0, 1, 500, 500, 500, 500])
+        first = ScrapedItem.objects.count()
+        self.assertGreater(first, 0)
+        # Plenty of time now: the rest arrive, the earlier ones are skipped.
+        created, skipped, truncated = self._run(posts, 70, [0] * 40)
+        self.assertFalse(truncated)
+        self.assertEqual(skipped, first)
+        self.assertEqual(ScrapedItem.objects.count(), 4)
+
+    def test_no_budget_means_no_truncation(self):
+        created, _, truncated = self._run(self._posts(3), None, [0] * 40)
+        self.assertFalse(truncated)
+        self.assertEqual(created, 3)
+
+
+class RemainingHelperTests(TestCase):
+    def test_caps_at_the_default_and_never_returns_zero(self):
+        from unittest.mock import patch as _p
+        import core.news_scraper as ns
+        self.assertEqual(ns._remaining(None, 240), 240)   # no deadline
+        with _p('core.news_scraper.time.monotonic', return_value=0):
+            self.assertEqual(ns._remaining(30, 240), 30)  # deadline is nearer
+            self.assertEqual(ns._remaining(900, 240), 240)  # default is nearer
+            self.assertEqual(ns._remaining(-5, 240), 1)   # already past: still positive

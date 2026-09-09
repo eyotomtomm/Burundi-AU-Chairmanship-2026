@@ -7343,6 +7343,8 @@ def share_card_image(request, kind, pk):
         cache.set(cache_key, jpeg, 60 * 60 * 12)
 
     response = HttpResponse(jpeg, content_type='image/jpeg')
+    # PublicCacheVaryMiddleware trims Vary for anything marked public, so this
+    # actually reaches a shared cache instead of being stored per visitor.
     response['Cache-Control'] = 'public, max-age=86400, s-maxage=604800'
     return response
 
@@ -7375,6 +7377,9 @@ def share_card(request, kind, pk):
         description += '…'
 
     ua = (request.META.get('HTTP_USER_AGENT', '') or '').lower()
+    # Everything below branches on the user agent: a crawler gets the plain
+    # page so the preview builds, a phone gets handed to the app. Cheap to
+    # render, and unsafe to share between clients — so it is never cached.
     is_bot = any(b in ua for b in (
         'bot', 'crawler', 'spider', 'facebookexternalhit', 'whatsapp',
         'slack', 'discord', 'embedly', 'preview', 'skypeuripreview',
@@ -7477,7 +7482,12 @@ def share_card(request, kind, pk):
 </body>
 </html>"""
 
-    return HttpResponse(html, content_type='text/html')
+    response = HttpResponse(html, content_type='text/html')
+    # Said plainly, so a future edge Cache Rule cannot serve a crawler's copy
+    # of this page to a phone that should have been handed to the app.
+    response['Cache-Control'] = 'private, no-store'
+    response['Vary'] = 'User-Agent, Accept-Encoding'
+    return response
 
 
 @api_view(['GET'])

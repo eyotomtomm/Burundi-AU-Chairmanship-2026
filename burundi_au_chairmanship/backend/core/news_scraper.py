@@ -36,6 +36,13 @@ logger = logging.getLogger(__name__)
 MAX_MEDIA_ITEMS = 400
 # One Gemini call per new post. Capped so a wide backfill cannot burn the
 # free tier's per-minute quota; past the cap we fall back to _title_from.
+# Cloudflare cuts any request off at 100s (error 524), which is stricter than
+# gunicorn's 120s. A fetch behind the admin's button therefore gets a wall-clock
+# budget and stops early rather than dying: every post is deduplicated by
+# external_id, so pressing Fetch again resumes where this run stopped. The
+# scheduled fetch runs in the worker, which has no HTTP timeout, and passes no
+# budget at all.
+WEB_TIME_BUDGET = 70
 MAX_AI_TITLES_PER_RUN = 40
 # Thinking models routinely take ~10s for a headline.
 AI_TIMEOUT = 45
@@ -54,6 +61,18 @@ MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 class ScrapeError(Exception):
     """A source could not be fetched; the message is shown to the admin."""
+
+
+def _remaining(deadline, default):
+    """Seconds left before `deadline`, capped at `default`. None = no limit."""
+    if deadline is None:
+        return default
+    return max(1, min(default, int(deadline - time.monotonic())))
+
+
+def _expired(deadline):
+    return deadline is not None and time.monotonic() >= deadline
+
 
 
 # Cached temp jar, keyed by a hash of its contents so an admin pasting a new
@@ -258,7 +277,7 @@ def _download_image(url):
 #  Adapters — each yields dicts, newest first
 # ─────────────────────────────────────────────────────────────
 
-def _fetch_x(handle, date_from, date_to):
+def _fetch_x(handle, date_from, date_to, deadline=None):
     """Read an X account through gallery-dl.
 
     Two routes, because X gates them differently:
@@ -298,7 +317,8 @@ def _fetch_x(handle, date_from, date_to):
     if cookies_file:
         cmd[1:1] = ['--cookies', cookies_file]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=FETCH_TIMEOUT)
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=_remaining(deadline, FETCH_TIMEOUT))
     except FileNotFoundError:
         raise ScrapeError(
             'gallery-dl is not installed on this server. Install it with '
@@ -437,10 +457,10 @@ def _find_text(entry, *names):
     return ''
 
 
-def _fetch_rss(url, date_from, date_to):
+def _fetch_rss(url, date_from, date_to, deadline=None):
     """Parse an RSS 2.0 or Atom feed with the stdlib."""
     try:
-        resp = requests.get(url, timeout=FETCH_TIMEOUT,
+        resp = requests.get(url, timeout=_remaining(deadline, FETCH_TIMEOUT),
                             headers={'User-Agent': 'Be4Africa-NewsBot/1.0'})
         resp.raise_for_status()
     except requests.RequestException as exc:
@@ -507,11 +527,17 @@ ADAPTERS = {'x': _fetch_x, 'rss': _fetch_rss}
 #  Entry point
 # ─────────────────────────────────────────────────────────────
 
-def fetch_source(source, date_from, date_to, download_images=True):
+def fetch_source(source, date_from, date_to, download_images=True, time_budget=None):
     """Pull `source` between two dates into pending ScrapedItems.
 
-    Returns ``(created, skipped)``. Already-seen posts are skipped, so
-    re-running over the same range is safe and idempotent.
+    Returns ``(created, skipped, truncated)``. Already-seen posts are skipped,
+    so re-running over the same range is safe and idempotent — which is what
+    makes stopping early harmless.
+
+    ``time_budget`` is a wall-clock ceiling in seconds. Pass one when a browser
+    is waiting (Cloudflare gives up at 100s); leave it None in the scheduled
+    worker, which has no such limit. When the budget runs out the run stops
+    where it is and reports ``truncated``; the next run continues from there.
     """
     adapter = ADAPTERS.get(source.kind)
     if adapter is None:
@@ -519,18 +545,26 @@ def fetch_source(source, date_from, date_to, download_images=True):
 
     date_from, date_to = _aware(date_from), _aware(date_to)
     created = skipped = ai_titles = 0
+    truncated = False
+    deadline = time.monotonic() + time_budget if time_budget else None
     ai_deadline = time.monotonic() + AI_TIME_BUDGET
 
-    for post in adapter(source.target, date_from, date_to):
+    for post in adapter(source.target, date_from, date_to, deadline):
         if ScrapedItem.objects.filter(source=source, external_id=post['external_id']).exists():
             skipped += 1
             continue
+
+        # Out of time: stop before starting work we cannot finish. Everything
+        # saved so far stays, and the next run picks up from here.
+        if _expired(deadline):
+            truncated = True
+            break
 
         # Only for genuinely new posts, and only where the title was guessed
         # from the body — re-running a range must not re-bill the same posts.
         title = post['title']
         if (post.get('title_derived') and ai_titles < MAX_AI_TITLES_PER_RUN
-                and time.monotonic() < ai_deadline):
+                and time.monotonic() < ai_deadline and not _expired(deadline)):
             headline = _ai_headline(post['content'])
             if headline:
                 title = headline[:300]
@@ -546,7 +580,7 @@ def fetch_source(source, date_from, date_to, download_images=True):
             published_at=post['published_at'],
             raw={**post['raw'], 'media': post.get('media') or []},
         )
-        if download_images and post['image_url']:
+        if download_images and post['image_url'] and not _expired(deadline):
             downloaded = _download_image(post['image_url'])
             if downloaded:
                 name, data = downloaded
@@ -560,4 +594,4 @@ def fetch_source(source, date_from, date_to, download_images=True):
 
     source.last_fetched_at = timezone.now()
     source.save(update_fields=['last_fetched_at'])
-    return created, skipped
+    return created, skipped, truncated

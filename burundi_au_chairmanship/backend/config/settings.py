@@ -72,7 +72,11 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'core.middleware.cloudflare.CloudflareProxyMiddleware',  # Must be first — sets real client IP
+    # First in the list means last to see the response: this trims `Vary` on
+    # responses that opted into public caching, after the session/CORS/CSRF
+    # middleware below have finished appending `Cookie` to it.
+    'core.middleware.public_cache.PublicCacheVaryMiddleware',
+    'core.middleware.cloudflare.CloudflareProxyMiddleware',  # Sets real client IP
     'django.middleware.security.SecurityMiddleware',
     'core.middleware.security_headers.SecurityHeadersMiddleware',  # Permissions-Policy + admin CSP
     # GZipMiddleware removed — Cloudflare handles compression; avoids BREACH attack vector

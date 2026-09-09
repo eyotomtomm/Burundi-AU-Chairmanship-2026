@@ -611,7 +611,9 @@ def auto_fetch_news_sources():
         if source.last_fetched_at and tz.localtime(source.last_fetched_at).date() == now.date():
             continue
         try:
-            created, _ = fetch_source(source, now - timedelta(days=source.auto_fetch_days), now)
+            # No time budget: the worker has no HTTP timeout to satisfy.
+            created, _, _ = fetch_source(
+                source, now - timedelta(days=source.auto_fetch_days), now)
             total += created
             logger.info('auto-fetch %s: %s new item(s)', source.name, created)
         except ScrapeError as exc:

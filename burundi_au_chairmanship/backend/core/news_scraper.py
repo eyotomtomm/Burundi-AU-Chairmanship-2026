@@ -339,19 +339,9 @@ def _fetch_x(handle, date_from, date_to, deadline=None):
         raise ScrapeError('Could not parse the response from gallery-dl.')
 
     # gallery-dl reports failures as a row of [-1, {"error": ...}].
-    for row in rows:
-        if isinstance(row, list) and row and row[0] == -1 and isinstance(row[-1], dict):
-            err = row[-1].get('error', '')
-            if err == 'AuthRequired':
-                raise ScrapeError(
-                    'X refused this request without a login. Export a cookies.txt '
-                    'from a browser signed in to any X account — it does not have to '
-                    'be the account being read — and set X_COOKIES_FILE to its path '
-                    'on the server. That also switches this source to the '
-                    'date-bounded search route, which is the only one that reliably '
-                    'returns recent posts. RSS sources need none of this.'
-                )
-            raise ScrapeError(f'X refused the request: {err or row[-1]}')
+    errors = [row[-1].get('error') or str(row[-1]) for row in rows
+              if isinstance(row, list) and row and row[0] == -1
+              and isinstance(row[-1], dict)]
 
     # gallery-dl emits two kinds of row, and we need both:
     #   directory ``[2, tweet]``      — exactly one per tweet, always present
@@ -380,6 +370,24 @@ def _fetch_x(handle, date_from, date_to, deadline=None):
         kind = 'image' if ext in IMAGE_EXTENSIONS else 'video' if ext in VIDEO_EXTENSIONS else None
         if kind and not any(m['url'] == url for m in bundle['media']):
             bundle['media'].append({'type': kind, 'url': url})
+
+    # A guest read of a timeline always ends in AuthRequired: X hands out
+    # roughly a hundred posts and then refuses to page further. That is where
+    # the timeline stops, not a failed fetch — raising here threw away every
+    # post already parsed. Only an error that cost us everything is fatal.
+    if errors and not posts:
+        if 'AuthRequired' in errors:
+            raise ScrapeError(
+                'X refused this request without a login. Export a cookies.txt '
+                'from a browser signed in to any X account — it does not have to '
+                'be the account being read — and set X_COOKIES_FILE to its path '
+                'on the server. That also switches this source to the '
+                'date-bounded search route, which is the only one that reliably '
+                'returns recent posts. RSS sources need none of this.'
+            )
+        raise ScrapeError(f'X refused the request: {errors[0]}')
+    if errors:
+        logger.info('scraper: X stopped after %d posts: %s', len(posts), errors[0])
 
     for tweet_id, bundle in posts.items():
         meta = bundle['meta']

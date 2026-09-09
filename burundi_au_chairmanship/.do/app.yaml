@@ -1,10 +1,30 @@
 # DigitalOcean App Platform Specification
-# Deploy: doctl apps create --spec .do/app.yaml
-# Update: doctl apps update <app-id> --spec .do/app.yaml
 #
-# Before deploying, set encrypted env vars in DO dashboard:
-#   DJANGO_SECRET_KEY, DATABASE_URL, EMAIL_HOST_PASSWORD,
-#   SENTRY_DSN, etc.
+# ⚠ THIS FILE IS NOT WHAT IS DEPLOYED. Read this before trusting it.
+#
+# Production runs an app named `monkfish-app`, whose spec App Platform stores
+# itself; deploys happen on push to main, not from this file. The two have
+# drifted, and this one describes components that do not exist:
+#
+#   - a Redis component and a Celery worker (`celery -A config worker -B`).
+#     Production has neither. REDIS_URL is unset, so CELERY_TASK_ALWAYS_EAGER
+#     makes every .delay() run inline in the web request, and scheduled work
+#     runs in a `scheduler` worker via `python manage.py run_scheduler`.
+#   - a two-node HA Postgres. Production is a single managed cluster,
+#     db-postgresql-fra1-49319.
+#   - a `pre-deploy` job. Production had none until 2026-09-09, which meant
+#     both web instances raced `migrate` on every deploy — see the duplicate
+#     0133 row in django_migrations.
+#
+# It is also stale in detail: DJANGO_ALLOWED_HOSTS below names
+# monkfish-app-afde5.ondigitalocean.app; the live host is
+# monkfish-app-afde5.ondigitalocean.app.
+#
+# To read the truth:  doctl apps spec get <app-id>
+# To change it:       doctl apps update <app-id> --spec <file>
+#
+# Keep this file as the intended target architecture, not as a description of
+# production, and do not apply it without reconciling the two first.
 
 name: burundi-au-chairmanship
 
@@ -43,7 +63,7 @@ services:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,monkfish-app-afde5.ondigitalocean.app"
       - key: SITE_URL
         value: "https://burundi4africa.com"
       # OTP and system mail send from the chairmanship domain, whose SMTP is
@@ -205,7 +225,7 @@ workers:
       - key: SENTRY_RELEASE
         value: "burundi-au-backend@${_self.COMMIT_HASH}"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,monkfish-app-afde5.ondigitalocean.app"
       - key: DJANGO_SECRET_KEY
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
@@ -269,7 +289,7 @@ jobs:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,monkfish-app-afde5.ondigitalocean.app"
       - key: DJANGO_SECRET_KEY
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"

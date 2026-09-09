@@ -1,13 +1,14 @@
 # Your next steps
 
-Updated 2026-09-08. Everything fixable in code is now committed on
+Updated 2026-09-09. Everything fixable in code is now committed on
 `production-readiness-fixes`. This file is the part that needs your hands, in
 the order I would do it.
 
 Full findings: `doc/production-readiness-audit-2026-09-03.html`
 
-**Nothing here is optional except section 8.** Sections 1–3 must happen before
-the deploy; 4–7 must happen with it.
+**Nothing here is optional except section 8.** Section 1 first, then 2; section
+3 goes out with the deploy itself and is the one that keeps the schema intact.
+Checked against the live `monkfish-app` spec, not the repo copy.
 
 ---
 
@@ -21,7 +22,7 @@ is what section 3 is about.
 | Hidden discussions were readable through the share link | No — closes a moderation bypass |
 | Event QR scan returned attendee email + phone to anyone | No — door staff still see them |
 | Home feed served draft and archived articles | **Yes — those posts disappear** |
-| News/Articles filter backends activated | **Yes — News tab drops 244 → 26** |
+| News and articles merged into one feed | Yes — News now shows everything, on old builds too |
 | iOS was missing `NSCalendarsUsageDescription` | No — unblocks App Store upload |
 | Tab content ran under the clock and Dynamic Island | Yes, an improvement |
 | More page rebuilt: 10 sections → 4, quick actions, verification callout | Yes, an improvement |
@@ -46,8 +47,18 @@ Rotate each at its source, then update it in the DigitalOcean dashboard
 | `EMAIL_HOST_PASSWORD` | Google Account → Security → App passwords → revoke the old one, create new |
 | `TWILIO_AUTH_TOKEN` | Twilio Console → Account → API keys & tokens → Secondary token → promote & revoke old |
 | Firebase service-account key | Firebase Console → Project settings → Service accounts → Generate new private key, then delete the old key in Google Cloud → IAM → Service accounts → Keys |
+| `SENTRY_AUTH_TOKEN` | Sentry → Settings → Auth Tokens → revoke `sntrys_…`, issue a new one |
 
 Rotating the Django secret key logs out all admin sessions. That is expected.
+
+**`SENTRY_AUTH_TOKEN` is a sixth one, and it is worse than the others.** In the
+live App Platform spec it is stored as a plain env var with no `type: SECRET`,
+so its value is readable by anyone who can export the spec — and it was pasted
+in cleartext during the 2026-09-09 session. It is an org-scoped token for
+`burundi-embassy-pu`. Revoke it in Sentry, issue a new one, and set it in the
+dashboard as a **SECRET**; `app_spec_fixed.yaml` already marks the key
+`type: SECRET` so App Platform encrypts whatever value it holds on the next
+apply. Encrypting the old value does not un-leak it — rotate first.
 
 ```bash
 rm "burundi_au_chairmanship/DIGITALOCEAN_RECOVERY.md"
@@ -78,38 +89,48 @@ psql "$DATABASE_URL" -f burundi_au_chairmanship/doc/check-0136.sql
 
 ---
 
-## 3. Decide the content sequencing — the one real risk
+## 3. Apply the corrected App Platform spec — do this with the deploy
 
-Today production serves 244 merged articles to the News tab (218 tagged
-`article`, 26 tagged `news`), because the filter backends were inactive and the
-home feed ignored article status. This branch fixes both at once, so on the
-deploy, every one of the ~761 installed phones sees:
-
-- News tab: **244 → 26 items**
-- Home: any post saved with the status dropdown set to `draft` or `archived`
-  vanishes
-
-Pick one before you deploy:
-
-**(a) Retag first — recommended.** Run this against production *before*
-deploying, decide which posts really are news, and fix their `content_type` and
-`status` in the admin. Then the deploy is a no-op for readers.
+Production (`monkfish-app`) has drifted from the repo, and four of the
+differences matter. A corrected spec is at `~/Downloads/app_spec_fixed.yaml`,
+built from the live one you exported, with every encrypted secret preserved:
 
 ```bash
-python manage.py shell -c "
-from core.models import Article
-from django.db.models import Count
-print(Article.objects.values('content_type', 'status').annotate(n=Count('id')).order_by('-n'))
-"
+doctl auth init                      # you have no token stored yet
+doctl apps list                      # find the monkfish-app id
+doctl apps update <app-id> --spec ~/Downloads/app_spec_fixed.yaml
 ```
 
-**(b) Ship backend and store release together.** The old app build does not know
-about the new tabs; the drop looks like data loss until the update lands.
+What it changes, and why each one matters:
 
-**(c) Hold the backend.** Deploy nothing until the store release is approved.
+**Migrations raced on every deploy.** `entrypoint.sh` runs `migrate` unless
+`SKIP_ENTRYPOINT_MIGRATE=1`, the web service runs `instance_count: 2`, and the
+live spec had no pre-deploy job — so both containers ran `migrate` at the same
+time, every time. The duplicate `0133` row in `django_migrations` is that race
+already having happened. Django takes no cross-process lock, so with a long
+queue of pending migrations this can half-apply a schema. The fixed spec adds a
+`PRE_DEPLOY` job that migrates once, and sets `SKIP_ENTRYPOINT_MIGRATE=1` on the
+service. **This is the reason not to deploy the old spec.**
 
----
+**`SITE_URL` pointed at a dead host.** It was `https://api.burundi4africa.com`,
+which returns 404 — `burundi4africa.com` is what serves. Every absolute URL the
+backend builds used it, including the unsubscribe link in every newsletter
+(`core/tasks.py:325`). Now `https://burundi4africa.com`.
 
+**`EMAIL_BACKEND` was the stock SMTP backend**, not
+`core.email_backend.LoggingEmailBackend`. So no `EmailLog` row was written for
+any message — Admin → Email Logs has been empty by construction — and the
+`FALLBACK_EMAIL_*` vars sitting in the spec were never consulted.
+
+**`SENTRY_PROJECT` was declared twice** on the web service, `b4africa-backend`
+then `b4africa-frontend`. The later wins, so backend errors have been filed
+under the frontend project. The duplicate is removed.
+
+Not changed, because it is a live-delivery risk and your call: `EMAIL_HOST` is
+Gmail with `smtp.burundichairship.africa` as the *fallback*, which is the
+inverse of what `.do/app.yaml` intends. Flipping them aligns SPF/DKIM with the
+new domain but moves all mail onto an SMTP host that has never carried it.
+Decide that deliberately, after the deploy, not during it.
 ## 4. Purge Cloudflare immediately after deploying
 
 Share cards are served with `s-maxage=604800`. Any hidden-discussion card that
@@ -167,15 +188,13 @@ with no licence registered. Community Edition is revenue-gated. For a
 government-facing app, get this in writing:
 https://www.syncfusion.com/sales/teamlicense
 
-**Redis.** You pay ~$15/month for it while `REDIS_URL` may be unset. If it is
-unset, `CELERY_TASK_ALWAYS_EAGER` makes every `.delay()` run inline inside the
-web request — which is what makes admin bulk sends time out. Either set
-`REDIS_URL` in the app spec, or drop the Redis component and accept that
-notifications send synchronously.
-
-```bash
-doctl apps spec get <app-id> | grep -A2 REDIS_URL   # after: doctl auth init
-```
+**Redis / Celery.** Settled by reading the live spec: there is no Redis
+component and no Celery worker, so you are not paying the ~$15/month the old
+note claimed. `REDIS_URL` is unset, `CELERY_TASK_ALWAYS_EAGER` is therefore on,
+and every `.delay()` runs inline inside the web request — which is why admin
+bulk sends time out. Scheduled work runs in the `scheduler` worker via
+`python manage.py run_scheduler`. Adding Redis plus a Celery worker is the fix
+for the timeouts; doing nothing keeps today's behaviour.
 
 **CI secrets.** CI runs on push but needs these in **GitHub → Settings → Secrets
 and variables → Actions**:

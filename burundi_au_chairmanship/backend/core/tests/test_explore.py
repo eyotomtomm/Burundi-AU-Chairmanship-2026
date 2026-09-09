@@ -24,7 +24,7 @@ def make_user(name, *, verified=True, terms=True):
 def complete(user):
     """Fill the fields _require_complete_profile insists on."""
     p = user.profile
-    p.nationality = 'Burundi'
+    p.nationality = 'BI'  # ISO code — the column is max_length=5, not a country name
     p.gender = 'female'
     p.date_of_birth = '1998-04-02'
     p.phone_number = '+25779000000'

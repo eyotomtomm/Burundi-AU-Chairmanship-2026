@@ -210,7 +210,11 @@
         bar.style.width = (d.percent || 0) + '%';
         count.textContent = (d.created || 0) + ' new · ' + (d.skipped || 0) + ' already queued';
 
-        if (d.state === 'running') {
+        if (d.state === 'queued') {
+          title.textContent = 'Queued…';
+          note.textContent = 'Waiting for the background worker to pick it up — ' +
+            'this starts within a minute.';
+        } else if (d.state === 'running') {
           title.textContent = 'Fetching' + (d.source ? ' ' + d.source : '') + '…';
           if (d.total) note.textContent = 'Post ' + d.done + ' of ' + d.total +
             ' — this runs in the background, you can leave this page.';

@@ -89,48 +89,64 @@ psql "$DATABASE_URL" -f burundi_au_chairmanship/doc/check-0136.sql
 
 ---
 
-## 3. Apply the corrected App Platform spec — do this with the deploy
+## 3. Apply the spec corrections — against a fresh export, never a saved one
 
-Production (`monkfish-app`) has drifted from the repo, and four of the
-differences matter. A corrected spec is at `~/Downloads/app_spec_fixed.yaml`,
-built from the live one you exported, with every encrypted secret preserved:
+⚠ **Do not apply `~/Downloads/app_spec_fixed.yaml`.** It was generated from the
+export taken before the secrets were rotated, so it carries the *old* encrypted
+values. Applying it would roll the rotation back and the app would return
+unable to reach the database. Delete that file.
+
+A spec export embeds every secret as it stood at export time, so the corrections
+have to be re-applied to a current export each time:
 
 ```bash
-doctl auth init                      # you have no token stored yet
-doctl apps list                      # find the monkfish-app id
-doctl apps update <app-id> --spec ~/Downloads/app_spec_fixed.yaml
+doctl auth init                        # once, if no token is stored
+doctl apps list                        # find the monkfish-app id
+
+doctl apps spec get <app-id> > /tmp/spec-now.yaml
+python3 burundi_au_chairmanship/doc/fix-app-spec.py /tmp/spec-now.yaml > /tmp/spec-fixed.yaml
+doctl apps propose --spec /tmp/spec-fixed.yaml       # validates, changes nothing
+doctl apps update <app-id> --spec /tmp/spec-fixed.yaml
 ```
 
-What it changes, and why each one matters:
+`fix-app-spec.py` prints what it changed to stderr and is idempotent — run it on
+an already-corrected spec and it says so and changes nothing. It never invents a
+secret value; it only moves the ones already in the export.
+
+Applying triggers a deploy. Watch it, because the pre-deploy job is new:
+
+```bash
+doctl apps logs <app-id> --type deploy --follow
+```
+
+What it corrects, and why each matters:
 
 **Migrations raced on every deploy.** `entrypoint.sh` runs `migrate` unless
-`SKIP_ENTRYPOINT_MIGRATE=1`, the web service runs `instance_count: 2`, and the
-live spec had no pre-deploy job — so both containers ran `migrate` at the same
-time, every time. The duplicate `0133` row in `django_migrations` is that race
-already having happened. Django takes no cross-process lock, so with a long
-queue of pending migrations this can half-apply a schema. The fixed spec adds a
-`PRE_DEPLOY` job that migrates once, and sets `SKIP_ENTRYPOINT_MIGRATE=1` on the
-service. **This is the reason not to deploy the old spec.**
+`SKIP_ENTRYPOINT_MIGRATE=1`, the web service runs `instance_count: 2`, and there
+was no pre-deploy job — so both containers migrated simultaneously, every time.
+The duplicate `0133` row in `django_migrations` is that race having already
+happened, and Django holds no cross-process lock. The fix adds a `PRE_DEPLOY`
+job that migrates once and sets the flag on the service.
 
 **`SITE_URL` pointed at a dead host.** It was `https://api.burundi4africa.com`,
-which returns 404 — `burundi4africa.com` is what serves. Every absolute URL the
+which answers 404; `burundi4africa.com` is what serves. Every absolute URL the
 backend builds used it, including the unsubscribe link in every newsletter
-(`core/tasks.py:325`). Now `https://burundi4africa.com`.
+(`core/tasks.py`).
 
-**`EMAIL_BACKEND` was the stock SMTP backend**, not
-`core.email_backend.LoggingEmailBackend`. So no `EmailLog` row was written for
-any message — Admin → Email Logs has been empty by construction — and the
-`FALLBACK_EMAIL_*` vars sitting in the spec were never consulted.
+**`EMAIL_BACKEND` was Django's stock SMTP backend**, so no `EmailLog` row was
+written for any message — Admin → Email Logs is empty by construction — and the
+`FALLBACK_EMAIL_*` vars in the spec were never consulted.
 
 **`SENTRY_PROJECT` was declared twice** on the web service, `b4africa-backend`
-then `b4africa-frontend`. The later wins, so backend errors have been filed
-under the frontend project. The duplicate is removed.
+then `b4africa-frontend`. The later wins, so backend errors were filed under the
+frontend project.
 
-Not changed, because it is a live-delivery risk and your call: `EMAIL_HOST` is
-Gmail with `smtp.burundichairship.africa` as the *fallback*, which is the
-inverse of what `.do/app.yaml` intends. Flipping them aligns SPF/DKIM with the
-new domain but moves all mail onto an SMTP host that has never carried it.
-Decide that deliberately, after the deploy, not during it.
+Left alone deliberately: `EMAIL_HOST` is Gmail with
+`smtp.burundichairship.africa` as the *fallback*, the inverse of what
+`.do/app.yaml` intends. Flipping them aligns SPF/DKIM with the new domain but
+moves all mail onto a host that has never carried it. Do that on its own, after
+this deploy has settled.
+
 ## 4. Cloudflare — you do not need a purge (verified 2026-09-09)
 
 The earlier advice here assumed the edge honoured the `s-maxage=604800` that

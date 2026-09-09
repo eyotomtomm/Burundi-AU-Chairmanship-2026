@@ -368,6 +368,17 @@ class XRowParsingTests(TestCase):
                 [3, url, dict(t, extension='jpg')]]
         self.assertEqual(len(self._parse(rows)[0]['media']), 1)
 
+    def test_guest_page_limit_keeps_the_posts_it_did_return(self):
+        """X hands a guest ~100 posts then says AuthRequired. Keep the 100."""
+        posts = self._parse([[2, self._tweet(1)], [2, self._tweet(2)],
+                             [-1, {'error': 'AuthRequired'}]])
+        self.assertEqual(len(posts), 2)
+
+    def test_auth_required_with_nothing_parsed_is_still_an_error(self):
+        from core.news_scraper import ScrapeError
+        with self.assertRaises(ScrapeError):
+            self._parse([[-1, {'error': 'AuthRequired'}]])
+
     def test_command_asks_for_text_tweets(self):
         import json, os
         from unittest.mock import patch as _p

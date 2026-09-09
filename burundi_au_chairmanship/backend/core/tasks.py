@@ -13,6 +13,7 @@ from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -589,6 +590,17 @@ def optimize_image_async(self, image_path):
     except Exception as exc:
         logger.error(f"Image optimization failed: {exc}")
         raise self.retry(exc=exc)
+
+
+@shared_task
+def run_queued_scrape_jobs():
+    """Start any fetch the admin queued from the Fetch button.
+
+    Also how this process tells the web instances that a scheduler exists at
+    all — see scrape_jobs.run_queued.
+    """
+    from . import scrape_jobs
+    return scrape_jobs.run_queued()
 
 
 @shared_task

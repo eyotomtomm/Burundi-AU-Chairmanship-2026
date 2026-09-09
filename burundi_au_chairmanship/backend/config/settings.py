@@ -742,6 +742,12 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'core.tasks.purge_old_user_sessions',
         'schedule': 86400,  # Every 24 hours
     },
+    # Not a schedule so much as a queue drain: the admin's Fetch button hands
+    # the work here, because the web process is recycled underneath it.
+    'run-queued-scrape-jobs': {
+        'task': 'core.tasks.run_queued_scrape_jobs',
+        'schedule': 30,
+    },
     # Hourly, but each source only fetches on its own configured hour.
     'auto-fetch-news-sources': {
         'task': 'core.tasks.auto_fetch_news_sources',

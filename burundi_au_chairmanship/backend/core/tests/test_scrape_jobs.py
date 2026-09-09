@@ -37,6 +37,79 @@ class ScrapeJobStateTests(TestCase):
         self.assertEqual(state['percent'], 100)
         self.assertEqual(state['created'], 2)
 
+    def test_a_job_whose_process_died_is_reported_failed(self):
+        """A recycled web worker takes its threads with it. Say so, don't spin."""
+        job = scrape_jobs.new_job()
+        state = cache.get(scrape_jobs.KEY.format(job))
+        state['updated'] = state['updated'] - scrape_jobs.STALE - 1
+        cache.set(scrape_jobs.KEY.format(job), state, scrape_jobs.TTL)
+        self.assertEqual(scrape_jobs.read(job)['state'], 'failed')
+
+    def test_a_finished_job_is_never_called_stale(self):
+        job = scrape_jobs.new_job()
+        scrape_jobs._update(job, state='done', percent=100)
+        state = cache.get(scrape_jobs.KEY.format(job))
+        state['updated'] = 0
+        cache.set(scrape_jobs.KEY.format(job), state, scrape_jobs.TTL)
+        self.assertEqual(scrape_jobs.read(job)['state'], 'done')
+
+    def test_spawn_queues_for_the_scheduler_when_one_is_running(self):
+        """The web process is recycled under long work; it must not run this."""
+        cache.set(scrape_jobs.RUNNER_KEY, True, 60)
+        job = scrape_jobs.new_job()
+        start, end = timezone.now() - timedelta(days=1), timezone.now()
+        with patch('core.scrape_jobs._start') as start_now:
+            self.assertIsNone(scrape_jobs.spawn(job, [self.source], start, end))
+        start_now.assert_not_called()
+        self.assertEqual(scrape_jobs.read(job)['state'], 'queued')
+        self.assertEqual(cache.get(scrape_jobs.QUEUE_KEY), [{
+            'job': job, 'sources': [self.source.pk],
+            'start': start.isoformat(), 'end': end.isoformat(),
+        }])
+
+    def test_the_scheduler_starts_what_was_queued_and_claims_it(self):
+        job = scrape_jobs.new_job()
+        cache.set(scrape_jobs.QUEUE_KEY, [{
+            'job': job, 'sources': [self.source.pk],
+            'start': timezone.now().isoformat(), 'end': timezone.now().isoformat(),
+        }], 60)
+        with patch('core.scrape_jobs._start') as start_now:
+            self.assertEqual(scrape_jobs.run_queued(), 1)
+            self.assertEqual(scrape_jobs.run_queued(), 0)  # not a second time
+        self.assertEqual(start_now.call_count, 1)
+        self.assertTrue(cache.get(scrape_jobs.RUNNER_KEY))
+
+    def test_with_no_scheduler_the_fetch_still_runs_here(self):
+        """A local runserver has no worker; Fetch must not silently do nothing."""
+        job = scrape_jobs.new_job()
+        with patch('core.scrape_jobs._run') as run:
+            thread = scrape_jobs.spawn(job, [self.source],
+                                       timezone.now(), timezone.now())
+        thread.join(timeout=5)
+        run.assert_called_once()
+
+    def test_a_queued_job_nobody_picks_up_is_reported_failed(self):
+        job = scrape_jobs.new_job()
+        scrape_jobs._update(job, state='queued')
+        state = cache.get(scrape_jobs.KEY.format(job))
+        state['updated'] = state['updated'] - scrape_jobs.STALE - 1
+        cache.set(scrape_jobs.KEY.format(job), state, scrape_jobs.TTL)
+        self.assertEqual(scrape_jobs.read(job)['state'], 'failed')
+
+    def test_the_worker_gets_the_range_back_as_datetimes(self):
+        seen = {}
+
+        def fake_fetch(source, start, end, time_budget=None, progress=None):
+            seen['start'], seen['end'] = start, end
+            return 0, 0, False
+
+        job = scrape_jobs.new_job()
+        start, end = timezone.now() - timedelta(days=1), timezone.now()
+        with patch('core.news_scraper.fetch_source', side_effect=fake_fetch):
+            scrape_jobs._run(job, [self.source.pk], start.isoformat(), end.isoformat())
+        self.assertEqual(seen['start'], start)
+        self.assertEqual(seen['end'], end)
+
     def test_one_dead_source_does_not_abandon_the_others(self):
         from core.news_scraper import ScrapeError
         other = NewsSource.objects.create(

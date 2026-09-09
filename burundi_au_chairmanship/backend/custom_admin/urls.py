@@ -424,8 +424,4 @@ urlpatterns = [
     path('reviewer/document/<int:doc_pk>/', views.reviewer_document_proxy, name='reviewer_document_proxy'),
 
     # News Scraper
-    path('news-scraper/', views.news_scraper, name='news_scraper'),
-    path('news-scraper/review/', views.news_scraper_review, name='news_scraper_review'),
-    path('news-scraper/progress/', views.news_scraper_progress, name='news_scraper_progress'),
-    path('news-scraper/sources/', views.news_sources_list, name='news_sources_list'),
 ]

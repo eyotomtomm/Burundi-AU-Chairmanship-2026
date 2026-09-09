@@ -607,9 +607,6 @@ h1, h2, h3, h4 { font-family: 'Sora', sans-serif; letter-spacing: -0.01em; }
       {% if 'articles_list' in allowed_sections %}
       <a class="nav-i {% if 'article' in url_name and 'category' not in url_name %}on{% endif %}" href="{% url 'custom_admin:articles_list' %}"><span class="ic material-symbols-rounded">article</span><span>Articles</span></a>
       {% endif %}
-      {% if 'news_scraper' in allowed_sections %}
-      <a class="nav-i {% if 'news_scraper' in url_name or 'news_sources' in url_name %}on{% endif %}" href="{% url 'custom_admin:news_scraper' %}"><span class="ic material-symbols-rounded">travel_explore</span><span>News Scraper</span></a>
-      {% endif %}
       {% if 'magazines_list' in allowed_sections %}
       <a class="nav-i {% if 'magazine' in url_name %}on{% endif %}" href="{% url 'custom_admin:magazines_list' %}"><span class="ic material-symbols-rounded">auto_stories</span><span>Magazine</span></a>
       {% endif %}

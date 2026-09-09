@@ -234,6 +234,11 @@ class FeedQueryBudgetTests(TestCase):
 
         client = APIClient()
         client.force_authenticate(user=user)
+        # Measure steady state. A user's first request also runs the
+        # maintenance check and writes their session row (last_active update,
+        # session lookup, session insert) — middleware noise that fires once
+        # and would otherwise be counted against the endpoint's budget.
+        client.get('/api/discussions/')
         with self.assertQueriesAtMost(12):
             res = client.get('/api/discussions/')
         self.assertEqual(len(res.json()['results']), 20)
@@ -245,6 +250,7 @@ class FeedQueryBudgetTests(TestCase):
             [DiscussionReply(discussion=post, author=user, content=f'r{i}') for i in range(30)])
         client = APIClient()
         client.force_authenticate(user=user)
+        client.get(f'/api/discussions/{post.pk}/replies/')  # warm-up, see above
         with self.assertQueriesAtMost(8):
             res = client.get(f'/api/discussions/{post.pk}/replies/')
         self.assertEqual(res.json()['count'], 30)

@@ -188,13 +188,17 @@ with no licence registered. Community Edition is revenue-gated. For a
 government-facing app, get this in writing:
 https://www.syncfusion.com/sales/teamlicense
 
-**Redis / Celery.** Settled by reading the live spec: there is no Redis
-component and no Celery worker, so you are not paying the ~$15/month the old
-note claimed. `REDIS_URL` is unset, `CELERY_TASK_ALWAYS_EAGER` is therefore on,
-and every `.delay()` runs inline inside the web request — which is why admin
-bulk sends time out. Scheduled work runs in the `scheduler` worker via
-`python manage.py run_scheduler`. Adding Redis plus a Celery worker is the fix
-for the timeouts; doing nothing keeps today's behaviour.
+**Redis / Celery — largely settled already.** There is no Redis component and
+no Celery worker in the live spec, so you are not paying the ~$15/month the old
+note claimed. `REDIS_URL` is unset, `CELERY_TASK_ALWAYS_EAGER` is on, and the
+`scheduler` worker added in `30dc627` supplies the missing clock by reading
+`CELERY_BEAT_SCHEDULE` directly — so scheduled publishing, live-feed status
+flips, the newsletter and the news fetch now actually fire.
+
+What remains is only the inline execution: a task triggered by a request still
+runs inside that request, which is why admin bulk sends time out. Adding Redis
+plus a real Celery worker fixes that and nothing else; the schedules would move
+across unchanged, since `run_scheduler` reads the same table.
 
 **CI secrets.** CI runs on push but needs these in **GitHub → Settings → Secrets
 and variables → Actions**:

@@ -38,7 +38,7 @@ def _get_campaign_smtp_connection():
 
     Uses CAMPAIGN_EMAIL_* settings so campaigns go through
     newsletter@burundichairship.africa while OTP / system emails
-    continue using the default info@burundi4africa.com account.
+    continue using the default info@burundichairship.africa account.
     """
     from django.core.mail import get_connection
     return get_connection(
@@ -446,102 +446,33 @@ def email_campaign_send_confirm(request, pk):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def email_campaign_send(request, pk):
-    """Send the campaign to its resolved audience. Inline / synchronous —
-    fine for audiences up to a few thousand. Each message is logged via
-    LoggingEmailBackend (EmailLog rows). Wraps body in branded template."""
+    """Queue the campaign. core.tasks.send_email_campaign resolves the audience
+    and fans out into <=200-recipient chunks (one SMTP connection each); the
+    list page shows status/sent/failed as chunks complete."""
     campaign = get_object_or_404(EmailCampaign, pk=pk)
 
     if campaign.status == 'sending':
         messages.warning(request, 'Campaign is already sending.')
         return redirect('custom_admin:email_campaigns_list')
 
-    recipients = _campaign_audience_queryset(campaign)
-    if not recipients:
+    recipient_count = len(_campaign_audience_queryset(campaign))
+    if not recipient_count:
         messages.error(request, 'No recipients resolved for this audience. Check your audience settings.')
         return redirect('custom_admin:email_campaign_edit', pk=pk)
 
     campaign.status = 'sending'
-    campaign.recipient_count = len(recipients)
+    campaign.recipient_count = recipient_count
     campaign.sent_count = 0
     campaign.failed_count = 0
     campaign.last_error = ''
     campaign.save(update_fields=['status', 'recipient_count', 'sent_count', 'failed_count', 'last_error'])
 
-    from django.core.mail import EmailMultiAlternatives
-    import re as _re
-
-    def _render(tpl, ctx):
-        out = tpl
-        for k, v in ctx.items():
-            out = _re.sub(r'\{\{\s*' + k + r'\s*\}\}', str(v), out)
-        return out
-
-    # Use dedicated newsletter SMTP connection
-    campaign_from = settings.CAMPAIGN_FROM_EMAIL
-    connection = _get_campaign_smtp_connection()
-
-    sent_ok = 0
-    sent_fail = 0
-    last_error = ''
-
-    try:
-        connection.open()
-        for email, name in recipients:
-            user_name = name or email.split('@')[0]
-            ctx = {
-                'user_name': user_name,
-                'user_email': email,
-                'app_name': 'Be 4 Africa',
-            }
-            subject = _render(campaign.subject, ctx)
-            raw_body = _render(campaign.body_html, ctx)
-            # Wrap in branded template with personalised greeting
-            full_html = _wrap_campaign_html(raw_body, user_name=user_name)
-            try:
-                msg = EmailMultiAlternatives(
-                    subject=subject,
-                    body=f'Hello {user_name},\n\n'
-                         f'{raw_body[:500]}\n\n'
-                         f'-- Be 4 Africa | Burundi AU Chairmanship',
-                    from_email=campaign_from,
-                    to=[email],
-                    connection=connection,
-                )
-                msg.attach_alternative(full_html, 'text/html')
-                msg.send(fail_silently=False)
-                sent_ok += 1
-                # Tag the most-recent EmailLog row with this campaign.
-                try:
-                    latest = EmailLog.objects.filter(
-                        recipients=email
-                    ).order_by('-created_at').first()
-                    if latest and latest.campaign_id is None:
-                        latest.campaign = campaign
-                        latest.category = 'campaign'
-                        latest.save(update_fields=['campaign', 'category'])
-                except Exception:
-                    logger.warning('Failed to tag EmailLog for %s', email, exc_info=True)
-            except Exception as e:
-                sent_fail += 1
-                last_error = str(e)[:2000]
-    finally:
-        try:
-            connection.close()
-        except Exception:
-            pass
-
-    campaign.status = 'sent' if sent_fail == 0 else ('failed' if sent_ok == 0 else 'sent')
-    campaign.sent_count = sent_ok
-    campaign.failed_count = sent_fail
-    campaign.last_error = last_error
-    campaign.sent_at = timezone.now()
-    campaign.save(update_fields=['status', 'sent_count', 'failed_count', 'last_error', 'sent_at'])
+    from core.tasks import send_email_campaign
+    send_email_campaign.delay(campaign.pk)
 
     log_admin_action(request, 'send', 'EmailCampaign', object_id=campaign.pk, object_repr=campaign.name)
-    if sent_fail == 0:
-        messages.success(request, f'Campaign "{campaign.name}" sent to {sent_ok} recipient(s).')
-    else:
-        messages.warning(request, f'Campaign "{campaign.name}" sent to {sent_ok}, failed {sent_fail}. Last error: {last_error[:200]}')
+    messages.success(request, f'Campaign "{campaign.name}" queued for {recipient_count} recipient(s). '
+                              'Refresh this page to follow progress.')
     return redirect('custom_admin:email_campaigns_list')
 
 

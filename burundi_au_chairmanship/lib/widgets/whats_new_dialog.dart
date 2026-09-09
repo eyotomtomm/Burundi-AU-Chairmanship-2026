@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_ds.dart';
 import 'ds/ds_widgets.dart';
 import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
 
 /// A modal bottom sheet that shows release highlights ("What's New").
 ///
@@ -223,7 +224,7 @@ class _WhatsNewSheet extends StatelessWidget {
     } else if (remoteTitleEn?.isNotEmpty ?? false) {
       headerTitle = remoteTitleEn!;
     } else {
-      headerTitle = isFr ? 'Nouveautes' : "What's new";
+      headerTitle = AppLocalizations.of(context).translate('whats_new');
     }
 
     return Container(
@@ -282,9 +283,7 @@ class _WhatsNewSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  isFr
-                      ? 'Decouvrez les dernieres ameliorations'
-                      : 'Here is what changed in this release',
+                  AppLocalizations.of(context).translate('w_whats_new_sub'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -313,7 +312,7 @@ class _WhatsNewSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: DsPrimaryButton(
-              isFr ? 'Compris !' : 'Got it',
+              AppLocalizations.of(context).translate('got_it'),
               radius: 14,
               onTap: onDismiss,
             ),

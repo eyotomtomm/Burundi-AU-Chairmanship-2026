@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -16,7 +15,10 @@ import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../services/api_service.dart';
+import '../../utils/color_utils.dart';
+import '../../l10n/app_localizations.dart';
 import '../../widgets/confetti_overlay.dart';
+import '../../widgets/app_network_image.dart';
 
 class YouthDialogueCredentialScreen extends StatefulWidget {
   const YouthDialogueCredentialScreen({super.key});
@@ -26,6 +28,7 @@ class YouthDialogueCredentialScreen extends StatefulWidget {
 }
 
 class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
   bool _isLoading = true;
   bool _isDownloading = false;
   String? _error;
@@ -114,7 +117,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
       if (!mounted) return;
       if (_credential == null) {
         setState(() {
-          _error = 'Failed to load credential.';
+          _error = _l10n.translate('ydc_load_failed');
           _isLoading = false;
         });
       } else {
@@ -160,7 +163,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to download PDF: $e')),
+          SnackBar(content: Text(e is ApiException ? e.message : AppLocalizations.of(context).translate('generic_error'))),
         );
       }
     } finally {
@@ -188,7 +191,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
       } catch (_) {}
     }
 
-    final roleColor = _parseHexColor(cred.roleColor);
+    final roleColor = hexToColor(cred.roleColor);
     final pdfRoleColor = PdfColor.fromInt(roleColor.toARGB32());
     final goldColor = const PdfColor.fromInt(0xFFD4AF37);
 
@@ -245,19 +248,19 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
 
               // Info table (respects visibility config)
               if (cred.isIdCardFieldVisible('organization'))
-                _pdfInfoRow('Organization', cred.organization),
+                _pdfInfoRow(_l10n.translate('ydc_organization'), cred.organization),
               if (cred.isIdCardFieldVisible('role'))
-                _pdfInfoRow('Role', cred.role),
+                _pdfInfoRow(_l10n.translate('ydc_role'), cred.role),
               if (cred.isIdCardFieldVisible('position'))
-                _pdfInfoRow('Position', cred.position),
+                _pdfInfoRow(_l10n.translate('ydc_position'), cred.position),
               if (cred.isIdCardFieldVisible('nationality') && cred.nationalityDisplay.isNotEmpty)
-                _pdfInfoRow('Nationality', '${cred.nationalityFlag} ${cred.nationalityDisplay}'),
+                _pdfInfoRow(_l10n.translate('ydc_nationality'), '${cred.nationalityFlag} ${cred.nationalityDisplay}'),
               if (cred.isIdCardFieldVisible('event_dates') && eventDates.isNotEmpty)
-                _pdfInfoRow('Event Date', eventDates),
+                _pdfInfoRow(_l10n.translate('ydc_event_date'), eventDates),
               if (cred.isIdCardFieldVisible('email') && cred.email.isNotEmpty)
-                _pdfInfoRow('Email', cred.email),
+                _pdfInfoRow(_l10n.translate('email'), cred.email),
               if (cred.isIdCardFieldVisible('side_event') && cred.sideEvent.isNotEmpty)
-                _pdfInfoRow('Side Event', cred.sideEvent),
+                _pdfInfoRow(_l10n.translate('ydc_side_event'), cred.sideEvent),
 
               // Extra fields from admin
               ...cred.extraFields.map((f) => _pdfInfoRow(f['label']!, f['value']!)),
@@ -323,7 +326,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
-      appBar: AppBar(title: const Text('My credential')),
+      appBar: AppBar(title: Text(_l10n.translate('ydc_my_credential'))),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green))
           : _error != null
@@ -345,7 +348,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Ds.body(context))),
             const SizedBox(height: 20),
-            DsOutlineButton('Retry', radius: Ds.rPill, onTap: () {
+            DsOutlineButton(_l10n.translate('retry'), radius: Ds.rPill, onTap: () {
               setState(() {
                 _isLoading = true;
                 _error = null;
@@ -356,6 +359,12 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
         ),
       ),
     );
+  }
+
+  /// Chairmanship runs Feb→Feb; derive "YYYY-YYYY+1" from the event year.
+  String _chairmanshipYears(YouthDialogueCredential cred) {
+    final y = (cred.eventStartDate ?? cred.eventEndDate ?? DateTime.now()).year;
+    return '$y-${y + 1}';
   }
 
   String _formatEventDates(YouthDialogueCredential cred) {
@@ -373,17 +382,12 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
     return '${d.day} ${months[d.month]} ${d.year}';
   }
 
-  Color _parseHexColor(String hex) {
-    hex = hex.replaceFirst('#', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.parse(hex, radix: 16));
-  }
-
   Widget _buildCredential(bool isDark) {
     final cred = _credential!;
     final qrData = cred.qrData;
     final eventDates = _formatEventDates(cred);
-    final roleColor = _parseHexColor(cred.roleColor);
+    final roleColor = hexToColor(cred.roleColor);
+    final chairmanshipYears = _chairmanshipYears(cred);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -396,9 +400,9 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: Ds.redTintOf(context),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: Ds.red.withValues(alpha: 0.4)),
               ),
               child: Row(
                 children: [
@@ -408,10 +412,10 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Credential Revoked',
+                        Text(_l10n.translate('ydc_revoked'),
                           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade800, fontSize: 15)),
                         const SizedBox(height: 2),
-                        Text('This credential is no longer valid.',
+                        Text(_l10n.translate('ydc_revoked_desc'),
                           style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
                       ],
                     ),
@@ -481,10 +485,10 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                                 ],
                               ),
                               padding: const EdgeInsets.all(6),
-                              child: CachedNetworkImage(
+                              child: AppNetworkImage(
                                 imageUrl: url,
                                 fit: BoxFit.contain,
-                                errorWidget: (_, __, ___) => Icon(Icons.image, color: AppColors.burundiGreen, size: 24),
+                                errorWidget: (_, _, _) => Icon(Icons.image, color: AppColors.burundiGreen, size: 24),
                               ),
                             ),
                           )),
@@ -510,8 +514,8 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                         ),
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        'Burundi AU Chairmanship 2025-2026',
+                      Text(
+                        'Burundi AU Chairmanship $chairmanshipYears',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 13,
@@ -560,11 +564,11 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                             ),
                             child: ClipOval(
                               child: cred.idPhotoUrl.isNotEmpty
-                                  ? CachedNetworkImage(
+                                  ? AppNetworkImage(
                                       imageUrl: cred.idPhotoUrl,
                                       fit: BoxFit.cover,
-                                      placeholder: (_, __) => _photoPlaceholder(isDark),
-                                      errorWidget: (_, __, ___) => _photoPlaceholder(isDark),
+                                      placeholder: (_, _) => _photoPlaceholder(isDark),
+                                      errorWidget: (_, _, _) => _photoPlaceholder(isDark),
                                     )
                                   : _photoPlaceholder(isDark),
                             ),
@@ -613,19 +617,25 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                 Builder(builder: (context) {
                   final dividerColor = isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06);
                   final List<Widget> visibleRows = [];
-                  if (cred.isIdCardFieldVisible('organization') && cred.organization.isNotEmpty)
-                    visibleRows.add(_detailRow(Icons.business_rounded, 'Organization', cred.organization, isDark, accentColor: roleColor));
-                  if (cred.isIdCardFieldVisible('role'))
-                    visibleRows.add(_detailRow(Icons.badge_rounded, 'Role', cred.role, isDark, accentColor: roleColor));
-                  if (cred.isIdCardFieldVisible('position') && cred.position.isNotEmpty)
-                    visibleRows.add(_detailRow(Icons.work_rounded, 'Position', cred.position, isDark, accentColor: roleColor));
-                  if (cred.isIdCardFieldVisible('nationality') && cred.nationalityDisplay.isNotEmpty)
-                    visibleRows.add(_detailRow(Icons.flag_rounded, 'Nationality',
+                  if (cred.isIdCardFieldVisible('organization') && cred.organization.isNotEmpty) {
+                    visibleRows.add(_detailRow(Icons.business_rounded, _l10n.translate('ydc_organization'), cred.organization, isDark, accentColor: roleColor));
+                  }
+                  if (cred.isIdCardFieldVisible('role')) {
+                    visibleRows.add(_detailRow(Icons.badge_rounded, _l10n.translate('ydc_role'), cred.role, isDark, accentColor: roleColor));
+                  }
+                  if (cred.isIdCardFieldVisible('position') && cred.position.isNotEmpty) {
+                    visibleRows.add(_detailRow(Icons.work_rounded, _l10n.translate('ydc_position'), cred.position, isDark, accentColor: roleColor));
+                  }
+                  if (cred.isIdCardFieldVisible('nationality') && cred.nationalityDisplay.isNotEmpty) {
+                    visibleRows.add(_detailRow(Icons.flag_rounded, _l10n.translate('ydc_nationality'),
                       '${cred.nationalityFlag} ${cred.nationalityDisplay}', isDark, accentColor: roleColor));
-                  if (cred.isIdCardFieldVisible('event_dates') && eventDates.isNotEmpty)
-                    visibleRows.add(_detailRow(Icons.calendar_today_rounded, 'Event Date', eventDates, isDark, accentColor: roleColor));
-                  if (cred.isIdCardFieldVisible('email') && cred.email.isNotEmpty)
-                    visibleRows.add(_detailRow(Icons.email_rounded, 'Email', cred.email, isDark, accentColor: roleColor));
+                  }
+                  if (cred.isIdCardFieldVisible('event_dates') && eventDates.isNotEmpty) {
+                    visibleRows.add(_detailRow(Icons.calendar_today_rounded, _l10n.translate('ydc_event_date'), eventDates, isDark, accentColor: roleColor));
+                  }
+                  if (cred.isIdCardFieldVisible('email') && cred.email.isNotEmpty) {
+                    visibleRows.add(_detailRow(Icons.email_rounded, _l10n.translate('email'), cred.email, isDark, accentColor: roleColor));
+                  }
                   // Extra fields from admin
                   for (final f in cred.extraFields) {
                     visibleRows.add(_detailRow(Icons.info_outline_rounded, f['label']!, f['value']!, isDark, accentColor: roleColor));
@@ -816,11 +826,11 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                             'assets/images/youth_dialogue/dialogue_logo_en.png',
                             width: 20,
                             height: 20,
-                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Burundi AU Chairmanship 2025-2026',
+                            'Burundi AU Chairmanship $chairmanshipYears',
                             style: TextStyle(
                               fontSize: 11,
                               color: isDark ? Colors.white30 : Colors.black26,
@@ -850,7 +860,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 22),
                 label: Text(
-                  _isDownloading ? 'Downloading...' : 'Download PDF',
+                  _l10n.translate(_isDownloading ? 'ydc_downloading' : 'ydc_download_pdf'),
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -875,7 +885,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                   Icon(Icons.picture_as_pdf_rounded, size: 18, color: isDark ? Colors.white30 : Colors.black26),
                   const SizedBox(width: 8),
                   Text(
-                    'PDF download is currently unavailable',
+                    _l10n.translate('ydc_pdf_unavailable'),
                     style: TextStyle(
                       fontSize: 14,
                       color: isDark ? Colors.white38 : Colors.black38,
@@ -886,7 +896,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
             ),
 
           DsFootnote(
-              'Works offline — show at every venue gate.',
+              _l10n.translate('ydc_works_offline'),
               center: true),
           const SizedBox(height: 20),
         ],
@@ -913,7 +923,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
       child: Image.asset(
         assetPath,
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => Icon(fallbackIcon, color: AppColors.burundiGreen, size: 28),
+        errorBuilder: (_, _, _) => Icon(fallbackIcon, color: AppColors.burundiGreen, size: 28),
       ),
     );
   }

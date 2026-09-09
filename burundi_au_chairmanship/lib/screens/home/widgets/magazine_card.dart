@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../widgets/app_network_image.dart';
 import '../../../config/app_ds.dart';
 import '../../../config/environment.dart';
 import '../../../models/magazine_model.dart';
@@ -43,7 +43,7 @@ class MagazineCard extends StatelessWidget {
               child: magazine.coverImageUrl.isEmpty
                   ? const DsImagePlaceholder(
                       radius: 0, icon: Icons.auto_stories_rounded)
-                  : CachedNetworkImage(
+                  : AppNetworkImage(
                       imageUrl: Environment.fixMediaUrl(magazine.listImage),
                       fit: BoxFit.cover,
                       placeholder: (_, _) => const DsImagePlaceholder(

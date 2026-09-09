@@ -156,7 +156,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           ),
           const SizedBox(height: 4),
           Text(
-            'Sign in to continue',
+            l10n.translate('auth_sign_in_to_continue'),
             textAlign: TextAlign.center,
             style: TextStyle(
                 fontSize: 13, color: Colors.white.withValues(alpha: 0.85)),
@@ -246,7 +246,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
   Widget _buildTabSwitch(AppLocalizations l10n, bool isDark) {
     return Container(
-      height: 48,
+      height: MediaQuery.textScalerOf(context).scale(48),
       decoration: BoxDecoration(
         color: Ds.surface(context),
         borderRadius: BorderRadius.circular(Ds.rTile),
@@ -308,12 +308,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             isDark: isDark,
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Password is required';
+                return l10n.translate('auth_password_required');
               }
               return null;
             },
             suffixIcon: IconButton(
-              tooltip: _obscureSignInPassword ? 'Show password' : 'Hide password',
+              tooltip: l10n.translate(_obscureSignInPassword ? 'auth_show_password' : 'auth_hide_password'),
               icon: Icon(
                 _obscureSignInPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -400,7 +400,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             isDark: isDark,
             onChanged: (value) => setState(() => _signUpPassword = value),
             suffixIcon: IconButton(
-              tooltip: _obscureSignUpPassword ? 'Show password' : 'Hide password',
+              tooltip: l10n.translate(_obscureSignUpPassword ? 'auth_show_password' : 'auth_hide_password'),
               icon: Icon(
                 _obscureSignUpPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -421,7 +421,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             obscureText: _obscureConfirmPassword,
             isDark: isDark,
             suffixIcon: IconButton(
-              tooltip: _obscureConfirmPassword ? 'Show password' : 'Hide password',
+              tooltip: l10n.translate(_obscureConfirmPassword ? 'auth_show_password' : 'auth_hide_password'),
               icon: Icon(
                 _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -430,8 +430,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
             ),
             validator: (value) {
-              if (value?.isEmpty ?? true) return 'Confirm password';
-              if (value != _signUpPasswordController.text) return 'Passwords don\'t match';
+              if (value?.isEmpty ?? true) return l10n.translate('auth_confirm_password_required');
+              if (value != _signUpPasswordController.text) return l10n.translate('auth_passwords_dont_match');
               return null;
             },
           ),
@@ -526,7 +526,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     required Color color,
   }) {
     return Container(
-      height: 52,
+      height: MediaQuery.textScalerOf(context).scale(52),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
@@ -624,7 +624,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   }) {
     return Semantics(
       button: true,
-      label: 'Sign in with $label',
+      label: '${AppLocalizations.of(context).translate('auth_sign_in_with')} $label',
       child: Container(
         height: 48,
         decoration: BoxDecoration(
@@ -775,6 +775,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   void _showAccountExistsDialog(BuildContext context, String email) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     showDialog(
       context: context,
@@ -792,19 +793,19 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               child: const Icon(Icons.account_circle_outlined, color: AppColors.patternOrange, size: 28),
             ),
             const SizedBox(width: 12),
-            const Expanded(
-              child: Text('Account Exists', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text(l10n.translate('auth_account_exists'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
         content: Text(
-          'An account with $email is already registered. Please sign in instead.',
+          '${l10n.translate('auth_account_exists_body_1')} $email ${l10n.translate('auth_account_exists_body_2')}',
           style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(l10n.translate('cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -817,7 +818,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               _signInEmailController.text = email;
               _tabController.animateTo(0);
             },
-            child: const Text('Go to Sign In'),
+            child: Text(l10n.translate('auth_go_to_sign_in')),
           ),
         ],
       ),
@@ -827,6 +828,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   void _showCompleteProfileDialog(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     showDialog(
       context: context,
@@ -847,7 +849,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Complete Your Profile',
+                l10n.translate('auth_complete_your_profile'),
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -862,7 +864,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Help us personalize your experience by completing your profile information.',
+              l10n.translate('auth_complete_profile_body'),
               style: TextStyle(
                 fontSize: 15,
                 height: 1.5,
@@ -883,7 +885,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'This will only take a minute',
+                      l10n.translate('auth_only_take_minute'),
                       style: TextStyle(
                         fontSize: 13,
                         color: isDark ? Colors.white70 : Colors.black87,
@@ -902,7 +904,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               Navigator.of(context).pushReplacementNamed('/home');
             },
             child: Text(
-              'Skip for Now',
+              l10n.translate('skip_for_now'),
               style: TextStyle(color: Colors.grey.shade600),
             ),
           ),
@@ -917,7 +919,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
-            child: const Text('Complete Profile', style: TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(l10n.translate('pc_complete_profile'), style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -942,7 +944,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           children: [
             const Icon(Icons.person_outline, color: Colors.white),
             const SizedBox(width: 12),
-            const Text('Continuing as guest'),
+            Text(AppLocalizations.of(context).translate('auth_continuing_as_guest')),
           ],
         ),
         backgroundColor: AppColors.burundiGreen,
@@ -956,25 +958,26 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     final emailController = TextEditingController();
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reset Password'),
+        title: Text(l10n.translate('auth_reset_password')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Enter your email address and we\'ll send you a link to reset your password.',
-              style: TextStyle(fontSize: 14),
+            Text(
+              l10n.translate('auth_reset_password_body'),
+              style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
-                hintText: 'Email',
+                hintText: l10n.email,
                 prefixIcon: const Icon(Icons.email_outlined),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -987,7 +990,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
-              'Cancel',
+              l10n.translate('cancel'),
               style: TextStyle(
                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
               ),
@@ -998,8 +1001,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               final email = emailController.text.trim();
               if (email.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter your email address'),
+                  SnackBar(
+                    content: Text(l10n.translate('auth_enter_email')),
                     backgroundColor: AppColors.burundiRed,
                   ),
                 );
@@ -1016,8 +1019,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   SnackBar(
                     content: Text(
                       success
-                          ? 'Password reset link sent to $email'
-                          : 'Failed to send reset link. Please try again.',
+                          ? '${l10n.translate('auth_reset_link_sent')} $email'
+                          : l10n.translate('auth_reset_link_failed'),
                     ),
                     backgroundColor: success ? AppColors.burundiGreen : AppColors.burundiRed,
                   ),
@@ -1028,10 +1031,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               backgroundColor: AppColors.burundiGreen,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Send Reset Link'),
+            child: Text(l10n.translate('auth_send_reset_link')),
           ),
         ],
       ),
-    );
+    ).then((_) => emailController.dispose());
   }
 }

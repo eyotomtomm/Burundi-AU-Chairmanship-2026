@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/app_colors.dart';
 import 'verified_badge.dart';
+import '../l10n/app_localizations.dart';
 
 /// Shows a success dialog when verification request is approved
 Future<void> showVerificationApprovedDialog(
@@ -39,7 +40,7 @@ Future<void> showVerificationApprovedDialog(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Congratulations!',
+                  AppLocalizations.of(context).translate('w_congratulations'),
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -54,7 +55,7 @@ Future<void> showVerificationApprovedDialog(
 
             // Message
             Text(
-              'Your verification request has been approved!',
+              AppLocalizations.of(context).translate('w_verification_approved'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -78,9 +79,9 @@ Future<void> showVerificationApprovedDialog(
                   VerifiedBadge(badgeType: badgeType, size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    badgeType == 'GOLD'
-                        ? 'Gold Badge Verified'
-                        : 'Blue Badge Verified',
+                    AppLocalizations.of(context).translate(badgeType == 'GOLD'
+                        ? 'w_gold_badge_verified'
+                        : 'w_blue_badge_verified'),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -107,8 +108,8 @@ Future<void> showVerificationApprovedDialog(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Got it!',
+                child: Text(
+                  AppLocalizations.of(context).translate('got_it'),
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -155,7 +156,7 @@ Future<bool?> showVerificationRejectedDialog(
 
             // Title
             Text(
-              'Verification Not Approved',
+              AppLocalizations.of(context).translate('w_verification_not_approved'),
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -200,7 +201,7 @@ Future<bool?> showVerificationRejectedDialog(
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Reason:',
+                        AppLocalizations.of(context).translate('w_reason_label'),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -232,8 +233,8 @@ Future<bool?> showVerificationRejectedDialog(
                   onAppeal();
                 },
                 icon: const Icon(Icons.edit_note),
-                label: const Text(
-                  'Submit an Appeal',
+                label: Text(
+                  AppLocalizations.of(context).translate('w_submit_appeal'),
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -284,7 +285,7 @@ Future<void> showAppealDialog(
   final controller = TextEditingController();
   final formKey = GlobalKey<FormState>();
 
-  return showDialog(
+  await showDialog(
     context: context,
     builder: (context) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -297,7 +298,7 @@ Future<void> showAppealDialog(
             Icon(Icons.edit_note, color: AppColors.burundiGreen),
             const SizedBox(width: 12),
             Text(
-              'Submit an Appeal',
+              AppLocalizations.of(context).translate('w_submit_appeal'),
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -313,7 +314,7 @@ Future<void> showAppealDialog(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'If you believe your request was rejected in error, please explain why you should be verified:',
+                AppLocalizations.of(context).translate('w_appeal_explain'),
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? Colors.white70 : Colors.black54,
@@ -325,7 +326,7 @@ Future<void> showAppealDialog(
                 maxLines: 5,
                 maxLength: 500,
                 decoration: InputDecoration(
-                  hintText: 'Explain why you believe this is an error...',
+                  hintText: AppLocalizations.of(context).translate('w_appeal_hint'),
                   filled: true,
                   fillColor: isDark
                       ? AppColors.darkBackground
@@ -352,10 +353,10 @@ Future<void> showAppealDialog(
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Please provide a reason for your appeal';
+                    return AppLocalizations.of(context).translate('w_appeal_reason_required');
                   }
                   if (value.trim().length < 20) {
-                    return 'Please provide more details (at least 20 characters)';
+                    return AppLocalizations.of(context).translate('w_appeal_more_details');
                   }
                   return null;
                 },
@@ -372,7 +373,7 @@ Future<void> showAppealDialog(
                 color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
               ),
             ),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context).translate('cancel')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -385,10 +386,11 @@ Future<void> showAppealDialog(
               backgroundColor: AppColors.burundiGreen,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Submit Appeal'),
+            child: Text(AppLocalizations.of(context).translate('w_submit_appeal')),
           ),
         ],
       );
     },
   );
+  controller.dispose();
 }

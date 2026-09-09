@@ -241,7 +241,7 @@ function autoTranslate() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-CSRFToken': getCookie('csrftoken'),
+      'X-CSRFToken': (document.querySelector('meta[name="csrf-token"]') || {}).content || getCookie('csrftoken'),
     },
     body: JSON.stringify({
       text: sourceText,

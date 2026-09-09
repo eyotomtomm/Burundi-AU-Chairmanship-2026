@@ -22,6 +22,8 @@ import 'pdf_viewer_screen.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../services/share_service.dart';
+import '../../services/data_saver_service.dart';
+import '../../widgets/bookmark_button.dart';
 
 class MagazineDetailScreen extends StatefulWidget {
   final MagazineEdition magazine;
@@ -197,7 +199,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
     } on ApiException catch (e) {
       if (mounted) { setState(() => _postingComment = false); showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId); }
     } catch (e) {
-      if (mounted) { setState(() => _postingComment = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
+      if (mounted) { setState(() => _postingComment = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).translate('generic_error')))); }
     }
   }
 
@@ -220,7 +222,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
       await ApiService().deleteMagazineComment(_magazine.id, comment.id);
       if (mounted) setState(() => _comments.removeWhere((c) => c.id == comment.id));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : AppLocalizations.of(context).translate('generic_error'))));
     }
   }
 
@@ -243,7 +245,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
     final url = _magazine.openablePdfUrl;
     if (url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDF not available yet.'), behavior: SnackBarBehavior.floating));
+        SnackBar(content: Text(AppLocalizations.of(context).translate('pdf_not_available')), behavior: SnackBarBehavior.floating));
       return;
     }
     Navigator.push(context, CupertinoPageRoute(
@@ -329,9 +331,16 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
             child: DsHeader(
               title: l10n.translate('magazine'),
               actions: [
+                BookmarkButton(
+                  contentType: 'magazine',
+                  contentId: int.tryParse(_magazine.id) ?? 0,
+                  onDarkHeader: true,
+                ),
+                const SizedBox(width: 4),
                 Builder(
                   builder: (btnContext) => DsHeaderAction(
                     Icons.share_rounded,
+                    label: l10n.translate('share'),
                     onTap: () => ShareService.item(
                       btnContext,
                       kind: 'magazines',
@@ -422,7 +431,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
                     // ── Date · pages · size ──
                     Text(
                       [
-                        DateFormat('MMMM yyyy').format(_magazine.publishDate),
+                        DateFormat.yMMMM(Localizations.localeOf(context).languageCode).format(_magazine.publishDate),
                         if (_magazine.pageCount > 0) '${_magazine.pageCount} pages',
                         if (_magazine.fileSize.isNotEmpty) _magazine.fileSize,
                       ].join('  ·  '),
@@ -586,6 +595,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
             ? frame(SizedBox(width: width, height: height, child: _coverPlaceholder()))
             : CachedNetworkImage(
                 imageUrl: imageUrl,
+                memCacheWidth: DataSaverService().heroCacheWidth,
                 imageBuilder: (_, provider) =>
                     frame(Image(image: provider, fit: BoxFit.contain)),
                 placeholder: (_, _) =>
@@ -624,7 +634,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
             focusNode: _commentFocusNode,
             decoration: InputDecoration(
               hintText: _replyingToName != null
-                  ? '${langCode == 'fr' ? 'Repondre a' : 'Reply to'} $_replyingToName...'
+                  ? '${langCode == 'fr' ? 'Répondre à' : 'Reply to'} $_replyingToName...'
                   : l10n.translate('add_comment'),
               hintStyle: const TextStyle(fontSize: 14),
               border: OutlineInputBorder(
@@ -633,6 +643,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               suffixIcon: _replyingToId != null
                   ? IconButton(
+                      tooltip: AppLocalizations.of(context).translate('cancel'),
                       icon: const Icon(Icons.close, size: 18),
                       onPressed: _cancelReply,
                     )
@@ -643,6 +654,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
         ),
         const SizedBox(width: 8),
         IconButton(
+          tooltip: AppLocalizations.of(context).translate('send'),
           icon: _postingComment
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.send_rounded, color: AppColors.burundiGreen),

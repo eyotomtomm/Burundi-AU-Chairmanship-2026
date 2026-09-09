@@ -4,6 +4,7 @@ import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
+import '../../widgets/async_content_view.dart';
 
 class NotificationPreferencesScreen extends StatefulWidget {
   const NotificationPreferencesScreen({super.key});
@@ -16,6 +17,7 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
   final ApiService _api = ApiService();
   Map<String, dynamic> _prefs = {};
   bool _loading = true;
+  String? _error;
 
   // Feature toggles from admin
   bool _discussionsFeatureEnabled = true;
@@ -41,10 +43,20 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       _prefs = await _api.getNotificationPreferences();
-    } catch (_) {}
+    } catch (e) {
+      // Don't render every toggle as "on" when we don't actually know.
+      if (mounted) {
+        _error = e is ApiException
+            ? e.message
+            : AppLocalizations.of(context).translate('st_could_not_load_prefs');
+      }
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -52,62 +64,73 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
     setState(() => _prefs[key] = value);
     try {
       await _api.updateNotificationPreferences({key: value});
-    } catch (_) {
-      if (mounted) setState(() => _prefs[key] = !value);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _prefs[key] = !value);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e is ApiException
+            ? e.message
+            : AppLocalizations.of(context).translate('st_could_not_save_pref')),
+        backgroundColor: Ds.red,
+      ));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final fr = Localizations.localeOf(context).languageCode == 'fr';
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(title: Text(l10n.translate('notification_preferences'))),
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-          : ListView(
+          : _error != null
+              ? AsyncContentView(
+                  state: AsyncContentState.error,
+                  errorSubtitle: _error,
+                  onRetry: _load,
+                  child: const SizedBox.shrink(),
+                )
+              : ListView(
               padding: const EdgeInsets.only(top: 16, bottom: 32),
               children: [
                 // Master switch sits alone in the comp, on a green-tinted icon.
                 DsTileGroup(children: [
-                  _toggle('push_enabled', fr ? 'Notifications push' : 'Push notifications',
+                  _toggle('push_enabled', l10n.translate('st_push_notifications'),
                       Icons.notifications_active_rounded, primary: true),
-                  _toggle('email_enabled', fr ? 'Notifications e-mail' : 'Email notifications',
+                  _toggle('email_enabled', l10n.translate('st_email_notifications'),
                       Icons.mail_rounded, primary: true),
                 ]),
-                DsGroupLabel(fr ? 'Sujets' : 'Topics',
+                DsGroupLabel(l10n.translate('st_topics'),
                     padding: const EdgeInsets.fromLTRB(22, 0, 22, 8)),
                 DsTileGroup(children: [
                   _toggle('articles_enabled',
-                      fr ? 'Actualités' : 'Breaking news', Icons.newspaper_rounded),
+                      l10n.translate('st_breaking_news'), Icons.newspaper_rounded),
                   _toggle('events_enabled',
-                      fr ? 'Rappels d’événements' : 'Event reminders', Icons.event_rounded),
+                      l10n.translate('st_event_reminders'), Icons.event_rounded),
                   _toggle('live_feeds_enabled',
-                      fr ? 'Alertes de direct' : 'Live stream alerts', Icons.live_tv_rounded),
+                      l10n.translate('st_live_alerts'), Icons.live_tv_rounded),
                   _toggle('magazines_enabled',
-                      fr ? 'Nouveaux numéros' : 'New magazine issues', Icons.auto_stories_rounded),
+                      l10n.translate('st_new_issues'), Icons.auto_stories_rounded),
                 ]),
-                DsGroupLabel(fr ? 'Participation' : 'Engagement',
+                DsGroupLabel(l10n.translate('st_engagement'),
                     padding: const EdgeInsets.fromLTRB(22, 0, 22, 8)),
                 DsTileGroup(children: [
                   if (_discussionsFeatureEnabled)
                     _toggle('discussions_enabled',
-                        fr ? 'Discussions' : 'Discussions', Icons.forum_rounded),
+                        l10n.translate('discussions'), Icons.forum_rounded),
                   if (_pollsFeatureEnabled)
-                    _toggle('polls_enabled', fr ? 'Sondages' : 'Polls', Icons.ballot_rounded),
-                  _toggle('messages_enabled', fr ? 'Messages' : 'Messages', Icons.chat_rounded),
+                    _toggle('polls_enabled', l10n.translate('polls'), Icons.ballot_rounded),
+                  _toggle('messages_enabled', l10n.translate('st_messages'), Icons.chat_rounded),
                 ]),
-                DsGroupLabel(fr ? 'Horaires' : 'Schedule',
+                DsGroupLabel(l10n.translate('st_schedule'),
                     padding: const EdgeInsets.fromLTRB(22, 0, 22, 8)),
                 DsTileGroup(children: [
                   _toggle('quiet_hours_enabled',
-                      fr ? 'Heures silencieuses' : 'Quiet hours', Icons.nights_stay_rounded),
+                      l10n.translate('st_quiet_hours'), Icons.nights_stay_rounded),
                 ]),
-                DsFootnote(fr
-                    ? 'Heures silencieuses 22:00–07:00 · Les notifications sont muettes la nuit.'
-                    : 'Quiet hours 22:00–07:00.'),
+                DsFootnote(l10n.translate('st_quiet_hours_note')),
               ],
             ),
     );

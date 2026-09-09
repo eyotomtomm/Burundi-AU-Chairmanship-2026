@@ -7,6 +7,10 @@ from django.conf import settings
 import os
 from PIL import Image
 
+# Decompression-bomb guard: PIL raises DecompressionBombError above this.
+Image.MAX_IMAGE_PIXELS = 40_000_000
+MAX_IMAGE_DIMENSION = 8000
+
 
 def validate_image_file(file):
     """
@@ -51,10 +55,16 @@ def validate_image_file(file):
     try:
         file.seek(0)
         img = Image.open(file)
+        width, height = img.size
         img.verify()
         file.seek(0)
     except Exception:
         raise ValidationError('Image file is corrupt or has an invalid internal structure.')
+
+    if width > MAX_IMAGE_DIMENSION or height > MAX_IMAGE_DIMENSION:
+        raise ValidationError(
+            f'Image dimensions too large. Maximum is {MAX_IMAGE_DIMENSION}x{MAX_IMAGE_DIMENSION} pixels.'
+        )
 
     return file
 
@@ -230,6 +240,17 @@ def validate_video_file(file):
         raise ValidationError(
             f'Invalid video format. Allowed formats: {", ".join(settings.ALLOWED_VIDEO_EXTENSIONS)}'
         )
+
+    # Sniff the container: ISO BMFF (mp4/mov/m4v) has 'ftyp' at offset 4;
+    # Matroska/WebM starts with the EBML magic; AVI is RIFF....AVI .
+    file.seek(0)
+    header = file.read(12)
+    file.seek(0)
+    is_isobmff = header[4:8] == b'ftyp'
+    is_ebml = header[:4] == b'\x1a\x45\xdf\xa3'
+    is_avi = header[:4] == b'RIFF' and header[8:12] == b'AVI '
+    if not (is_isobmff or is_ebml or is_avi):
+        raise ValidationError('File content does not match a valid video format.')
 
     return file
 

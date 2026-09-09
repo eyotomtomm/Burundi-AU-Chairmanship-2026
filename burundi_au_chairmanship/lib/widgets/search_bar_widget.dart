@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../l10n/app_localizations.dart';
 
 class SearchBarWidget extends StatefulWidget {
   final String hintText;
@@ -74,6 +75,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           ),
           if (_controller.text.isNotEmpty)
             IconButton(
+              tooltip: AppLocalizations.of(context).translate('w_clear'),
               icon: Icon(
                 Icons.clear,
                 color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),

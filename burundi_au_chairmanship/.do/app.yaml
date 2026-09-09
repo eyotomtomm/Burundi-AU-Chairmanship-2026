@@ -1,10 +1,30 @@
 # DigitalOcean App Platform Specification
-# Deploy: doctl apps create --spec .do/app.yaml
-# Update: doctl apps update <app-id> --spec .do/app.yaml
 #
-# Before deploying, set encrypted env vars in DO dashboard:
-#   DJANGO_SECRET_KEY, DATABASE_URL, EMAIL_HOST_PASSWORD,
-#   SENTRY_DSN, etc.
+# ⚠ THIS FILE IS NOT WHAT IS DEPLOYED. Read this before trusting it.
+#
+# Production runs an app named `monkfish-app`, whose spec App Platform stores
+# itself; deploys happen on push to main, not from this file. The two have
+# drifted, and this one describes components that do not exist:
+#
+#   - a Redis component and a Celery worker (`celery -A config worker -B`).
+#     Production has neither. REDIS_URL is unset, so CELERY_TASK_ALWAYS_EAGER
+#     makes every .delay() run inline in the web request, and scheduled work
+#     runs in a `scheduler` worker via `python manage.py run_scheduler`.
+#   - a two-node HA Postgres. Production is a single managed cluster,
+#     db-postgresql-fra1-49319.
+#   - a `pre-deploy` job. Production had none until 2026-09-09, which meant
+#     both web instances raced `migrate` on every deploy — see the duplicate
+#     0133 row in django_migrations.
+#
+# It is also stale in detail: DJANGO_ALLOWED_HOSTS below names
+# monkfish-app-afde5.ondigitalocean.app; the live host is
+# monkfish-app-afde5.ondigitalocean.app.
+#
+# To read the truth:  doctl apps spec get <app-id>
+# To change it:       doctl apps update <app-id> --spec <file>
+#
+# Keep this file as the intended target architecture, not as a description of
+# production, and do not apply it without reconciling the two first.
 
 name: burundi-au-chairmanship
 
@@ -18,12 +38,17 @@ services:
       deploy_on_push: false
     source_dir: /burundi_au_chairmanship/backend
     environment_slug: python
-    instance_count: 1
+    # Matches deployed production (2 instances). Do not lower this
+    # without meaning to: applying the spec would halve web capacity.
+    instance_count: 2
     instance_size_slug: professional-xs  # $12/mo, 1 vCPU, 1GB RAM
     http_port: 8080
     # ASGI via gunicorn + uvicorn workers — serves both HTTP and WebSocket.
     # Migrate and collectstatic run once in the pre-deploy job below.
     run_command: gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -c gunicorn.conf.py
+    # /api/health/ returns {"status":"ok"} for anonymous callers — it proves the
+    # ASGI worker is up and routing, not that Postgres/Redis are reachable
+    # (component checks are staff-only). DB/cache failures surface via Sentry.
     health_check:
       http_path: /api/health/
       initial_delay_seconds: 60
@@ -38,25 +63,50 @@ services:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,monkfish-app-afde5.ondigitalocean.app"
       - key: SITE_URL
         value: "https://burundi4africa.com"
+      # OTP and system mail send from the chairmanship domain, whose SMTP is
+      # SPF/DKIM-aligned for that From address. Gmail is the fallback below.
+      # Writes an EmailLog row for every message so the admin's Email Logs page
+      # has something in it, and carries the SMTP fallback for all mail rather
+      # than OTP alone. Honours fail_silently, so failures still surface.
       - key: EMAIL_BACKEND
-        value: "django.core.mail.backends.smtp.EmailBackend"
+        value: "core.email_backend.LoggingEmailBackend"
       - key: EMAIL_HOST
-        value: "smtp.gmail.com"
+        value: "smtp.burundichairship.africa"
       - key: EMAIL_PORT
-        value: "587"
+        value: "465"
       - key: EMAIL_USE_TLS
+        value: "False"
+      - key: EMAIL_USE_SSL
         value: "True"
       - key: EMAIL_HOST_USER
-        value: "info@burundi4africa.com"
+        value: "info@burundichairship.africa"
       - key: DEFAULT_FROM_EMAIL
+        value: "Be 4 Africa <info@burundichairship.africa>"
+      # Fallback, used only when the primary host refuses the connection.
+      - key: FALLBACK_EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: FALLBACK_EMAIL_PORT
+        value: "587"
+      - key: FALLBACK_EMAIL_USE_TLS
+        value: "True"
+      - key: FALLBACK_EMAIL_USE_SSL
+        value: "False"
+      - key: FALLBACK_EMAIL_HOST_USER
+        value: "info@burundi4africa.com"
+      - key: FALLBACK_FROM_EMAIL
         value: "Be 4 Africa <info@burundi4africa.com>"
       - key: SENTRY_ENVIRONMENT
         value: "production"
+      # ${_self.COMMIT_HASH} is the git SHA App Platform built this component from.
       - key: SENTRY_RELEASE
-        value: "burundi-au-backend@1.0.0"
+        value: "burundi-au-backend@${_self.COMMIT_HASH}"
+      # Play App Signing certificate SHA-256 (comma-separated if several). Set in
+      # the dashboard so App Links verify for the Play-signed build. See config/urls.py.
+      - key: ANDROID_PLAY_SIGNING_SHA256
+        value: ""
       - key: SENTRY_TRACES_SAMPLE_RATE
         value: "0.2"
       # Sensitive — set as ENCRYPTED in DigitalOcean dashboard
@@ -74,6 +124,10 @@ services:
         type: SECRET
         value: ""
       - key: EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      # The Gmail app password, now used only by the fallback path.
+      - key: FALLBACK_EMAIL_HOST_PASSWORD
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
       - key: SENTRY_DSN
@@ -124,13 +178,54 @@ workers:
     source_dir: /burundi_au_chairmanship/backend
     environment_slug: python
     instance_count: 1
-    instance_size_slug: professional-xs
+    # basic-xs (1 vCPU / 1GB) is enough for periodic jobs, email and
+    # image work. professional-xs costs ~2.5x for headroom we do not use.
+    instance_size_slug: basic-xs
     run_command: celery -A config worker -B -l info --concurrency=2
     envs:
       - key: DJANGO_DEBUG
         value: "False"
+      # Mirrors the api service: tasks send email and build absolute media URLs.
+      - key: SITE_URL
+        value: "https://burundi4africa.com"
+      # OTP and system mail send from the chairmanship domain, whose SMTP is
+      # SPF/DKIM-aligned for that From address. Gmail is the fallback below.
+      # Writes an EmailLog row for every message so the admin's Email Logs page
+      # has something in it, and carries the SMTP fallback for all mail rather
+      # than OTP alone. Honours fail_silently, so failures still surface.
+      - key: EMAIL_BACKEND
+        value: "core.email_backend.LoggingEmailBackend"
+      - key: EMAIL_HOST
+        value: "smtp.burundichairship.africa"
+      - key: EMAIL_PORT
+        value: "465"
+      - key: EMAIL_USE_TLS
+        value: "False"
+      - key: EMAIL_USE_SSL
+        value: "True"
+      - key: EMAIL_HOST_USER
+        value: "info@burundichairship.africa"
+      - key: DEFAULT_FROM_EMAIL
+        value: "Be 4 Africa <info@burundichairship.africa>"
+      # Fallback, used only when the primary host refuses the connection.
+      - key: FALLBACK_EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: FALLBACK_EMAIL_PORT
+        value: "587"
+      - key: FALLBACK_EMAIL_USE_TLS
+        value: "True"
+      - key: FALLBACK_EMAIL_USE_SSL
+        value: "False"
+      - key: FALLBACK_EMAIL_HOST_USER
+        value: "info@burundi4africa.com"
+      - key: FALLBACK_FROM_EMAIL
+        value: "Be 4 Africa <info@burundi4africa.com>"
+      - key: CDN_DOMAIN
+        value: "burundi-au-media.fra1.cdn.digitaloceanspaces.com"
+      - key: SENTRY_RELEASE
+        value: "burundi-au-backend@${_self.COMMIT_HASH}"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,monkfish-app-afde5.ondigitalocean.app"
       - key: DJANGO_SECRET_KEY
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
@@ -162,6 +257,10 @@ workers:
       - key: EMAIL_HOST_PASSWORD
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
+      # The Gmail app password, now used only by the fallback path.
+      - key: FALLBACK_EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
       - key: SENTRY_DSN
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
@@ -170,6 +269,12 @@ workers:
 
 # Pre-deploy job — runs ONCE per deploy, before any web container starts.
 # This prevents migration races when instance_count > 1.
+      # The daily news auto-fetch runs here and writes headlines with Gemini.
+      # Without this the worker silently falls back to truncated titles while
+      # the api service (which has the key) produces good ones.
+      - key: GEMINI_API_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
 jobs:
   - name: pre-deploy
     kind: PRE_DEPLOY
@@ -184,7 +289,7 @@ jobs:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,monkfish-app-afde5.ondigitalocean.app"
       - key: DJANGO_SECRET_KEY
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"

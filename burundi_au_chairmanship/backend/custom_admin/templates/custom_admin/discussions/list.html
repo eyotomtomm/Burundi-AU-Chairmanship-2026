@@ -79,6 +79,9 @@
             </td>
             <td class="px-6 py-4 text-right">
               <div class="flex items-center justify-end gap-1">
+                <a href="{% url 'custom_admin:comment_engagement' %}?type=discussion&amp;content={{ d.pk }}" class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Likes &amp; comments">
+                    <span class="material-symbols-outlined text-xl">add_reaction</span>
+                </a>
                 <form method="post" action="{% url 'custom_admin:discussion_toggle_pin' d.pk %}" class="inline">{% csrf_token %}
                   <button type="submit" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="{% if d.is_pinned %}Unpin{% else %}Pin{% endif %}">
                     <span class="material-symbols-outlined text-xl">push_pin</span>

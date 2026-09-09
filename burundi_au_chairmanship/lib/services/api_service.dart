@@ -10,6 +10,7 @@ import '../config/app_constants.dart';
 import '../config/environment.dart';
 import '../main.dart' show getOrCreateDeviceId;
 import '../models/api_models.dart';
+import '../l10n/app_localizations.dart';
 import '../models/magazine_model.dart';
 import '../models/event_registration_model.dart';
 import '../models/location_model.dart';
@@ -17,6 +18,14 @@ import '../models/fact_model.dart';
 import 'pinned_http_client.dart';
 
 /// Wraps a single page of results from a paginated DRF response.
+/// One page of the Explore feed, plus whether another follows it.
+class FeedPage {
+  final List<Map<String, dynamic>> posts;
+  final bool hasMore;
+
+  const FeedPage({required this.posts, required this.hasMore});
+}
+
 class PaginatedResponse<T> {
   final int count;
   final String? next;
@@ -75,6 +84,19 @@ class ApiService {
   /// UI can listen to this to show a "Reconnecting..." banner.
   final ValueNotifier<bool> authDegraded = ValueNotifier<bool>(false);
 
+  /// Fired when a 401 could not be recovered by refreshing credentials.
+  /// AuthProvider sets this to its sign-out path.
+  static void Function()? onSessionExpired;
+
+  // Firebase ID tokens last 1h. Cache the last good one (keyed by uid) so a
+  // request doesn't pay for getIdToken() every time; after a failure back off
+  // for 30s instead of stalling every call on two 5s timeouts.
+  String? _cachedIdToken;
+  String? _cachedIdTokenUid;
+  DateTime? _cachedIdTokenExpiry;
+  DateTime? _firebaseDegradedUntil;
+  bool _refreshingJwt = false;
+
   Future<Map<String, String>> _headers({bool auth = false, bool noAutoAuth = false}) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -93,32 +115,12 @@ class ApiService {
     // backend can return personalised fields (is_liked, etc.)
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser != null) {
-      // First attempt: cached token (5s ceiling so a stalled SDK
-      // doesn't block the entire API call indefinitely)
-      try {
-        final idToken = await firebaseUser
-            .getIdToken()
-            .timeout(const Duration(seconds: 5));
-        if (idToken != null) {
-          headers['Authorization'] = 'Bearer $idToken';
-          _notifyAuthHealthy();
-          return headers;
-        }
-      } catch (_) {}
-
-      // Second attempt: force-refresh the token
-      try {
-        final idToken = await firebaseUser
-            .getIdToken(true)
-            .timeout(const Duration(seconds: 5));
-        if (idToken != null) {
-          headers['Authorization'] = 'Bearer $idToken';
-          _notifyAuthHealthy();
-          return headers;
-        }
-      } catch (_) {}
-
-      // Both Firebase attempts failed — we're degraded
+      final idToken = await _firebaseIdToken(firebaseUser);
+      if (idToken != null) {
+        headers['Authorization'] = 'Bearer $idToken';
+        _notifyAuthHealthy();
+        return headers;
+      }
       _notifyAuthDegraded();
     }
     if (auth) {
@@ -129,6 +131,96 @@ class ApiService {
       }
     }
     return headers;
+  }
+
+  /// Returns a valid Firebase ID token, from cache when possible.
+  /// [force] bypasses the cache and the 30s back-off (used after a 401).
+  Future<String?> _firebaseIdToken(User user, {bool force = false}) async {
+    final now = DateTime.now();
+    if (!force &&
+        _cachedIdToken != null &&
+        _cachedIdTokenUid == user.uid &&
+        _cachedIdTokenExpiry != null &&
+        now.isBefore(_cachedIdTokenExpiry!)) {
+      return _cachedIdToken;
+    }
+    if (!force && _firebaseDegradedUntil != null && now.isBefore(_firebaseDegradedUntil!)) {
+      return null;
+    }
+    // Cached SDK token first (5s ceiling so a stalled SDK can't block the
+    // call), then one force-refresh.
+    String? token = await _tryGetIdToken(user, force);
+    if (token == null && !force) token = await _tryGetIdToken(user, true);
+    if (token == null) {
+      _firebaseDegradedUntil = now.add(const Duration(seconds: 30));
+      return null;
+    }
+    _cachedIdToken = token;
+    _cachedIdTokenUid = user.uid;
+    _cachedIdTokenExpiry = _jwtExpiry(token) ?? now.add(const Duration(minutes: 55));
+    _firebaseDegradedUntil = null;
+    return token;
+  }
+
+  static Future<String?> _tryGetIdToken(User user, bool refresh) async {
+    try {
+      return await user.getIdToken(refresh).timeout(const Duration(seconds: 5));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// `exp` claim of a JWT minus a 1-minute safety margin, or null.
+  static DateTime? _jwtExpiry(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final payload = json.decode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      final exp = payload['exp'];
+      if (exp is! num) return null;
+      return DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000)
+          .subtract(const Duration(minutes: 1));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Called on a 401. Firebase users get a force-refreshed ID token; legacy
+  /// JWT users go through auth/refresh/. Returns true if the request should
+  /// be retried. An unrecoverable JWT session is cleared and
+  /// [onSessionExpired] fires.
+  Future<bool> _recoverAuth() async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
+      return await _firebaseIdToken(firebaseUser, force: true) != null;
+    }
+    // ponytail: the refresh call itself (and any concurrent 401) just fails;
+    // no shared future needed at this request volume.
+    if (_refreshingJwt) return false;
+    final refresh = await _secureStorage.read(key: AppConstants.refreshTokenKey);
+    if (refresh == null || refresh.isEmpty) return false;
+    _refreshingJwt = true;
+    try {
+      final data = await refreshToken(refresh);
+      final access = data['access'] as String?;
+      if (access == null || access.isEmpty) throw ApiException('No access token', 401);
+      await _secureStorage.write(key: AppConstants.userTokenKey, value: access);
+      final rotated = data['refresh'] as String?;
+      if (rotated != null && rotated.isNotEmpty) {
+        await _secureStorage.write(key: AppConstants.refreshTokenKey, value: rotated);
+      }
+      return true;
+    } on ApiException catch (e) {
+      // Only a definitive rejection ends the session; a network blip doesn't.
+      if (e.statusCode >= 400 && e.statusCode < 500) {
+        await _secureStorage.delete(key: AppConstants.userTokenKey);
+        await _secureStorage.delete(key: AppConstants.refreshTokenKey);
+        onSessionExpired?.call();
+      }
+      return false;
+    } finally {
+      _refreshingJwt = false;
+    }
   }
 
   void _notifyAuthDegraded() {
@@ -172,11 +264,21 @@ class ApiService {
   ) async {
     const maxRetries = 2;
     const retryableStatuses = {429, 500, 502, 504};
+    var refreshed = false;
 
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
       final headers = await fetchHeaders();
-      final response = await execute(headers);
-      final status = response.statusCode;
+      var response = await execute(headers);
+      var status = response.statusCode;
+
+      // 401: refresh credentials once and re-issue the same request.
+      if (status == 401 && !refreshed) {
+        refreshed = true;
+        if (await _recoverAuth()) {
+          response = await execute(await fetchHeaders());
+          status = response.statusCode;
+        }
+      }
 
       // Maintenance 503 — redirect and stop, never retry.
       // Check header first (survives Cloudflare HTML replacement),
@@ -264,7 +366,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed: $e', 0);
+      throw ApiException.connection(e);
     }
   }
 
@@ -287,53 +389,51 @@ class ApiService {
     bool auth = false,
     bool noAutoAuth = false,
     Map<String, String>? extraHeaders,
+  }) =>
+      _send('POST', endpoint, body,
+          auth: auth, noAutoAuth: noAutoAuth, extraHeaders: extraHeaders);
+
+  Future<dynamic> _put(String endpoint, Map<String, dynamic> body, {bool auth = false}) =>
+      _send('PUT', endpoint, body, auth: auth);
+
+  Future<dynamic> _patch(String endpoint, Map<String, dynamic> body, {bool auth = false}) =>
+      _send('PATCH', endpoint, body, auth: auth);
+
+  /// Shared POST/PUT/PATCH path. Status and content-type are checked before
+  /// decoding so an HTML 502 page becomes a clean ApiException, not a
+  /// FormatException string.
+  Future<dynamic> _send(
+    String method,
+    String endpoint,
+    Map<String, dynamic> body, {
+    bool auth = false,
+    bool noAutoAuth = false,
+    Map<String, String>? extraHeaders,
   }) async {
     try {
+      final uri = Uri.parse('$_baseUrl/$endpoint');
       final encodedBody = json.encode(body);
       final response = await _retryOnTransient(
         (headers) {
           if (extraHeaders != null) headers.addAll(extraHeaders);
-          return _client
-              .post(
-                Uri.parse('$_baseUrl/$endpoint'),
-                headers: headers,
-                body: encodedBody,
-              )
-              .timeout(const Duration(seconds: 20));
+          final call = switch (method) {
+            'PUT' => _client.put(uri, headers: headers, body: encodedBody),
+            'PATCH' => _client.patch(uri, headers: headers, body: encodedBody),
+            _ => _client.post(uri, headers: headers, body: encodedBody),
+          };
+          return call.timeout(const Duration(seconds: 20));
         },
         () => _headers(auth: auth, noAutoAuth: noAutoAuth),
       );
-      final data = json.decode(response.body);
+      final data = _decodeJsonBody(response);
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return data;
+        return data ?? <String, dynamic>{};
       }
-      // Extract error message
-      String message = 'Request failed';
-      String? referenceId;
-      if (data is Map) {
-        if (data.containsKey('detail')) {
-          message = data['detail'];
-        } else {
-          // Collect field errors
-          final errors = <String>[];
-          data.forEach((key, value) {
-            if (value is List) {
-              errors.addAll(value.map((e) => e.toString()));
-            } else {
-              errors.add(value.toString());
-            }
-          });
-          if (errors.isNotEmpty) message = errors.join('\n');
-        }
-        if (data.containsKey('reference_id')) {
-          referenceId = data['reference_id']?.toString();
-        }
-      }
-      throw ApiException(message, response.statusCode, referenceId: referenceId);
+      throw _errorFromBody(data, response.statusCode);
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed: $e', 0);
+      throw ApiException.connection(e);
     }
   }
 
@@ -346,54 +446,51 @@ class ApiService {
         () => _headers(auth: auth),
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (response.body.isEmpty) return {};
-        return json.decode(response.body);
+        return _decodeJsonBody(response) ?? <String, dynamic>{};
       }
-      throw ApiException('HTTP ${response.statusCode}', response.statusCode);
+      throw _errorFromBody(_decodeJsonBody(response), response.statusCode);
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException.connection(e);
     }
   }
 
-  Future<dynamic> _patch(
-    String endpoint,
-    Map<String, dynamic> body, {
-    bool auth = false,
-  }) async {
+  /// Decoded JSON body, or null when the server didn't send JSON
+  /// (empty 204, Cloudflare/HTML error pages).
+  static dynamic _decodeJsonBody(http.Response response) {
+    if (response.body.isEmpty) return null;
+    if (!(response.headers['content-type'] ?? '').contains('json')) return null;
     try {
-      final encodedBody = json.encode(body);
-      final response = await _retryOnTransient(
-        (headers) => _client
-            .patch(
-              Uri.parse('$_baseUrl/$endpoint'),
-              headers: headers,
-              body: encodedBody,
-            )
-            .timeout(const Duration(seconds: 20)),
-        () => _headers(auth: auth),
-      );
-      final data = json.decode(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return data;
-      }
-      String message = 'Request failed';
-      String? referenceId;
-      if (data is Map) {
-        if (data.containsKey('detail')) {
-          message = data['detail'];
-        }
-        if (data.containsKey('reference_id')) {
-          referenceId = data['reference_id']?.toString();
-        }
-      }
-      throw ApiException(message, response.statusCode, referenceId: referenceId);
-    } on ApiException {
-      rethrow;
-    } catch (e) {
-      throw ApiException('Connection failed: $e', 0);
+      return json.decode(response.body);
+    } catch (_) {
+      return null;
     }
+  }
+
+  /// Build a user-facing ApiException from a DRF error body (or none).
+  static ApiException _errorFromBody(dynamic data, int status) {
+    String message = status >= 500 ? AppLocalizations.current.server_error_retry : AppLocalizations.current.request_failed;
+    String? referenceId;
+    if (data is Map) {
+      if (data['detail'] != null) {
+        message = data['detail'].toString();
+      } else {
+        // Collect field errors
+        final errors = <String>[];
+        data.forEach((key, value) {
+          if (key == 'reference_id') return;
+          if (value is List) {
+            errors.addAll(value.map((e) => e.toString()));
+          } else {
+            errors.add(value.toString());
+          }
+        });
+        if (errors.isNotEmpty) message = errors.join('\n');
+      }
+      referenceId = data['reference_id']?.toString();
+    }
+    return ApiException(message, status, referenceId: referenceId);
   }
 
   /// Extract results from paginated or flat list responses
@@ -403,53 +500,6 @@ class ApiService {
       return data['results'] as List<dynamic>;
     }
     return [];
-  }
-
-  /// Fetch a single page with pagination metadata.
-  Future<PaginatedResponse<T>> _getPaginated<T>(
-    String endpoint,
-    T Function(dynamic) fromItem, {
-    bool auth = false,
-    Map<String, String>? queryParams,
-  }) async {
-    final data = await _get(endpoint, auth: auth, queryParams: queryParams);
-    if (data is Map<String, dynamic> && data.containsKey('results')) {
-      return PaginatedResponse.fromJson(data, fromItem);
-    }
-    // Non-paginated fallback (endpoint returns bare list)
-    final items = _extractResults(data);
-    return PaginatedResponse<T>(
-      count: items.length,
-      results: items.map((e) => fromItem(e)).toList(),
-    );
-  }
-
-  /// Fetch all pages of a paginated endpoint and combine results.
-  /// Safety cap at [maxPages] to prevent runaway requests.
-  Future<List<T>> _fetchAllPages<T>(
-    String endpoint,
-    T Function(dynamic) fromItem, {
-    bool auth = false,
-    Map<String, String>? queryParams,
-    int maxPages = 50,
-  }) async {
-    final allResults = <T>[];
-    var page = 1;
-    final params = Map<String, String>.from(queryParams ?? {});
-
-    while (page <= maxPages) {
-      params['page'] = page.toString();
-      final response = await _getPaginated<T>(
-        endpoint,
-        fromItem,
-        auth: auth,
-        queryParams: params,
-      );
-      allResults.addAll(response.results);
-      if (!response.hasNext) break;
-      page++;
-    }
-    return allResults;
   }
 
   // ── Auth ────────────────────────────────────────────────
@@ -605,7 +655,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException(AppLocalizations.current.connection_failed, 0);
     }
   }
 
@@ -638,7 +688,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException(AppLocalizations.current.connection_failed, 0);
     }
   }
 
@@ -657,7 +707,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException(AppLocalizations.current.connection_failed, 0);
     }
   }
 
@@ -676,7 +726,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException(AppLocalizations.current.connection_failed, 0);
     }
   }
 
@@ -697,18 +747,12 @@ class ApiService {
   }
 
   // ── Articles ─────────────────────────────────────────────
-  Future<List<Article>> getArticles({bool? featured}) async {
-    String endpoint = 'articles/?content_type=article';
-    if (featured != null) endpoint += '&is_featured=$featured';
-    final data = await _get(endpoint);
-    return _extractResults(data)
-        .map((j) => Article.fromJson(j))
-        .toList();
-  }
-
+  /// Every post. News and articles were never two things editorially — the
+  /// admin form preselected 'article', so the split only recorded which
+  /// option happened to be highlighted. One feed now.
   Future<List<Article>> getNews({bool? featured}) async {
-    String endpoint = 'articles/?content_type=news';
-    if (featured != null) endpoint += '&is_featured=$featured';
+    String endpoint = 'articles/?';
+    if (featured != null) endpoint += 'is_featured=$featured';
     final data = await _get(endpoint);
     return _extractResults(data)
         .map((j) => Article.fromJson(j))
@@ -1048,7 +1092,7 @@ class ApiService {
       maxSizeBytes: 10 * 1024 * 1024,
     );
     try {
-      final uri = Uri.parse('${_baseUrl}event-submissions/upload-file/');
+      final uri = Uri.parse('$_baseUrl/event-submissions/upload-file/');
       final request = http.MultipartRequest('POST', uri);
 
       final headers = await _headers(auth: true);
@@ -1065,12 +1109,11 @@ class ApiService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return json.decode(response.body);
       }
-      final errorBody = json.decode(response.body);
-      throw ApiException(errorBody['detail'] ?? 'Failed to upload file', response.statusCode);
+      throw _errorFromBody(_decodeJsonBody(response), response.statusCode);
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException(AppLocalizations.current.connection_failed, 0);
     }
   }
 
@@ -1343,7 +1386,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> checkBookmark(String contentType, int contentId) async {
-    return await _get('bookmarks/check_bookmark/?content_type=$contentType&content_id=$contentId', auth: true);
+    return await _get('bookmarks/check/?content_type=$contentType&content_id=$contentId', auth: true);
   }
 
   // ── Reactions ─────────────────────────────────────────────
@@ -1386,10 +1429,19 @@ class ApiService {
   }
 
 
-  Future<List<Map<String, dynamic>>> getDiscussionReplies(int discussionId) async {
-    final data = await _get('discussions/$discussionId/replies/', auth: true);
+  Future<List<Map<String, dynamic>>> getDiscussionReplies(int discussionId,
+      {int page = 1}) async {
+    final data =
+        await _get('discussions/$discussionId/replies/?page=$page', auth: true);
     if (data is List) return data.cast<Map<String, dynamic>>();
     return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  /// Whether the thread has another page after [page].
+  Future<bool> discussionRepliesHaveMore(int discussionId, int page) async {
+    final data =
+        await _get('discussions/$discussionId/replies/?page=$page', auth: true);
+    return data is Map && data['next'] != null;
   }
 
   Future<Map<String, dynamic>> postDiscussionReply(int discussionId, String content, {int? parentId}) async {
@@ -1421,6 +1473,29 @@ class ApiService {
   // ── Explore feed (social) ─────────────────────────────────
   /// The Explore feed. [following] narrows it to people the caller follows;
   /// [authorId] narrows it to one person's posts for their profile page.
+  /// One page of the Explore feed. The server paginates at 20; without
+  /// [page] the feed could never show a twenty-first post.
+  Future<FeedPage> getFeedPage({
+    bool following = false,
+    int? authorId,
+    String? tag,
+    int? topicId,
+    String? category,
+    int page = 1,
+  }) async {
+    final params = <String>['page=$page'];
+    if (following) params.add('feed=following');
+    if (category != null) params.add('category=$category');
+    if (authorId != null) params.add('author=$authorId');
+    if (tag != null && tag.isNotEmpty) params.add('tag=${Uri.encodeComponent(tag)}');
+    if (topicId != null) params.add('topic=$topicId');
+    final data = await _get('discussions/?${params.join('&')}', auth: true);
+    return FeedPage(
+      posts: _extractResults(data).cast<Map<String, dynamic>>(),
+      hasMore: data is Map && data['next'] != null,
+    );
+  }
+
   Future<List<Map<String, dynamic>>> getFeed({
     bool following = false,
     int? authorId,
@@ -1442,12 +1517,34 @@ class ApiService {
     return await _post('discussions/$discussionId/repost/', {'content': content}, auth: true);
   }
 
+  /// Ids of articles this reader has already been through.
+  Future<List<int>> getReadArticleIds() async {
+    final data = await _get('reading-progress/read/', auth: true);
+    final ids = (data is Map ? data['article_ids'] : null) as List<dynamic>?;
+    return (ids ?? []).map((e) => e is int ? e : int.tryParse('$e')).whereType<int>().toList();
+  }
+
   Future<Map<String, dynamic>> getUserProfile(int userId) async {
     return await _get('users/$userId/profile/', auth: true);
   }
 
   Future<Map<String, dynamic>> toggleFollow(int userId) async {
     return await _post('users/$userId/follow/', {}, auth: true);
+  }
+
+  /// Block or unblock an account. Their posts and replies disappear from the
+  /// caller's feed, and notifications stop in both directions.
+  Future<Map<String, dynamic>> toggleBlock(int userId) async {
+    return await _post('users/$userId/block/', {}, auth: true);
+  }
+
+  Future<List<Map<String, dynamic>>> getBlockedUsers() async {
+    final data = await _get('explore/blocked/', auth: true);
+    return (data is List ? data : _extractResults(data)).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> deleteDiscussion(int discussionId) async {
+    await _delete('discussions/$discussionId/', auth: true);
   }
 
   Future<List<Map<String, dynamic>>> getFollowList(int userId, {bool following = false}) async {
@@ -1558,7 +1655,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException(AppLocalizations.current.connection_failed, 0);
     }
   }
 
@@ -1617,7 +1714,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> updateNotificationPreferences(Map<String, dynamic> prefs) async {
-    return await _post('notification-preferences/', prefs, auth: true);
+    return await _put('notification-preferences/', prefs, auth: true);
   }
 
   // ── User Preferences ─────────────────────────────────────
@@ -1653,7 +1750,7 @@ class ApiService {
   }
 
   Future<void> revokeSession(int sessionId) async {
-    await _post('auth/sessions/$sessionId/revoke/', {}, auth: true);
+    await _delete('auth/sessions/$sessionId/revoke/', auth: true);
   }
 
   Future<Map<String, dynamic>> changePassword(String currentPassword, String newPassword) async {
@@ -1712,9 +1809,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> upvoteQAQuestion(int sessionId, int questionId) async {
-    return await _post('live-qa/$sessionId/upvote_question/', {
-      'question_id': questionId,
-    }, auth: true);
+    return await _post('live-qa/$sessionId/questions/$questionId/upvote/', {}, auth: true);
   }
 
   // ── Reading Progress ──────────────────────────────────────
@@ -1884,7 +1979,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException(AppLocalizations.current.connection_failed, 0);
     }
   }
 
@@ -2045,7 +2140,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException(AppLocalizations.current.connection_failed, 0);
     }
   }
 
@@ -2140,14 +2235,56 @@ class ApiService {
       throw ApiException('File too large. Maximum size: ${maxMB}MB', 0);
     }
   }
+
+  // --- added by screens fix wave ---
+  /// Multipart variant of [submitVerificationRequest] that also uploads the
+  /// optional supporting document (backend: ImageField `supporting_document`).
+  Future<Map<String, dynamic>> submitVerificationRequestWithDocument(
+    Map<String, String> fields,
+    File document,
+  ) async {
+    _validateUploadFile(document,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'heic'],
+      maxSizeBytes: 10 * 1024 * 1024,
+    );
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/verification/request/'));
+      final headers = await _headers(auth: true);
+      headers.remove('Content-Type');
+      request.headers.addAll(headers);
+      request.fields.addAll(fields);
+      request.files.add(await http.MultipartFile.fromPath('supporting_document', document.path));
+
+      final streamed = await _client.send(request).timeout(const Duration(seconds: 60));
+      final response = await http.Response.fromStream(streamed);
+      final body = response.body.isEmpty ? <String, dynamic>{} : json.decode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) return body;
+      final detail = body is Map
+          ? (body['detail'] ?? body.values.map((v) => v is List ? v.join(' ') : v).join(' '))
+          : null;
+      throw ApiException(detail?.toString() ?? 'Failed to submit verification request', response.statusCode);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(AppLocalizations.current.connection_failed, 0);
+    }
+  }
+  // --- end screens fix wave ---
 }
 
 class ApiException implements Exception {
+  /// User-facing message — safe to show in a snackbar.
   final String message;
   final int statusCode;
   final String? referenceId;
-  ApiException(this.message, this.statusCode, {this.referenceId});
+  /// Raw underlying error for logs; never shown to users.
+  final String? debugDetail;
+  ApiException(this.message, this.statusCode, {this.referenceId, this.debugDetail});
+
+  ApiException.connection(Object error)
+      : this(AppLocalizations.current.connection_failed, 0, debugDetail: error.toString());
 
   @override
-  String toString() => 'ApiException: $message (status: $statusCode)';
+  String toString() =>
+      'ApiException: $message (status: $statusCode)${debugDetail == null ? '' : ' [$debugDetail]'}';
 }

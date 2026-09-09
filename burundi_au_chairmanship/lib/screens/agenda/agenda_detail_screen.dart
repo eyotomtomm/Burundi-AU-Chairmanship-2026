@@ -1,12 +1,14 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/environment.dart';
 import '../../services/api_service.dart';
 import '../../config/app_ds.dart';
-import '../discussions/discussions_screen.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../services/share_service.dart';
+import '../../widgets/async_content_view.dart';
+import '../../widgets/app_network_image.dart';
+import '../../l10n/app_localizations.dart';
+import '../feed/tag_feed_screen.dart';
 
 /// Section wording for one priority agenda. Only the copy differs between the
 /// three agendas — the layout is identical, so it lives here once.
@@ -56,6 +58,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
   final ApiService _apiService = ApiService();
   Map<String, dynamic>? agendaData;
   bool isLoading = true;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -64,6 +67,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
   }
 
   Future<void> _loadAgendaData() async {
+    if (!isLoading && mounted) setState(() { isLoading = true; _loadFailed = false; });
     try {
       final agendas = await _apiService.getPriorityAgendas();
       agendaData = agendas.firstWhere(
@@ -72,6 +76,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
       );
     } catch (e) {
       if (kDebugMode) debugPrint('Error loading agenda: $e');
+      _loadFailed = true;
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -127,6 +132,17 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
         backgroundColor: Ds.bg(context),
         body: const Center(
             child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green)),
+      );
+    }
+    if (_loadFailed && (agendaData == null || agendaData!.isEmpty)) {
+      return Scaffold(
+        backgroundColor: Ds.bg(context),
+        appBar: AppBar(backgroundColor: Ds.bg(context), elevation: 0),
+        body: AsyncContentView(
+          state: AsyncContentState.error,
+          onRetry: _loadAgendaData,
+          child: const SizedBox.shrink(),
+        ),
       );
     }
 
@@ -186,8 +202,10 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) =>
-                  DiscussionsScreen(initialCategory: widget.debateCategory),
+              builder: (_) => TagFeedScreen(
+                category: widget.debateCategory,
+                topicTitle: _isFr ? 'Le débat' : 'The debate',
+              ),
             ),
           ),
           child: Padding(
@@ -265,7 +283,10 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
         children: [
           Row(
             children: [
-              GestureDetector(
+              Semantics(
+                button: true,
+                label: MaterialLocalizations.of(context).backButtonTooltip,
+                child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.maybePop(context),
                 child: const SizedBox(
@@ -278,10 +299,11 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                   ),
                 ),
               ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  _isFr ? 'NOTRE AGENDA' : 'OUR AGENDA',
+                  AppLocalizations.of(context).translate('rs_our_agenda'),
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -321,7 +343,7 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
                   borderRadius: BorderRadius.circular(Ds.rCard),
                 ),
                 child: hasImage
-                    ? CachedNetworkImage(
+                    ? AppNetworkImage(
                         imageUrl: Environment.fixMediaUrl(heroImage.toString()),
                         fit: BoxFit.cover,
                         errorWidget: (_, _, _) => Icon(widget.icon,

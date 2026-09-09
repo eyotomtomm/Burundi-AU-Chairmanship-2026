@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,13 +6,17 @@ import '../../config/app_ds.dart';
 import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/async_content_view.dart';
 import '../../widgets/feed/post_card.dart';
 import '../../widgets/feed/repost_sheet.dart';
 import 'tag_feed_screen.dart';
 import '../../widgets/feed/report_sheet.dart';
 import '../../widgets/verified_badge.dart';
+import '../../widgets/app_network_image.dart';
 import '../discussions/discussion_detail_screen.dart';
 import 'edit_profile_screen.dart';
+import '../../l10n/app_localizations.dart';
+import '../../services/feed_pager.dart';
 
 /// A person's public page: who they are, their counts, and their posts.
 class UserProfileScreen extends StatefulWidget {
@@ -28,22 +31,42 @@ class UserProfileScreen extends StatefulWidget {
 class _UserProfileScreenState extends State<UserProfileScreen> {
   final _api = ApiService();
   Map<String, dynamic>? _profile;
-  List<Map<String, dynamic>> _posts = [];
   bool _loading = true;
+  bool _loadFailed = false;
   bool _followBusy = false;
+  bool _blockBusy = false;
+  late final FeedPager _pager =
+      FeedPager((page) => _api.getFeedPage(authorId: widget.userId, page: page));
+
+  List<Map<String, dynamic>> get _posts => _pager.posts;
 
   @override
   void initState() {
     super.initState();
+    _pager.addListener(_onPager);
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _pager.removeListener(_onPager);
+    _pager.dispose();
+    super.dispose();
+  }
+
+  void _onPager() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _load({bool quiet = false}) async {
+    if (!quiet) setState(() => _loading = true);
     try {
       _profile = await _api.getUserProfile(widget.userId);
-      _posts = await _api.getFeed(authorId: widget.userId);
-    } catch (_) {}
+      await _pager.load(quiet: quiet);
+      _loadFailed = false;
+    } catch (e) {
+      _loadFailed = e is! ApiException || e.statusCode != 404;
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -103,7 +126,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       return Scaffold(
         backgroundColor: Ds.bg(context),
         appBar: AppBar(),
-        body: Center(child: Text(fr ? 'Profil introuvable' : 'Profile not found')),
+        body: _loadFailed
+            ? AsyncContentView(
+                state: AsyncContentState.error,
+                onRetry: _load,
+                child: const SizedBox.shrink(),
+              )
+            : Center(child: Text(fr ? 'Profil introuvable' : 'Profile not found')),
       );
     }
 
@@ -113,6 +142,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         onRefresh: _load,
         color: Ds.green,
         child: ListView(
+          controller: _pager.scroll,
           padding: EdgeInsets.only(bottom: Ds.navSpace(context)),
           physics:
               const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
@@ -151,7 +181,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       .map((p) => PostCard(
                             post: p,
                             onRepost: () async {
-                              if (await RepostSheet.open(context, p)) _load();
+                              if (await RepostSheet.open(context, p)) _load(quiet: true);
                             },
                             onTopicTap: (id, title) => Navigator.push(
                               context,
@@ -166,11 +196,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 builder: (_) => DiscussionDetailScreen(
                                     discussionId: p['id'] as int),
                               ),
-                            ).then((_) => _load()),
+                            ).then((_) => _load(quiet: true)),
                           ))
                       .toList(),
                 ),
               ),
+            FeedPagerFooter(_pager, accent: Ds.green, endStyle: Ds.meta(context)),
           ],
         ),
       ),
@@ -203,12 +234,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         children: [
           Row(
             children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: const SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
+              Semantics(
+                button: true,
+                label: MaterialLocalizations.of(context).backButtonTooltip,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
+                  ),
                 ),
               ),
               const Spacer(),
@@ -304,7 +339,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       );
     } else {
       inner = ClipOval(
-        child: CachedNetworkImage(
+        child: AppNetworkImage(
           imageUrl: fixed,
           width: 78,
           height: 78,
@@ -409,10 +444,79 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            _blockButton(context),
           ],
         ],
       ),
     );
+  }
+
+  /// Block / unblock. Reporting alone is not enough for a public feed — and
+  /// Apple's guideline 1.2 asks for this specifically.
+  Widget _blockButton(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final blocked = _profile?['is_blocked'] == true;
+    return GestureDetector(
+      onTap: _blockBusy ? null : _toggleBlock,
+      child: Container(
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          border: Border.all(color: Ds.outline(context)),
+          borderRadius: BorderRadius.circular(Ds.rPill),
+        ),
+        child: Text(
+          blocked ? l10n.translate('w_unblock') : l10n.translate('w_block'),
+          style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: blocked ? Ds.body(context) : Ds.red),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleBlock() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) {
+      Navigator.pushNamed(context, '/auth');
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    final blocked = _profile?['is_blocked'] == true;
+    if (!blocked) {
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.translate('w_block_account')),
+          content: Text(l10n.translate('w_block_body')),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.translate('cancel'))),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(l10n.translate('w_block'),
+                    style: const TextStyle(color: Ds.red))),
+          ],
+        ),
+      );
+      if (go != true) return;
+    }
+    setState(() => _blockBusy = true);
+    try {
+      final res = await _api.toggleBlock(widget.userId);
+      _profile?['is_blocked'] = res['is_blocked'] == true;
+      // Blocking drops the follow on both sides, so the header is stale.
+      await _load(quiet: true);
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+    if (mounted) setState(() => _blockBusy = false);
   }
 
   Widget _divider(BuildContext context) =>

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../config/app_colors.dart';
+import 'app_network_image.dart';
 
 class FeatureCard extends StatelessWidget {
   final String title;
@@ -188,10 +189,10 @@ class NewsCard extends StatelessWidget {
                 height: 140,
                 width: double.infinity,
                 color: AppColors.burundiGreen.withValues(alpha: 0.2),
-                child: Image.network(
-                  imageUrl,
+                child: AppNetworkImage(
+                  imageUrl: imageUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Center(
+                  errorWidget: (_, _, _) => Center(
                     child: Icon(
                       Icons.image,
                       size: 48,

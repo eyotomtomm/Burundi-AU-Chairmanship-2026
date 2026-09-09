@@ -13,3 +13,7 @@ class CoreConfig(AppConfig):
         # Register signals that auto-create AdminNotification entries.
         from .signals import register_admin_notification_signals
         register_admin_notification_signals()
+
+        # Drop cached API responses when their source rows change.
+        from .signals import register_cache_invalidation_signals
+        register_cache_invalidation_signals()

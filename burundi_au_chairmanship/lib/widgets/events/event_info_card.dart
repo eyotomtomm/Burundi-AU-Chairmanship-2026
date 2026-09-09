@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/event_registration_model.dart';
 import '../../config/app_ds.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../l10n/app_localizations.dart';
 
 class EventInfoCard extends StatelessWidget {
   final EventRegistrationModel event;
@@ -77,7 +78,7 @@ class EventInfoCard extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () => _openDirections(event.venueAddress),
                 icon: const Icon(Icons.directions, size: 18),
-                label: const Text('Get Directions'),
+                label: Text(AppLocalizations.of(context).translate('get_directions')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Ds.green,
                   side: const BorderSide(color: Ds.green, width: 1.5),

@@ -82,6 +82,9 @@
                   title="{% if event.is_active %}Deactivate{% else %}Activate{% endif %}">
             <span class="material-symbols-outlined text-[18px] {% if event.is_active %}text-slate-500{% else %}text-emerald-600{% endif %}">{% if event.is_active %}visibility_off{% else %}check_circle{% endif %}</span>
           </button>
+          <a href="{% url 'custom_admin:comment_engagement' %}?type=event&amp;content={{ event.pk }}" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors" title="Likes &amp; comments">
+              <span class="material-symbols-outlined text-lg">add_reaction</span>
+          </a>
           <a href="{% url 'custom_admin:event_edit' event.pk %}" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors" title="Edit">
             <span class="material-symbols-outlined text-[18px] text-slate-500">edit</span>
           </a>

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'app_network_image.dart';
 import '../config/app_colors.dart';
 import '../services/api_service.dart';
 import '../services/deep_link_router.dart';
@@ -48,10 +48,6 @@ class PromotionalSplashOverlay extends StatefulWidget {
 class _PromotionalSplashOverlayState extends State<PromotionalSplashOverlay> {
   late int _secondsRemaining;
   Timer? _timer;
-
-  String get _title => widget.languageCode == 'fr' && (widget.splash['title_fr'] ?? '').isNotEmpty
-      ? widget.splash['title_fr']
-      : widget.splash['title'] ?? '';
 
   String get _actionText => widget.languageCode == 'fr' && (widget.splash['action_text_fr'] ?? '').isNotEmpty
       ? widget.splash['action_text_fr']
@@ -112,8 +108,9 @@ class _PromotionalSplashOverlayState extends State<PromotionalSplashOverlay> {
         children: [
           // Full-screen image
           if (_imageUrl.isNotEmpty)
-            CachedNetworkImage(
+            AppNetworkImage(
               imageUrl: _imageUrl,
+              hero: true,
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,

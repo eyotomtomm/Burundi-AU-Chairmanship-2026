@@ -1,5 +1,6 @@
 import logging
 from datetime import timedelta
+from django.core.cache import cache
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,12 @@ class SessionTrackingMiddleware:
 
         user = request.user if hasattr(request, 'user') and request.user.is_authenticated else None
 
-        # Throttle: max 1 session per user/IP per hour
+        # Throttle: max 1 session per user/IP per hour. The cache key short-
+        # circuits the DB probe on every request; the DB check below only
+        # runs on a cold cache (index on ip_address, created_at).
+        cache_key = f'session_tracked:{user.pk if user else "anon"}:{ip}'
+        if cache.get(cache_key):
+            return
         one_hour_ago = timezone.now() - timedelta(hours=1)
         existing = UserSession.objects.filter(
             ip_address=ip,
@@ -58,7 +64,9 @@ class SessionTrackingMiddleware:
             existing = existing.filter(user__isnull=True)
 
         if existing.exists():
+            cache.set(cache_key, 1, 3600)
             return
+        cache.set(cache_key, 1, 3600)
 
         # Geolocate IP
         country_code, country_name, city = get_country_from_ip(ip)

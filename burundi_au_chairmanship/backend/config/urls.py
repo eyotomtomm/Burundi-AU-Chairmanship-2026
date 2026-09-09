@@ -1,3 +1,4 @@
+import os
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -44,10 +45,19 @@ setTimeout(function() {{ window.location.href = "{fallback}"; }}, 2500);
 
 APPLE_APP_ID = '4P52QG4BDR.com.b4africa.app'
 ANDROID_PACKAGE = 'com.b4africa.app'
-# Upload key. Add the Play App Signing certificate SHA-256 here too, or links
-# from the Play build will not verify.
+# Both certificates must be listed: releases are signed with the upload key,
+# then Play re-signs the store build with the Play App Signing key, and that is
+# the signature devices actually verify. Both fingerprints are public — they are
+# served from this file at /.well-known/assetlinks.json — so they live in source
+# rather than in secrets. Verified against Play Console → App signing on
+# 2026-09-03. ANDROID_PLAY_SIGNING_SHA256 (comma-separated) appends any extra
+# certificate, e.g. during a key rotation, without a code change.
 ANDROID_SHA256_FINGERPRINTS = [
+    # Upload key (signs what we send to Play).
     '2E:76:17:60:16:F9:E0:31:54:64:0F:47:91:12:C0:5F:45:AD:C6:B5:18:A0:D9:4B:A4:6E:FD:9D:E0:DC:D0:67',
+    # Play App Signing key (signs what users install) — required for verification.
+    'A6:A6:09:FB:77:77:FE:20:CF:BC:9A:51:19:9E:87:28:39:7E:E2:35:71:0A:4F:1E:7B:D6:D4:07:7B:1A:DF:6B',
+    *[f.strip().upper() for f in os.environ.get('ANDROID_PLAY_SIGNING_SHA256', '').split(',') if f.strip()],
 ]
 
 

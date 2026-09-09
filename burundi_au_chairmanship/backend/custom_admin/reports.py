@@ -781,7 +781,7 @@ def _build_header(title, subtitle=None):
 
     elements = []
     # App branding line
-    elements.append(Paragraph('Be 4 Africa 2026-2027', sub_style))
+    elements.append(Paragraph('Be 4 Africa', sub_style))
     elements.append(Paragraph(title, header_style))
     if subtitle:
         elements.append(Paragraph(subtitle, sub_style))

@@ -5,14 +5,17 @@
 # JVM crash dumps
 hs_err_pid*.log
 
-# Markdown docs
-*.md
+# Docs with live credentials / recovery notes
+burundi_au_chairmanship/DIGITALOCEAN_RECOVERY.md
 
 # Claude
 .claude/
 
-# Flutter build
-burundi_au_chairmanship/build/
+# Build output (Flutter, Gradle, Xcode)
+**/build/
+**/android/build/
+**/android/.gradle/
+**/android/app/.cxx/
 burundi_au_chairmanship/.dart_tool/
 burundi_au_chairmanship/.flutter-plugins-dependencies
 
@@ -39,11 +42,13 @@ burundi_au_chairmanship/backend/credentials/
 # Firebase credentials (NEVER COMMIT THESE)
 *firebase-adminsdk*.json
 burundi_au_chairmanship/backend/config/firebase-adminsdk.json
-burundi_au_chairmanship/ios/Runner/GoogleService-Info.plist
-burundi_au_chairmanship/android/app/google-services.json
-burundi_au_chairmanship/lib/firebase_options.dart
+# Firebase *client* config is public by design (API keys are restricted per
+# platform in Firebase console) — the app copies are tracked so CI can build.
+# Stray copies elsewhere in the tree stay ignored.
 GoogleService-Info*.plist
 google-services*.json
+!burundi_au_chairmanship/ios/Runner/GoogleService-Info.plist
+!burundi_au_chairmanship/android/app/google-services.json
 
 # Apple auth keys (NEVER COMMIT THESE)
 *.p8
@@ -67,6 +72,5 @@ APP_STORE_SUBMISSION_NOTES.md
 burundi_au_chairmanship/macos/Flutter/ephemeral/
 
 # Build artifacts and scratch files
-burundi_au_chairmanship/ios/build/
 .impeccable/
 burundi_au_chairmanship/android/WhatsApp Image*

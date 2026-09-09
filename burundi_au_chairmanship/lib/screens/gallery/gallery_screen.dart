@@ -2,10 +2,11 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_ds.dart';
+import '../../l10n/app_localizations.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
@@ -109,7 +110,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
       }
       return Scaffold(
         backgroundColor: Ds.bg(context),
-        appBar: AppBar(title: const Text('Gallery')),
+        appBar: AppBar(title: Text(AppLocalizations.of(context).translate('gallery'))),
         body: AsyncContentView(
           state: state,
           loadingWidget: const ShimmerVideoGridSkeleton(),
@@ -135,7 +136,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
-      appBar: AppBar(title: const Text('Gallery')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context).translate('gallery'))),
       body: RefreshIndicator(
         color: Ds.green,
         onRefresh: () async {
@@ -251,7 +252,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   Widget _buildCoverImage(String? coverUrl, {double iconSize = 50}) {
     if (coverUrl != null && coverUrl.isNotEmpty) {
       final fixedUrl = Environment.fixMediaUrl(coverUrl);
-      return CachedNetworkImage(
+      return AppNetworkImage(
         imageUrl: fixedUrl,
         fit: BoxFit.cover,
         placeholder: (context, url) =>

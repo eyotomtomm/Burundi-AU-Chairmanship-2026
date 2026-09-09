@@ -36,15 +36,20 @@ class _HomeNavBarState extends State<HomeNavBar>
     with SingleTickerProviderStateMixin {
   static const double _raised = 56;
   static const double _sideMargin = 14;
-  static const double _bottomMargin = 6;
+
+  /// Measured from the screen edge rather than the home-indicator inset, so
+  /// the bar sits low without floating. Enough gap for its rounded bottom
+  /// corners to read as a floating pill, not so much that it drifts up.
+  static const double _bottomMargin = 18;
   static const double _hPad = 10;
 
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 380),
   );
-  late Animation<double> _slide =
-      AlwaysStoppedAnimation<double>(widget.currentIndex.toDouble());
+  late Animation<double> _slide = AlwaysStoppedAnimation<double>(
+    widget.currentIndex.toDouble(),
+  );
 
   double _from = 0;
   double _barWidth = 0;
@@ -64,8 +69,9 @@ class _HomeNavBarState extends State<HomeNavBar>
       // continues from mid-flight instead of jumping back.
       _from = _slide.value;
       _slide = Tween<double>(begin: _from, end: widget.currentIndex.toDouble())
-          .animate(CurvedAnimation(
-              parent: _controller, curve: Curves.easeOutCubic));
+          .animate(
+            CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+          );
       _controller.forward(from: 0);
     }
   }
@@ -78,20 +84,21 @@ class _HomeNavBarState extends State<HomeNavBar>
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-
     return SizedBox(
       // Room for the circle to stand proud of the bar without being clipped.
-      height: HomeNavBar.barHeight + _bottomMargin + bottomInset + (_raised / 2),
+      height: HomeNavBar.barHeight + _bottomMargin + (_raised / 2),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final barWidth = constraints.maxWidth - (_sideMargin * 2);
           // A width change means the geometry moved under us (rotation, resize):
           // settle the circle at its slot instead of animating across.
-          if (_barWidth != 0 && _barWidth != barWidth && _controller.isAnimating) {
+          if (_barWidth != 0 &&
+              _barWidth != barWidth &&
+              _controller.isAnimating) {
             _controller.stop();
             _slide = AlwaysStoppedAnimation<double>(
-                widget.currentIndex.toDouble());
+              widget.currentIndex.toDouble(),
+            );
           }
           _barWidth = barWidth;
 
@@ -130,7 +137,7 @@ class _HomeNavBarState extends State<HomeNavBar>
                   Positioned(
                     left: _sideMargin,
                     right: _sideMargin,
-                    bottom: _bottomMargin + bottomInset,
+                    bottom: _bottomMargin,
                     height: HomeNavBar.barHeight,
                     child: PhysicalShape(
                       clipper: _NotchClipper(notchX),
@@ -138,11 +145,14 @@ class _HomeNavBarState extends State<HomeNavBar>
                       elevation: 10,
                       shadowColor: Colors.black.withValues(alpha: 0.28),
                       child: CustomPaint(
-                        foregroundPainter:
-                            _NotchOutlinePainter(notchX, Ds.hairline(context)),
+                        foregroundPainter: _NotchOutlinePainter(
+                          notchX,
+                          Ds.hairline(context),
+                        ),
                         child: Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: _hPad),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: _hPad,
+                          ),
                           child: Row(
                             children: [
                               for (var i = 0; i < widget.items.length; i++)
@@ -155,8 +165,8 @@ class _HomeNavBarState extends State<HomeNavBar>
                   ),
                   Positioned(
                     left: _sideMargin + notchX - (_raised / 2),
-                    bottom: _bottomMargin +
-                        bottomInset +
+                    bottom:
+                        _bottomMargin +
                         HomeNavBar.barHeight -
                         (_raised / 2) -
                         6,
@@ -176,57 +186,70 @@ class _HomeNavBarState extends State<HomeNavBar>
     final active = widget.currentIndex == index;
 
     return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Ds.rTile),
-        onTap: () => widget.onTap(index),
-        // The active slot is covered by the raised circle, so only its label
-        // shows through — its icon would sit behind the button.
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (!active) ...[
-              Icon(item.icon, size: 22, color: Ds.muted(context)),
-              const SizedBox(height: 3),
-            ] else
-              const SizedBox(height: 25),
-            Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w600,
-                color: active ? Ds.green : Ds.body(context),
+      child: Semantics(
+        button: true,
+        selected: active,
+        label: item.label,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Ds.rTile),
+          onTap: () => widget.onTap(index),
+          // The active slot is covered by the raised circle, so only its label
+          // shows through — its icon would sit behind the button.
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (!active) ...[
+                Icon(item.icon, size: 22, color: Ds.muted(context)),
+                const SizedBox(height: 3),
+              ] else
+                const SizedBox(height: 25),
+              Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                  color: active ? Ds.green : Ds.body(context),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _raisedButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () => widget.onTap(widget.currentIndex),
-      child: Container(
-        width: _raised,
-        height: _raised,
-        decoration: BoxDecoration(
-          color: Ds.green,
-          shape: BoxShape.circle,
-          border: Border.all(color: Ds.bg(context), width: 3),
-          boxShadow: Ds.shadowLg(context),
-        ),
-        // Keyed on the index so the icon pops as the circle arrives.
-        child: TweenAnimationBuilder<double>(
-          key: ValueKey(widget.currentIndex),
-          tween: Tween<double>(begin: 0.6, end: 1),
-          duration: const Duration(milliseconds: 380),
-          curve: Curves.easeOutBack,
-          builder: (_, scale, child) =>
-              Transform.scale(scale: scale, child: child),
-          child: Icon(widget.items[widget.currentIndex].icon,
-              size: 26, color: Colors.white),
+    return Semantics(
+      button: true,
+      selected: true,
+      label: widget.items[widget.currentIndex].label,
+      child: GestureDetector(
+        onTap: () => widget.onTap(widget.currentIndex),
+        child: Container(
+          width: _raised,
+          height: _raised,
+          decoration: BoxDecoration(
+            color: Ds.green,
+            shape: BoxShape.circle,
+            border: Border.all(color: Ds.bg(context), width: 3),
+            boxShadow: Ds.shadowLg(context),
+          ),
+          // Keyed on the index so the icon pops as the circle arrives.
+          child: TweenAnimationBuilder<double>(
+            key: ValueKey(widget.currentIndex),
+            tween: Tween<double>(begin: 0.6, end: 1),
+            duration: const Duration(milliseconds: 380),
+            curve: Curves.easeOutBack,
+            builder: (_, scale, child) =>
+                Transform.scale(scale: scale, child: child),
+            child: Icon(
+              widget.items[widget.currentIndex].icon,
+              size: 26,
+              color: Colors.white,
+            ),
+          ),
         ),
       ),
     );
@@ -251,15 +274,16 @@ class _NotchClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     final bar = Path()
-      ..addRRect(RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-        const Radius.circular(_corner),
-      ));
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, 0, size.width, size.height),
+          const Radius.circular(_corner),
+        ),
+      );
     final notch = Path()
-      ..addOval(Rect.fromCircle(
-        center: Offset(notchCentreX, 0),
-        radius: _notchRadius,
-      ));
+      ..addOval(
+        Rect.fromCircle(center: Offset(notchCentreX, 0), radius: _notchRadius),
+      );
     return Path.combine(PathOperation.difference, bar, notch);
   }
 

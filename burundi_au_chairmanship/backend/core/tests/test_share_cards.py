@@ -3,7 +3,9 @@ hand chat apps a JPEG preview rather than the stored WebP."""
 from django.test import TestCase
 from django.utils import timezone
 
-from core.models import Article, EventRegistration, Fact, FactCategory
+from django.contrib.auth import get_user_model
+
+from core.models import Article, Discussion, EventRegistration, Fact, FactCategory
 
 
 class ShareCardTests(TestCase):
@@ -43,6 +45,16 @@ class ShareCardTests(TestCase):
     def test_unpublished_content_is_not_shareable(self):
         self.assertEqual(self.client.get(f'/articles/{self.draft.pk}/share/').status_code, 404)
         self.assertEqual(self.client.get(f'/articles/{self.draft.pk}/card.jpg').status_code, 404)
+
+    def test_hidden_discussion_is_not_shareable(self):
+        # Moderation takes a post out of the feed; the share link must follow it,
+        # or a reported post stays readable at a URL anyone can guess.
+        author = get_user_model().objects.create_user(
+            username='poster', email='poster@example.com', password='x',
+        )
+        hidden = Discussion.objects.create(content='Reported post', author=author, is_hidden=True)
+        self.assertEqual(self.client.get(f'/discussions/{hidden.pk}/share/').status_code, 404)
+        self.assertEqual(self.client.get(f'/discussions/{hidden.pk}/card.jpg').status_code, 404)
 
     def test_card_renders_as_jpeg_for_every_kind(self):
         for path in (

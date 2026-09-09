@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +9,8 @@ import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../config/environment.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/app_network_image.dart';
 import '../../models/event_registration_model.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../providers/language_provider.dart';
@@ -36,6 +37,8 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
   bool _showApprovalBanner = false;
   DateTime? _lastChecked;
   bool _isRefreshing = false;
+  /// Status call failed — we can't tell "no application" from "unknown".
+  bool _statusUnknown = false;
 
   @override
   void initState() {
@@ -48,7 +51,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     try {
       final results = await Future.wait([
         ApiService().youthDialogueSettings(),
-        ApiService().youthDialogueStatus().catchError((_) => <String, dynamic>{}),
+        ApiService().youthDialogueStatus().catchError((_) => <String, dynamic>{'_unknown': true}),
       ]);
       if (!mounted) return;
 
@@ -90,6 +93,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
 
       setState(() {
         _settings = settingsData;
+        _statusUnknown = statusData['_unknown'] == true;
         final rawFields = _settings?['form_fields'] as List<dynamic>? ?? [];
         _formFields = rawFields
             .map((f) => RegistrationFormField.fromJson(f as Map<String, dynamic>))
@@ -140,22 +144,20 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     setState(() => _isLoading = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final isFr = Localizations.localeOf(context).languageCode == 'fr';
+      final l10n = AppLocalizations.of(context);
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
-          title: Text(isFr ? 'Acc\u00e8s refus\u00e9' : 'Access Denied'),
-          content: Text(isFr
-              ? 'Vous avez \u00e9t\u00e9 banni de ce programme.'
-              : 'You have been banned from this programme.'),
+          title: Text(l10n.translate('ydm_access_denied')),
+          content: Text(l10n.translate('ydm_banned')),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(ctx).pop();
                 if (mounted) Navigator.of(context).pop();
               },
-              child: Text(isFr ? 'OK' : 'OK'),
+              child: Text(l10n.translate('ok')),
             ),
           ],
         ),
@@ -279,8 +281,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     // Days left until registration closes, when the backend supplies a date.
     final deadlineStr = _settings?['registration_end_date']?.toString() ?? '';
     final deadline = DateTime.tryParse(deadlineStr);
-    final daysLeft =
-        deadline == null ? null : deadline.difference(DateTime.now()).inDays;
+    final daysLeft = deadline?.difference(DateTime.now()).inDays;
 
     final startStr = _settings?['event_start_date']?.toString() ??
         _settings?['start_date']?.toString() ??
@@ -305,7 +306,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: bannerUrl.isNotEmpty
-                    ? CachedNetworkImage(
+                    ? AppNetworkImage(
                         imageUrl: Environment.fixMediaUrl(bannerUrl),
                         fit: BoxFit.cover,
                         errorWidget: (_, _, _) => const Icon(Icons.groups_rounded,
@@ -342,17 +343,17 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             children: [
               _summaryStat(
                 start == null ? '—' : '${start.day}',
-                isFr ? 'Jour 1' : 'Starts',
+                AppLocalizations.of(context).translate('ydm_starts'),
               ),
               const SizedBox(width: 8),
               _summaryStat(
                 location.isEmpty ? '—' : location.split(',').first.trim(),
-                isFr ? 'Lieu' : 'Venue',
+                AppLocalizations.of(context).translate('ydm_venue'),
               ),
               const SizedBox(width: 8),
               _summaryStat(
                 daysLeft == null ? '—' : (daysLeft < 0 ? '0d' : '${daysLeft}d'),
-                isFr ? 'Échéance' : 'To deadline',
+                AppLocalizations.of(context).translate('ydm_to_deadline'),
                 color: Ds.red,
               ),
             ],
@@ -389,7 +390,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
 
   Widget _buildLanguageToggle() {
     final langProvider = context.watch<LanguageProvider>();
-    final currentLang = langProvider.languageCode.toUpperCase();
     final otherLang = langProvider.isEnglish ? 'FR' : 'EN';
 
     return Padding(
@@ -529,7 +529,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
         children: [
           if (hasRegistration)
             buildDateCard(
-              title: isFr ? 'Inscription' : 'Registration',
+              title: AppLocalizations.of(context).translate('ydm_registration'),
               dateText: formatDateCard(regStartStr, regEndStr),
               accentColor: AppColors.burundiGreen,
               icon: Icons.edit_calendar_rounded,
@@ -537,7 +537,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
           if (hasRegistration && hasEvent) const SizedBox(width: 12),
           if (hasEvent)
             buildDateCard(
-              title: isFr ? 'Jour de l\'événement' : 'Event Day',
+              title: AppLocalizations.of(context).translate('ydm_event_day'),
               dateText: formatDateCard(evtStartStr, evtEndStr),
               accentColor: AppColors.burundiRed,
               icon: Icons.event_rounded,
@@ -573,7 +573,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               isDark,
               icon: Icons.calendar_today_rounded,
               color: AppColors.burundiGreen,
-              label: isFr ? 'Date' : 'Date',
+              label: AppLocalizations.of(context).translate('ydm_date'),
               value: dateRange,
             ),
           if (location.isNotEmpty) ...[
@@ -582,7 +582,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               isDark,
               icon: Icons.location_on_rounded,
               color: AppColors.burundiRed,
-              label: isFr ? 'Lieu' : 'Location',
+              label: AppLocalizations.of(context).translate('ydm_location'),
               value: location,
               onTap: () => _openMaps(location),
             ),
@@ -593,7 +593,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               isDark,
               icon: Icons.business_rounded,
               color: AppColors.auGold,
-              label: isFr ? 'Lieu de l\'événement' : 'Venue',
+              label: AppLocalizations.of(context).translate('ydm_event_venue'),
               value: venueName + (venueAddress.isNotEmpty ? '\n$venueAddress' : ''),
               onTap: venueAddress.isNotEmpty ? () => _openMaps('$venueName, $venueAddress') : null,
             ),
@@ -695,7 +695,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               Icon(Icons.info_outline_rounded, size: 20, color: isDark ? Colors.white70 : Colors.black54),
               const SizedBox(width: 8),
               Text(
-                isFr ? 'À propos' : 'About the Event',
+                AppLocalizations.of(context).translate('ydm_about_event'),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -739,7 +739,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               Icon(Icons.star_rounded, size: 20, color: AppColors.auGold),
               const SizedBox(width: 8),
               Text(
-                isFr ? 'Points forts' : 'Key Highlights',
+                AppLocalizations.of(context).translate('ydm_key_highlights'),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -798,7 +798,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               Icon(Icons.checklist_rounded, size: 20, color: isDark ? Colors.white70 : Colors.black54),
               const SizedBox(width: 8),
               Text(
-                isFr ? 'Critères d\'éligibilité' : 'Eligibility',
+                AppLocalizations.of(context).translate('ydm_eligibility'),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -863,7 +863,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 Icon(Icons.event_note_rounded, size: 20, color: isDark ? Colors.white70 : Colors.black54),
                 const SizedBox(width: 8),
                 Text(
-                  isFr ? 'Événements parallèles' : 'Side Events',
+                  AppLocalizations.of(context).translate('ydm_side_events'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -954,7 +954,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 Icon(Icons.assignment_rounded, size: 20, color: isDark ? Colors.white70 : Colors.black54),
                 const SizedBox(width: 8),
                 Text(
-                  isFr ? 'Votre candidature' : 'Your Application',
+                  AppLocalizations.of(context).translate('ydm_your_application'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1019,13 +1019,15 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                   color: Colors.white,
                 ),
                 label: Text(
-                  _application!.isRevoked
-                      ? (isFr ? 'Voir le statut' : 'View Status')
-                      : _application!.status == 'credential_issued'
-                          ? (isFr ? 'Voir la carte d\'identité' : 'View ID Card')
-                          : ['accepted', 'documents_pending', 'documents_rejected'].contains(_application!.status)
-                              ? (isFr ? 'Gérer les documents' : 'Manage Documents')
-                              : (isFr ? 'Voir le statut' : 'View Status'),
+                  AppLocalizations.of(context).translate(
+                    _application!.isRevoked
+                        ? 'ydm_view_status'
+                        : _application!.status == 'credential_issued'
+                            ? 'ydm_view_id_card'
+                            : ['accepted', 'documents_pending', 'documents_rejected'].contains(_application!.status)
+                                ? 'ydm_manage_documents'
+                                : 'ydm_view_status',
+                  ),
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -1057,7 +1059,9 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                     ),
                   ],
                 )
-              : SizedBox(
+              : _statusUnknown
+                  ? _buildStatusUnknown(isFr)
+                  : SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton.icon(
@@ -1093,7 +1097,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                     },
                     icon: const Icon(Icons.edit_document, color: Colors.white),
                     label: Text(
-                      isFr ? 'Postuler Maintenant' : 'Apply Now',
+                      AppLocalizations.of(context).translate('ydm_apply_now'),
                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -1139,7 +1143,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               ),
               const SizedBox(height: 20),
               Text(
-                isFr ? 'Félicitations !' : 'Congratulations!',
+                AppLocalizations.of(context).translate('ydm_congratulations'),
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -1148,9 +1152,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                isFr
-                    ? 'Votre candidature au ${_programmeTitle(isFr)} a été acceptée !'
-                    : 'Your ${_programmeTitle(isFr)} application has been accepted!',
+                '${AppLocalizations.of(context).translate('ydm_accepted_before')}${_programmeTitle(isFr)}${AppLocalizations.of(context).translate('ydm_accepted_after')}',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -1160,9 +1162,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                isFr
-                    ? 'Veuillez télécharger vos documents requis pour poursuivre le processus.'
-                    : 'Please upload your required documents to continue the process.',
+                AppLocalizations.of(context).translate('ydm_upload_required_docs'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -1184,7 +1184,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                   },
                   icon: const Icon(Icons.upload_rounded, color: Colors.white),
                   label: Text(
-                    isFr ? 'Télécharger les documents' : 'Upload Documents',
+                    AppLocalizations.of(context).translate('ydm_upload_documents'),
                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -1201,7 +1201,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                   _dismissApprovalBanner();
                 },
                 child: Text(
-                  isFr ? 'Plus tard' : 'Later',
+                  AppLocalizations.of(context).translate('ydm_later'),
                   style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 14),
                 ),
               ),
@@ -1221,7 +1221,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
 
   void _showCredentialIssuedDialog() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isFr = Localizations.localeOf(context).languageCode == 'fr';
 
     showDialog(
       context: context,
@@ -1251,7 +1250,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               ),
               const SizedBox(height: 20),
               Text(
-                isFr ? 'Félicitations !' : 'Congratulations!',
+                AppLocalizations.of(context).translate('ydm_congratulations'),
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -1260,9 +1259,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                isFr
-                    ? 'Vos documents ont été vérifiés et votre carte d\'identité numérique est prête !'
-                    : 'Your documents have been verified and your Digital ID is ready!',
+                AppLocalizations.of(context).translate('ydm_docs_verified_id_ready'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -1272,9 +1269,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                isFr
-                    ? 'Consultez votre email pour plus de détails sur vos accréditations.'
-                    : 'Check your email for more details about your credential.',
+                AppLocalizations.of(context).translate('ydm_check_email_credential'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -1296,7 +1291,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                   },
                   icon: const Icon(Icons.badge_rounded, color: Colors.white),
                   label: Text(
-                    isFr ? 'Voir la carte d\'identité' : 'View ID Card',
+                    AppLocalizations.of(context).translate('ydm_view_id_card'),
                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -1313,7 +1308,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                   _dismissCredentialIssuedDialog();
                 },
                 child: Text(
-                  isFr ? 'Plus tard' : 'Later',
+                  AppLocalizations.of(context).translate('ydm_later'),
                   style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 14),
                 ),
               ),
@@ -1331,29 +1326,25 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     )).then((_) => _loadData());
   }
 
-  Widget _buildNextStep(String number, String text, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
+  /// Shown instead of "Apply Now" when the status check failed, so a user who
+  /// already applied is never offered a duplicate application.
+  Widget _buildStatusUnknown(bool isFr) => Row(
         children: [
-          Container(
-            width: 22, height: 22,
-            decoration: BoxDecoration(
-              color: AppColors.burundiGreen.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(number, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.burundiGreen)),
+          const Icon(Icons.cloud_off_rounded, color: AppColors.burundiRed, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              AppLocalizations.of(context).translate('ydm_status_check_failed'),
+              style: const TextStyle(fontSize: 13),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+          TextButton.icon(
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: Text(AppLocalizations.of(context).translate('retry')),
           ),
         ],
-      ),
-    );
-  }
+      );
 
   // ── Status Stepper — 5-step pipeline ────────────────────────
   Widget _buildStatusStepper(bool isDark) {
@@ -1522,12 +1513,12 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
         children: [
           const Icon(Icons.celebration_rounded, size: 40, color: Colors.white),
           const SizedBox(height: 12),
-          const Text('Congratulations!',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text(AppLocalizations.of(context).translate('ydm_congratulations'),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
-          const Text('Your application has been accepted.\nPlease upload your documents to proceed.',
+          Text(AppLocalizations.of(context).translate('ydm_accepted_upload_to_proceed'),
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.5)),
+            style: const TextStyle(fontSize: 14, color: Colors.white70, height: 1.5)),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -1545,13 +1536,13 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text('Upload Documents', style: TextStyle(fontWeight: FontWeight.w600)),
+                  child: Text(AppLocalizations.of(context).translate('ydm_upload_documents'), style: const TextStyle(fontWeight: FontWeight.w600)),
                 ),
               ),
               const SizedBox(width: 12),
               TextButton(
                 onPressed: _dismissApprovalBanner,
-                child: const Text('Dismiss', style: TextStyle(color: Colors.white70)),
+                child: Text(AppLocalizations.of(context).translate('ydm_dismiss'), style: const TextStyle(color: Colors.white70)),
               ),
             ],
           ),
@@ -1598,10 +1589,10 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Action Required', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                      Text(AppLocalizations.of(context).translate('ydm_action_required'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
                         color: isDark ? Colors.red[200] : AppColors.burundiRed)),
                       const SizedBox(height: 2),
-                      Text('Re-upload: ${names.join(", ")}', style: TextStyle(fontSize: 12,
+                      Text('${AppLocalizations.of(context).translate('ydm_reupload')}: ${names.join(", ")}', style: TextStyle(fontSize: 12,
                         color: isDark ? Colors.red[300] : AppColors.burundiRed.withValues(alpha: 0.8))),
                     ],
                   ),
@@ -1630,7 +1621,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             ElevatedButton(
               onPressed: () { setState(() { _isLoading = true; _error = null; }); _loadData(); },
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.burundiGreen),
-              child: const Text('Retry', style: TextStyle(color: Colors.white)),
+              child: Text(AppLocalizations.of(context).translate('retry'), style: const TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -1647,11 +1638,12 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: CachedNetworkImage(
+        child: AppNetworkImage(
           imageUrl: Environment.fixMediaUrl(sponsorsUrl),
+          hero: true,
           width: double.infinity,
           fit: BoxFit.contain,
-          placeholder: (_, __) => Container(
+          placeholder: (_, _) => Container(
             height: 120,
             decoration: BoxDecoration(
               color: isDark ? Colors.grey[800] : Colors.grey[200],
@@ -1659,7 +1651,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             ),
             child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.burundiGreen)),
           ),
-          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+          errorWidget: (_, _, _) => const SizedBox.shrink(),
         ),
       ),
     );
@@ -1692,7 +1684,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               Icon(Icons.support_agent_rounded, size: 22,
                 color: isDark ? Colors.white70 : Colors.black54),
               const SizedBox(width: 8),
-              Text(isFr ? 'Support' : 'Support',
+              Text(AppLocalizations.of(context).translate('ydm_support'),
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white : Colors.black87)),
             ],
@@ -1710,14 +1702,14 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             runSpacing: 10,
             children: [
               if (email.isNotEmpty)
-                _buildContactChip(isDark, icon: Icons.email_outlined, label: isFr ? 'Email' : 'Email',
+                _buildContactChip(isDark, icon: Icons.email_outlined, label: AppLocalizations.of(context).translate('ydm_email'),
                   onTap: () => launchUrl(Uri.parse('mailto:$email'))),
               if (phone.isNotEmpty)
-                _buildContactChip(isDark, icon: Icons.phone_outlined, label: isFr ? 'Appeler' : 'Call',
+                _buildContactChip(isDark, icon: Icons.phone_outlined, label: AppLocalizations.of(context).translate('ydm_call'),
                   onTap: () => launchUrl(Uri.parse('tel:$phone'))),
               if (chatUrl.isNotEmpty)
                 _buildContactChip(isDark, icon: Icons.chat_bubble_outline_rounded,
-                  label: isFr ? 'Chat' : 'Live Chat',
+                  label: AppLocalizations.of(context).translate('ydm_live_chat'),
                   onTap: () => launchUrl(Uri.parse(chatUrl), mode: LaunchMode.inAppBrowserView)),
             ],
           ),
@@ -1728,7 +1720,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             child: OutlinedButton.icon(
               onPressed: () => Navigator.pushNamed(context, '/contact-support'),
               icon: const Icon(Icons.headset_mic_rounded, size: 18),
-              label: Text(isFr ? 'Contacter le support' : 'Contact Support'),
+              label: Text(AppLocalizations.of(context).translate('contact_support')),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.burundiGreen,
                 side: BorderSide(color: AppColors.burundiGreen.withValues(alpha: 0.4)),
@@ -1844,7 +1836,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               color: isDark ? Colors.white60 : Colors.black54)),
           const SizedBox(height: 16),
           if (lastCheckedStr.isNotEmpty)
-            Text('Last checked at $lastCheckedStr',
+            Text('${AppLocalizations.of(context).translate('ydm_last_checked_at')} $lastCheckedStr',
               style: TextStyle(fontSize: 11, color: isDark ? Colors.white30 : Colors.black26)),
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -1888,7 +1880,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             child: const Icon(Icons.cancel_rounded, size: 36, color: AppColors.burundiRed),
           ),
           const SizedBox(height: 16),
-          Text('Application Not Approved', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+          Text(AppLocalizations.of(context).translate('ydm_not_approved'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : Colors.black87)),
           const SizedBox(height: 12),
           if (app.rejectionReason != null && app.rejectionReason!.isNotEmpty)
@@ -1927,10 +1919,10 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             child: const Icon(Icons.upload_file_rounded, size: 36, color: Colors.blue),
           ),
           const SizedBox(height: 16),
-          Text('Upload Your Documents', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+          Text(AppLocalizations.of(context).translate('ydm_upload_your_documents'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : Colors.black87)),
           const SizedBox(height: 8),
-          Text('Please upload the required documents to continue your application.',
+          Text(AppLocalizations.of(context).translate('ydm_upload_required_to_continue'),
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: isDark ? Colors.white60 : Colors.black54)),
           const SizedBox(height: 20),
@@ -1943,7 +1935,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 _loadData();
               },
               icon: const Icon(Icons.upload_rounded, color: Colors.white),
-              label: const Text('Upload Documents', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              label: Text(AppLocalizations.of(context).translate('ydm_upload_documents'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1971,7 +1963,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             children: [
               const Icon(Icons.warning_amber_rounded, color: AppColors.burundiRed),
               const SizedBox(width: 8),
-              Text('Documents Need Attention', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+              Text(AppLocalizations.of(context).translate('ydm_docs_need_attention'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : Colors.black87)),
             ],
           ),
@@ -2000,7 +1992,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 _loadData();
               },
               icon: const Icon(Icons.edit_document, color: Colors.white),
-              label: const Text('Fix Documents', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              label: Text(AppLocalizations.of(context).translate('ydm_fix_documents'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.burundiRed,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -2085,7 +2077,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 Icon(Icons.play_circle_outline_rounded, size: 20, color: isDark ? Colors.white70 : Colors.black54),
                 const SizedBox(width: 8),
                 Text(
-                  isFr ? 'Vidéo promotionnelle' : 'Promotional Video',
+                  AppLocalizations.of(context).translate('ydm_promo_video'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -2106,13 +2098,14 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               child: Stack(
                 children: [
                   if (thumbUrl.isNotEmpty)
-                    CachedNetworkImage(
+                    AppNetworkImage(
                       imageUrl: thumbUrl,
+                      hero: true,
                       width: double.infinity,
                       height: 200,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(height: 200, color: isDark ? Colors.grey[900] : Colors.grey[200]),
-                      errorWidget: (_, __, ___) => Container(
+                      placeholder: (_, _) => Container(height: 200, color: isDark ? Colors.grey[900] : Colors.grey[200]),
+                      errorWidget: (_, _, _) => Container(
                         height: 200,
                         color: isDark ? Colors.grey[900] : Colors.grey[200],
                         child: const Center(child: Icon(Icons.play_circle_fill, size: 56, color: Colors.white54)),
@@ -2207,7 +2200,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 Icon(Icons.photo_library_rounded, size: 20, color: isDark ? Colors.white70 : Colors.black54),
                 const SizedBox(width: 8),
                 Text(
-                  isFr ? 'Éditions précédentes' : 'Past Editions',
+                  AppLocalizations.of(context).translate('past_editions'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -2247,8 +2240,9 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                               backgroundColor: Colors.transparent,
                               child: GestureDetector(
                                 onTap: () => Navigator.pop(context),
-                                child: CachedNetworkImage(
+                                child: AppNetworkImage(
                                   imageUrl: Environment.fixMediaUrl(item.fileUrl),
+                                  hero: true,
                                   fit: BoxFit.contain,
                                 ),
                               ),
@@ -2259,12 +2253,12 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                       child: Stack(
                         children: [
                           if (imgUrl.isNotEmpty)
-                            CachedNetworkImage(
+                            AppNetworkImage(
                               imageUrl: imgUrl,
                               width: 200, height: 160,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(color: isDark ? Colors.grey[900] : Colors.grey[200]),
-                              errorWidget: (_, __, ___) => Container(
+                              placeholder: (_, _) => Container(color: isDark ? Colors.grey[900] : Colors.grey[200]),
+                              errorWidget: (_, _, _) => Container(
                                 color: isDark ? Colors.grey[900] : Colors.grey[200],
                                 child: const Center(child: Icon(Icons.image, color: Colors.grey)),
                               ),
@@ -2336,7 +2330,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             child: const Icon(Icons.badge_rounded, size: 40, color: Colors.white),
           ),
           const SizedBox(height: 16),
-          Text('Your ID Card is Ready!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,
+          Text(AppLocalizations.of(context).translate('ydm_id_card_ready'), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : Colors.black87)),
           const SizedBox(height: 8),
           if (app.participantCode != null)
@@ -2357,7 +2351,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             child: ElevatedButton.icon(
               onPressed: () => Navigator.pushNamed(context, '/youth-dialogue-credential'),
               icon: const Icon(Icons.credit_card_rounded, color: Colors.white),
-              label: const Text('View ID Card', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+              label: Text(AppLocalizations.of(context).translate('ydm_view_id_card'), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.purple,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -2370,8 +2364,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
   }
 
   Widget _buildRevokedCard(bool isDark, YouthDialogueApplication app) {
-    final isOpen = _settings?['is_registration_open'] ?? false;
-    final isFr = Provider.of<LanguageProvider>(context, listen: false).isFrench;
+    final l10n = AppLocalizations.of(context);
 
     return Container(
       width: double.infinity,
@@ -2395,7 +2388,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            isFr ? 'Accréditation révoquée' : 'Your Credential Has Been Revoked',
+            l10n.translate('ydm_credential_revoked_title'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 20,
@@ -2433,9 +2426,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             const SizedBox(height: 16),
           ],
           Text(
-            isFr
-                ? 'Votre accréditation a été révoquée et ne peut plus être utilisée.'
-                : 'Your credential has been revoked and can no longer be used.',
+            l10n.translate('ydm_credential_revoked_msg'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -2464,7 +2455,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 },
                 icon: const Icon(Icons.refresh_rounded, color: Colors.white),
                 label: Text(
-                  isFr ? 'Postuler à nouveau' : 'Apply Again',
+                  l10n.translate('ydm_apply_again'),
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -2484,9 +2475,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
               ),
               child: Text(
-                isFr
-                    ? 'Vous n\'êtes pas éligible pour postuler à nouveau à ce programme.'
-                    : 'You are not eligible to re-apply for this programme.',
+                l10n.translate('ydm_not_eligible_reapply'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -2569,6 +2558,7 @@ class _YDYouTubePlayerScreenState extends State<_YDYouTubePlayerScreen> {
                   top: MediaQuery.of(context).padding.top + 8,
                   left: 8,
                   child: IconButton(
+                    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                     icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
                     onPressed: () => _controller.toggleFullScreenMode(),
                   ),
@@ -2655,12 +2645,12 @@ class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isFr = widget.isFr;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(
-        title: Text(isFr ? 'Politique de Confidentialité' : 'Privacy Policy'),
+        title: Text(l10n.translate('privacy_policy')),
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -2683,9 +2673,7 @@ class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    isFr
-                        ? 'Veuillez lire et accepter la politique de confidentialité pour continuer.'
-                        : 'Please read and accept the privacy policy to continue.',
+                    l10n.translate('ydm_privacy_read_accept'),
                     style: TextStyle(
                       fontSize: 13, height: 1.4,
                       color: isDark ? Colors.white70 : Colors.black54,
@@ -2753,9 +2741,7 @@ class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            isFr
-                                ? 'J\'ai lu et j\'accepte la politique de confidentialité des données'
-                                : 'I have read and agree to the Data Privacy Policy',
+                            l10n.translate('ydm_privacy_agree'),
                             style: TextStyle(
                               fontSize: 13, fontWeight: FontWeight.w500,
                               color: isDark ? Colors.white : Colors.black87,
@@ -2773,7 +2759,7 @@ class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
                       onPressed: _agreed ? () => Navigator.pop(context, true) : null,
                       icon: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
                       label: Text(
-                        isFr ? 'Continuer vers la candidature' : 'Continue to Application',
+                        l10n.translate('ydm_continue_to_application'),
                         style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
@@ -2803,15 +2789,6 @@ class _YDStatusPage extends StatelessWidget {
   final bool isFr;
 
   const _YDStatusPage({required this.application, required this.isFr});
-
-  // Pipeline steps in order
-  static const _pipeline = [
-    'submitted',        // 0 — Applied
-    'under_review',     // 1 — Under Review
-    'documents',        // 2 — Documents Upload (accepted/documents_pending/documents_submitted)
-    'verification',     // 3 — Verification (documents_under_review)
-    'credential_issued',// 4 — Digital ID
-  ];
 
   int _currentStep() {
     // Revoked credential — show at Digital ID step (with red X)
@@ -2846,11 +2823,12 @@ class _YDStatusPage extends StatelessWidget {
     final isRejected = status == 'rejected';
     final isDocsRejected = status == 'documents_rejected';
     final isRevoked = application.isRevoked;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: Text(isFr ? 'Statut de candidature' : 'Application Status'),
+        title: Text(l10n.translate('ydm_application_status')),
         centerTitle: true,
         elevation: 0,
       ),
@@ -2861,33 +2839,33 @@ class _YDStatusPage extends StatelessWidget {
             const SizedBox(height: 8),
 
             // ── Hero status icon ──
-            _buildHeroIcon(isDark, status, step),
+            _buildHeroIcon(l10n, isDark, status, step),
             const SizedBox(height: 28),
 
             // ── Reference card ──
             if (application.referenceId != null && application.referenceId!.isNotEmpty)
-              _buildReferenceCard(isDark),
+              _buildReferenceCard(l10n, isDark),
 
             // ── Pipeline tracker ──
             const SizedBox(height: 20),
-            _buildPipeline(isDark, step, isRejected, isDocsRejected, isRevoked: isRevoked),
+            _buildPipeline(l10n, isDark, step, isRejected, isDocsRejected, isRevoked: isRevoked),
 
             // ── What happens next ──
             const SizedBox(height: 20),
-            _buildNextSteps(isDark, status, step, isRevoked: isRevoked),
+            _buildNextSteps(l10n, isDark, status, step, isRevoked: isRevoked),
 
             // ── Rejection details ──
             if (isRejected && application.rejectionReason != null && application.rejectionReason!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 20),
-                child: _buildRejectionCard(isDark),
+                child: _buildRejectionCard(l10n, isDark),
               ),
 
             // ── Docs rejection details ──
             if (isDocsRejected && application.documentsRejectionNotes != null && application.documentsRejectionNotes!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 20),
-                child: _buildDocsRejectionCard(isDark),
+                child: _buildDocsRejectionCard(l10n, isDark),
               ),
 
             const SizedBox(height: 40),
@@ -2898,7 +2876,7 @@ class _YDStatusPage extends StatelessWidget {
   }
 
   // ── Hero icon + title + subtitle ──
-  Widget _buildHeroIcon(bool isDark, String status, int step) {
+  Widget _buildHeroIcon(AppLocalizations l10n, bool isDark, String status, int step) {
     final IconData icon;
     final Color color;
     final String title;
@@ -2907,49 +2885,37 @@ class _YDStatusPage extends StatelessWidget {
     if (application.isRevoked) {
       icon = Icons.block_rounded;
       color = Colors.red;
-      title = isFr ? 'Accréditation révoquée' : 'Credential Revoked';
-      subtitle = isFr
-          ? 'Votre accréditation a été révoquée et ne peut plus être utilisée.'
-          : 'Your credential has been revoked and can no longer be used.';
+      title = l10n.translate('ydm_credential_revoked');
+      subtitle = l10n.translate('ydm_credential_revoked_msg');
     } else if (status == 'rejected') {
       icon = Icons.cancel_rounded;
       color = Colors.red;
-      title = isFr ? 'Candidature non retenue' : 'Application Not Accepted';
-      subtitle = isFr
-          ? 'Malheureusement, votre candidature n\'a pas été retenue par le comité de sélection.'
-          : 'Unfortunately, your application was not selected by the review committee.';
+      title = l10n.translate('ydm_not_accepted_title');
+      subtitle = l10n.translate('ydm_not_selected_msg');
     } else if (step <= 1) {
       // submitted / under_review
       icon = Icons.hourglass_top_rounded;
       color = Colors.orange;
-      title = isFr ? 'Candidature en cours de révision' : 'Application Under Review';
-      subtitle = isFr
-          ? 'Notre comité examine votre candidature. Vous serez notifié dès qu\'une décision sera prise.'
-          : 'Our committee is reviewing your application. You\'ll be notified once a decision is made.';
+      title = l10n.translate('ydm_under_review_title');
+      subtitle = l10n.translate('ydm_under_review_msg');
     } else if (step == 2) {
       // documents phase
       icon = Icons.upload_file_rounded;
       color = Colors.blue;
-      title = isFr ? 'Documents requis' : 'Documents Required';
-      subtitle = isFr
-          ? 'Votre candidature a été acceptée! Veuillez soumettre les documents requis.'
-          : 'Your application has been accepted! Please submit the required documents.';
+      title = l10n.translate('ydm_documents_required');
+      subtitle = l10n.translate('ydm_documents_required_msg');
     } else if (step == 3) {
       // verification
       icon = Icons.verified_user_outlined;
       color = Colors.orange;
-      title = isFr ? 'Vérification en cours' : 'Verification In Progress';
-      subtitle = isFr
-          ? 'Nos équipes vérifient vos documents. Vous serez notifié une fois la vérification terminée.'
-          : 'Our team is verifying your documents. You\'ll be notified once verification is complete.';
+      title = l10n.translate('ydm_verification_in_progress');
+      subtitle = l10n.translate('ydm_verification_msg');
     } else {
       // credential_issued
       icon = Icons.badge_rounded;
       color = Colors.purple;
-      title = isFr ? 'Identifiant numérique prêt' : 'Digital ID Ready';
-      subtitle = isFr
-          ? 'Votre identifiant numérique a été émis. Vous pouvez le consulter à tout moment.'
-          : 'Your Digital ID has been issued. You can view it anytime.';
+      title = l10n.translate('ydm_digital_id_ready');
+      subtitle = l10n.translate('ydm_digital_id_msg');
     }
 
     return Column(
@@ -2988,7 +2954,7 @@ class _YDStatusPage extends StatelessWidget {
   }
 
   // ── Reference number + date card ──
-  Widget _buildReferenceCard(bool isDark) {
+  Widget _buildReferenceCard(AppLocalizations l10n, bool isDark) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -3016,7 +2982,7 @@ class _YDStatusPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isFr ? 'Numéro de référence' : 'Reference Number',
+                  l10n.translate('ydm_reference_number'),
                   style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black45),
                 ),
                 const SizedBox(height: 2),
@@ -3043,7 +3009,7 @@ class _YDStatusPage extends StatelessWidget {
   }
 
   // ── Pipeline tracker — 5 real steps ──
-  Widget _buildPipeline(bool isDark, int currentStep, bool isRejected, bool isDocsRejected, {bool isRevoked = false}) {
+  Widget _buildPipeline(AppLocalizations l10n, bool isDark, int currentStep, bool isRejected, bool isDocsRejected, {bool isRevoked = false}) {
     final steps = [
       {'icon': Icons.app_registration_rounded, 'en': 'Applied', 'fr': 'Inscrit(e)'},
       {'icon': Icons.rate_review_outlined, 'en': 'Under Review', 'fr': 'En révision'},
@@ -3066,7 +3032,7 @@ class _YDStatusPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isFr ? 'Progression' : 'Progress',
+            l10n.translate('ydm_progress'),
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -3162,17 +3128,17 @@ class _YDStatusPage extends StatelessWidget {
                           // Extra label for rejected / docs rejected / revoked
                           if (isRejectedHere)
                             Text(
-                              isFr ? 'Non retenue' : 'Not accepted',
+                              l10n.translate('ydm_not_accepted'),
                               style: const TextStyle(fontSize: 12, color: Colors.red),
                             ),
                           if (isDocsRejectedHere)
                             Text(
-                              isFr ? 'Re-téléchargement nécessaire' : 'Re-upload required',
+                              l10n.translate('ydm_reupload_required'),
                               style: const TextStyle(fontSize: 12, color: Colors.orange),
                             ),
                           if (isRevokedHere)
                             Text(
-                              isFr ? 'Révoqué' : 'Revoked',
+                              l10n.translate('ydm_revoked'),
                               style: const TextStyle(fontSize: 12, color: Colors.red),
                             ),
                         ],
@@ -3221,7 +3187,7 @@ class _YDStatusPage extends StatelessWidget {
   }
 
   // ── What happens next ──
-  Widget _buildNextSteps(bool isDark, String status, int step, {bool isRevoked = false}) {
+  Widget _buildNextSteps(AppLocalizations l10n, bool isDark, String status, int step, {bool isRevoked = false}) {
     final List<Map<String, String>> items;
 
     if (isRevoked) {
@@ -3333,7 +3299,7 @@ class _YDStatusPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isFr ? 'Prochaines étapes' : 'What Happens Next',
+            l10n.translate('ydm_what_happens_next'),
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -3371,7 +3337,7 @@ class _YDStatusPage extends StatelessWidget {
   }
 
   // ── Rejection reason card ──
-  Widget _buildRejectionCard(bool isDark) {
+  Widget _buildRejectionCard(AppLocalizations l10n, bool isDark) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -3388,7 +3354,7 @@ class _YDStatusPage extends StatelessWidget {
               Icon(Icons.info_outline, size: 18, color: Colors.red.shade300),
               const SizedBox(width: 8),
               Text(
-                isFr ? 'Motif' : 'Reason',
+                l10n.translate('ydm_reason'),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -3412,7 +3378,7 @@ class _YDStatusPage extends StatelessWidget {
   }
 
   // ── Documents rejection card ──
-  Widget _buildDocsRejectionCard(bool isDark) {
+  Widget _buildDocsRejectionCard(AppLocalizations l10n, bool isDark) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -3429,7 +3395,7 @@ class _YDStatusPage extends StatelessWidget {
               Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange.shade300),
               const SizedBox(width: 8),
               Text(
-                isFr ? 'Documents à corriger' : 'Documents to Fix',
+                l10n.translate('ydm_documents_to_fix'),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -3449,9 +3415,7 @@ class _YDStatusPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            isFr
-                ? 'Veuillez re-télécharger uniquement le(s) document(s) concerné(s).'
-                : 'Please re-upload only the affected document(s).',
+            l10n.translate('ydm_reupload_affected_only'),
             style: TextStyle(
               fontSize: 12,
               fontStyle: FontStyle.italic,

@@ -7,7 +7,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:io';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
-import '../../config/app_ds.dart';
+import '../../l10n/app_localizations.dart';
+import 'package:intl/intl.dart';
 
 class EventTicketScreen extends StatefulWidget {
   final int submissionId;
@@ -42,7 +43,7 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to load ticket. Please try again.';
+          _error = AppLocalizations.of(context).translate('tk_load_failed');
           _isLoading = false;
         });
       }
@@ -52,17 +53,18 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Event Ticket'),
+        title: Text(l10n.translate('tk_title')),
         actions: [
           if (_ticketData != null)
             IconButton(
               icon: const Icon(Icons.share),
               onPressed: _shareTicket,
-              tooltip: 'Share Ticket',
+              tooltip: l10n.translate('tk_share'),
             ),
         ],
       ),
@@ -101,7 +103,7 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
                 _loadTicket();
               },
               icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              label: Text(AppLocalizations.of(context).translate('retry')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.burundiGreen,
                 foregroundColor: Colors.white,
@@ -114,6 +116,7 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
   }
 
   Widget _buildTicket(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     final data = _ticketData!;
     final eventName = data['event_name'] as String? ?? '';
     final eventDate = data['event_date'] as String?;
@@ -173,9 +176,9 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
                         ),
-                        child: const Text(
-                          'WAITLISTED',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.translate('tk_waitlisted'),
+                          style: const TextStyle(
                             color: Colors.orange,
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -192,9 +195,9 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
                         ),
-                        child: const Text(
-                          'CHECKED IN',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.translate('tk_checked_in'),
+                          style: const TextStyle(
                             color: Colors.greenAccent,
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -241,7 +244,7 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
                 child: Column(
                   children: [
                     Text(
-                      'Scan for Check-in',
+                      l10n.translate('tk_scan_checkin'),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -294,11 +297,11 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    _infoRow('Attendee', attendeeName, isDark),
+                    _infoRow(l10n.translate('tk_attendee'), attendeeName, isDark),
                     const SizedBox(height: 10),
-                    _infoRow('Email', attendeeEmail, isDark),
+                    _infoRow(l10n.translate('email'), attendeeEmail, isDark),
                     const SizedBox(height: 10),
-                    _infoRow('Status', status.toUpperCase(), isDark,
+                    _infoRow(l10n.translate('tk_status'), status.toUpperCase(), isDark,
                         valueColor: _getStatusColor(status)),
                   ],
                 ),
@@ -316,7 +319,7 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
                   ),
                 ),
                 child: Text(
-                  'Be 4 Africa 2025',
+                  'Be 4 Africa ${(DateTime.tryParse(eventDate ?? '') ?? DateTime.now()).year}',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -393,10 +396,10 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
 
   Widget _buildQrCodeWidget(String qrData) {
     if (qrData.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         width: 180,
         height: 180,
-        child: Center(child: Text('No QR data', style: TextStyle(color: Colors.grey))),
+        child: Center(child: Text(AppLocalizations.of(context).translate('tk_no_qr'), style: const TextStyle(color: Colors.grey))),
       );
     }
     return SizedBox(
@@ -448,18 +451,13 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
   String _formatDateRange(String startIso, String? endIso) {
     final start = DateTime.tryParse(startIso);
     if (start == null) return startIso;
-
-    final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    final startStr = '${months[start.month - 1]} ${start.day}, ${start.year}';
+    final fmt = DateFormat.yMMMd(Localizations.localeOf(context).languageCode);
+    final startStr = fmt.format(start);
 
     if (endIso != null) {
       final end = DateTime.tryParse(endIso);
       if (end != null && end.difference(start).inDays > 0) {
-        final endStr = '${months[end.month - 1]} ${end.day}, ${end.year}';
-        return '$startStr - $endStr';
+        return '$startStr - ${fmt.format(end)}';
       }
     }
     return startStr;
@@ -493,6 +491,8 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/event_ticket.png');
       await file.writeAsBytes(pngBytes);
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
 
       final box = context.findRenderObject() as RenderBox?;
       final origin = box != null
@@ -500,13 +500,13 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
           : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 1);
       await Share.shareXFiles(
         [XFile(file.path)],
-        text: 'My ticket for ${_ticketData?['event_name'] ?? 'event'}',
+        text: '${l10n.translate('tk_share_text')} ${_ticketData?['event_name'] ?? l10n.translate('event')}',
         sharePositionOrigin: origin,
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to share ticket.')),
+          SnackBar(content: Text(AppLocalizations.of(context).translate('tk_share_failed'))),
         );
       }
     }

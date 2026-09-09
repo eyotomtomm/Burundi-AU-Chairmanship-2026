@@ -79,6 +79,11 @@ class LoggingEmailBackend(SMTPEmailBackend):
             return 0
 
         total_sent = 0
+        # Django's contract: a backend raises when a send fails unless the
+        # caller asked for fail_silently. Swallowing everything here would let
+        # send_email_otp report "OTP sent successfully" for mail that never
+        # left, leaving the user waiting on a code that is not coming.
+        last_error = None
         for msg in email_messages:
             subject = getattr(msg, 'subject', '') or ''
             recipients = ', '.join(getattr(msg, 'to', []) or [])
@@ -92,13 +97,18 @@ class LoggingEmailBackend(SMTPEmailBackend):
                 total_sent += sent
                 status = 'sent' if sent else 'failed'
                 error = '' if sent else 'send_messages returned 0'
+                if not sent:
+                    last_error = RuntimeError('SMTP accepted no recipients')
             except (SMTPAuthenticationError, ConnectionRefusedError, OSError) as exc:
                 # Primary SMTP failed — try fallback server
                 sent, status, error = self._try_fallback(msg, exc)
                 total_sent += sent
+                if not sent:
+                    last_error = exc
             except Exception as exc:
                 status = 'failed'
                 error = str(exc)[:2000]
+                last_error = exc
 
             try:
                 EmailLog.objects.create(
@@ -113,6 +123,10 @@ class LoggingEmailBackend(SMTPEmailBackend):
             except Exception:
                 # Logging must never break real mail delivery.
                 pass
+
+        # The row is written either way; the caller still needs to know.
+        if last_error is not None and not self.fail_silently:
+            raise last_error
 
         return total_sent
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 
 class LiveQAWidget extends StatefulWidget {
   final int sessionId;
@@ -70,7 +71,7 @@ class _LiveQAWidgetState extends State<LiveQAWidget> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load questions.';
+          _errorMessage = AppLocalizations.of(context).translate('w_qa_load_failed');
           _isLoading = false;
         });
       }
@@ -128,7 +129,7 @@ class _LiveQAWidgetState extends State<LiveQAWidget> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Failed to submit question. Try again.'),
+          content: Text(AppLocalizations.of(context).translate('w_qa_submit_failed')),
           backgroundColor: AppColors.burundiRed,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -205,7 +206,7 @@ class _LiveQAWidgetState extends State<LiveQAWidget> {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Live Q&A',
+            AppLocalizations.of(context).translate('w_qa_title'),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -249,7 +250,7 @@ class _LiveQAWidgetState extends State<LiveQAWidget> {
                     color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                   ),
             padding: EdgeInsets.zero,
-            tooltip: 'Refresh questions',
+            tooltip: AppLocalizations.of(context).translate('w_qa_refresh'),
           ),
         ),
       ],
@@ -278,7 +279,7 @@ class _LiveQAWidgetState extends State<LiveQAWidget> {
                 color: isDark ? AppColors.darkText : AppColors.lightText,
               ),
               decoration: InputDecoration(
-                hintText: 'Ask a question...',
+                hintText: AppLocalizations.of(context).translate('w_qa_ask_hint'),
                 hintStyle: TextStyle(
                   color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                   fontSize: 14,
@@ -366,7 +367,7 @@ class _LiveQAWidgetState extends State<LiveQAWidget> {
             TextButton.icon(
               onPressed: _loadQuestions,
               icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Retry'),
+              label: Text(AppLocalizations.of(context).translate('retry')),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.burundiGreen,
               ),
@@ -396,7 +397,7 @@ class _LiveQAWidgetState extends State<LiveQAWidget> {
             ),
             const SizedBox(height: 10),
             Text(
-              'No questions yet',
+              AppLocalizations.of(context).translate('w_qa_none'),
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -405,7 +406,7 @@ class _LiveQAWidgetState extends State<LiveQAWidget> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Be the first to ask!',
+              AppLocalizations.of(context).translate('w_qa_be_first'),
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? Colors.white38 : Colors.black38,

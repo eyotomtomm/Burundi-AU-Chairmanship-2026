@@ -5,7 +5,6 @@ import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
-import '../../config/app_ds.dart';
 
 class ProfileCompletionScreen extends StatefulWidget {
   const ProfileCompletionScreen({super.key});
@@ -82,11 +81,12 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       appBar: AppBar(
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
         leading: IconButton(
+          tooltip: l10n.translate('close'),
           icon: Icon(Icons.close, color: isDark ? Colors.white : Colors.black87),
           onPressed: () => _confirmSkip(context),
         ),
         title: Text(
-          'Complete Profile',
+          l10n.translate('pc_complete_profile'),
           style: TextStyle(
             color: isDark ? Colors.white : Colors.black87,
             fontWeight: FontWeight.w700,
@@ -102,7 +102,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header
-                _buildHeader(isDark),
+                _buildHeader(isDark, l10n),
                 const SizedBox(height: 32),
 
                 // Name Field
@@ -118,19 +118,19 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                 const SizedBox(height: 20),
 
                 // Nationality Dropdown
-                _buildNationalityField(isDark),
+                _buildNationalityField(isDark, l10n),
                 const SizedBox(height: 20),
 
                 // Date of Birth Picker
-                _buildDobField(isDark),
+                _buildDobField(isDark, l10n),
                 const SizedBox(height: 32),
 
                 // Submit Button
-                _buildSubmitButton(isDark),
+                _buildSubmitButton(isDark, l10n),
                 const SizedBox(height: 16),
 
                 // Skip Button
-                _buildSkipButton(isDark),
+                _buildSkipButton(isDark, l10n),
               ],
             ),
           ),
@@ -139,7 +139,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     );
   }
 
-  Widget _buildHeader(bool isDark) {
+  Widget _buildHeader(bool isDark, AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -157,7 +157,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         ),
         const SizedBox(height: 20),
         Text(
-          'Tell us about yourself',
+          l10n.translate('pc_tell_us'),
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w800,
@@ -166,7 +166,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Complete your profile to get personalized content and exclusive features.',
+          l10n.translate('pc_intro'),
           style: TextStyle(
             fontSize: 15,
             height: 1.5,
@@ -182,7 +182,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Full Name',
+          l10n.translate('full_name'),
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -193,7 +193,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         TextFormField(
           controller: _nameController,
           decoration: InputDecoration(
-            hintText: 'Enter your full name',
+            hintText: l10n.translate('pc_enter_full_name'),
             prefixIcon: Icon(Icons.person_outline),
             filled: true,
             fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
@@ -212,10 +212,10 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Please enter your name';
+              return l10n.translate('pc_name_required');
             }
             if (value.trim().length < 2) {
-              return 'Name must be at least 2 characters';
+              return l10n.translate('pc_name_min');
             }
             return null;
           },
@@ -230,7 +230,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Phone Number',
+          l10n.translate('pc_phone_number'),
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -243,7 +243,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           children: [
             // Country code selector with flag
             GestureDetector(
-              onTap: () => _showPhoneCountryPicker(isDark),
+              onTap: () => _showPhoneCountryPicker(isDark, l10n),
               child: Container(
                 height: 56,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -284,7 +284,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                   FilteringTextInputFormatter.digitsOnly,
                 ],
                 decoration: InputDecoration(
-                  hintText: 'Phone number (optional)',
+                  hintText: l10n.translate('pc_phone_optional'),
                   prefixIcon: const Icon(Icons.phone_outlined),
                   filled: true,
                   fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
@@ -309,7 +309,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     );
   }
 
-  void _showPhoneCountryPicker(bool isDark) {
+  void _showPhoneCountryPicker(bool isDark, AppLocalizations l10n) {
     String searchQuery = '';
     final entries = AppConstants.countryDialCodes.entries
         .where((e) => AppConstants.nationalityChoices.containsKey(e.key))
@@ -354,7 +354,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                       child: TextField(
                         autofocus: true,
                         decoration: InputDecoration(
-                          hintText: 'Search country...',
+                          hintText: l10n.translate('pc_search_country'),
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -407,15 +407,15 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
   Widget _buildGenderSelector(bool isDark, AppLocalizations l10n) {
     final genderOptions = [
-      {'value': 'male', 'label': 'Male', 'icon': Icons.male},
-      {'value': 'female', 'label': 'Female', 'icon': Icons.female},
+      {'value': 'male', 'label': l10n.translate('pc_male'), 'icon': Icons.male},
+      {'value': 'female', 'label': l10n.translate('pc_female'), 'icon': Icons.female},
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Gender',
+          l10n.translate('pc_gender'),
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -479,12 +479,12 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     );
   }
 
-  Widget _buildNationalityField(bool isDark) {
+  Widget _buildNationalityField(bool isDark, AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Nationality',
+          l10n.translate('pc_nationality'),
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -497,7 +497,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
               ? _selectedNationality
               : null,
           decoration: InputDecoration(
-            hintText: 'Select your nationality',
+            hintText: l10n.translate('pc_select_nationality'),
             prefixIcon: const Icon(Icons.flag_outlined),
             filled: true,
             fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
@@ -534,7 +534,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           },
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Please select your nationality';
+              return l10n.translate('pc_nationality_required');
             }
             return null;
           },
@@ -545,8 +545,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     );
   }
 
-  Widget _buildDobField(bool isDark) {
-    String dobText = 'Select your date of birth';
+  Widget _buildDobField(bool isDark, AppLocalizations l10n) {
+    String dobText = l10n.translate('pc_select_dob');
     if (_selectedDob != null) {
       dobText = '${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}';
     }
@@ -555,7 +555,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Date of Birth',
+          l10n.translate('pc_dob'),
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -621,7 +621,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     );
   }
 
-  Widget _buildSubmitButton(bool isDark) {
+  Widget _buildSubmitButton(bool isDark, AppLocalizations l10n) {
     return SizedBox(
       width: double.infinity,
       height: 56,
@@ -641,30 +641,30 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   Text(
-                    'Save Profile',
-                    style: TextStyle(
+                    l10n.translate('pc_save_profile'),
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Icon(Icons.check_circle_outline, size: 20),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.check_circle_outline, size: 20),
                 ],
               ),
       ),
     );
   }
 
-  Widget _buildSkipButton(bool isDark) {
+  Widget _buildSkipButton(bool isDark, AppLocalizations l10n) {
     return SizedBox(
       width: double.infinity,
       child: TextButton(
         onPressed: () => _confirmSkip(context),
         child: Text(
-          'I\'ll do this later',
+          l10n.translate('pc_do_later'),
           style: TextStyle(
             fontSize: 14,
             color: isDark ? Colors.white54 : Colors.black45,
@@ -678,17 +678,18 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
   Future<void> _submitProfile() async {
     if (!_formKey.currentState!.validate()) return;
+    final l10n = AppLocalizations.of(context);
 
     if (_selectedGender == null) {
-      _showSnackBar(context, 'Please select your gender', isError: true);
+      _showSnackBar(context, l10n.translate('pc_gender_required'), isError: true);
       return;
     }
     if (_selectedNationality == null || _selectedNationality!.isEmpty) {
-      _showSnackBar(context, 'Please select your nationality', isError: true);
+      _showSnackBar(context, l10n.translate('pc_nationality_required'), isError: true);
       return;
     }
     if (_selectedDob == null) {
-      _showSnackBar(context, 'Please select your date of birth', isError: true);
+      _showSnackBar(context, l10n.translate('pc_dob_required'), isError: true);
       return;
     }
 
@@ -711,7 +712,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       );
 
       if (success && mounted) {
-        _showSnackBar(context, 'Profile updated successfully!');
+        _showSnackBar(context, l10n.translate('profile_updated'));
         await Future.delayed(const Duration(milliseconds: 500));
         if (mounted) {
           Navigator.of(context).pushReplacementNamed('/home');
@@ -721,7 +722,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar(context, 'Failed to update profile: $e', isError: true);
+        _showSnackBar(context, '${l10n.translate('pc_update_failed')}: $e', isError: true);
       }
     } finally {
       if (mounted) {
@@ -733,6 +734,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   void _confirmSkip(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     showDialog(
       context: context,
@@ -740,7 +742,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          'Skip Profile Completion?',
+          l10n.translate('pc_skip_title'),
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -748,7 +750,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           ),
         ),
         content: Text(
-          'You can complete your profile anytime from the settings.',
+          l10n.translate('pc_skip_body'),
           style: TextStyle(
             fontSize: 15,
             color: isDark ? Colors.white70 : Colors.black87,
@@ -757,7 +759,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(l10n.translate('cancel')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -769,7 +771,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Skip'),
+            child: Text(l10n.translate('skip')),
           ),
         ],
       ),

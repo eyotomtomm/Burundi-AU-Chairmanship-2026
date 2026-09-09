@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
+import '../../l10n/app_localizations_generated.dart';
+import '../../widgets/app_network_image.dart';
+import '../../config/app_ds.dart';
 
 class OnboardingScreen extends StatefulWidget {
   /// When true, shows "Close" instead of "Get Started" and skips the
@@ -47,57 +50,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// Hardcoded bilingual fallback steps — used when the API returns nothing.
   static List<Map<String, dynamic>> _fallbackSteps(String lang) {
-    final isFr = lang == 'fr';
+    final g = lookupAppLocalizationsGenerated(Locale(lang));
     return [
-      {
-        'icon': Icons.celebration_rounded,
-        'title': isFr ? 'Bienvenue sur B4Africa' : 'Welcome to B4Africa',
-        'description': isFr
-            ? 'Votre compagnon pour la Présidence de l\'Union Africaine 2026. Faisons le tour !'
-            : 'Your companion for the African Union Chairmanship 2026. Let\'s show you around!',
-      },
-      {
-        'icon': Icons.article_rounded,
-        'title': isFr ? 'Actualités' : 'News',
-        'description': isFr
-            ? 'Restez informé des derniers articles et annonces'
-            : 'Stay updated with the latest articles and announcements',
-      },
-      {
-        'icon': Icons.event_rounded,
-        'title': isFr ? 'Événements' : 'Events',
-        'description': isFr
-            ? 'Parcourez les événements à venir, inscrivez-vous et obtenez des billets'
-            : 'Browse upcoming events, register, and get tickets',
-      },
-      {
-        'icon': Icons.auto_stories_rounded,
-        'title': isFr ? 'Magazine Numérique' : 'Digital Magazine',
-        'description': isFr
-            ? 'Lisez le magazine numérique et les articles en vedette'
-            : 'Read the digital magazine and featured articles',
-      },
-      {
-        'icon': Icons.live_tv_rounded,
-        'title': isFr ? 'Diffusions en Direct' : 'Live Feeds',
-        'description': isFr
-            ? 'Regardez les diffusions en direct et le contenu vidéo'
-            : 'Watch live streams and video content',
-      },
-      {
-        'icon': Icons.translate_rounded,
-        'title': isFr ? 'Traduction' : 'Translate',
-        'description': isFr
-            ? 'Traduisez le contenu entre les langues instantanément'
-            : 'Translate content between languages instantly',
-      },
-      {
-        'icon': Icons.photo_library_rounded,
-        'title': isFr ? 'Galerie' : 'Gallery',
-        'description': isFr
-            ? 'Explorez les albums photos des événements et sommets'
-            : 'Explore photo albums from events and summits',
-      },
+      {'icon': Icons.celebration_rounded, 'title': g.onboarding_welcome, 'description': g.onboarding_welcome_desc},
+      {'icon': Icons.article_rounded, 'title': g.onboarding_news, 'description': g.onboarding_news_desc},
+      // Explore is the newest surface, so it is flagged and carried near the
+      // front where a returning reader will actually meet it.
+      {'icon': Icons.forum_rounded, 'title': g.onboarding_explore, 'description': g.onboarding_explore_desc, 'is_new': true},
+      {'icon': Icons.event_rounded, 'title': g.onboarding_events, 'description': g.onboarding_events_desc},
+      {'icon': Icons.auto_stories_rounded, 'title': g.onboarding_magazine, 'description': g.onboarding_magazine_desc},
+      {'icon': Icons.live_tv_rounded, 'title': g.onboarding_live, 'description': g.onboarding_live_desc},
+      {'icon': Icons.translate_rounded, 'title': g.onboarding_translate, 'description': g.onboarding_translate_desc},
+      {'icon': Icons.photo_library_rounded, 'title': g.onboarding_gallery, 'description': g.onboarding_gallery_desc},
     ];
   }
 
@@ -179,64 +143,117 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final isLastPage = _currentPage == _steps.length - 1;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       body: SafeArea(
         child: Column(
           children: [
-            // Skip button
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8, right: 8),
-                child: TextButton(
-                  onPressed: _completeOnboarding,
-                  child: Text(
-                    l10n.skip,
+            // Where you are, and the way out. A counter beats a row of dots
+            // when there are eight steps to get through.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+              child: Row(
+                children: [
+                  Text(
+                    '${_currentPage + 1} ${l10n.translate('guide_step_of')} ${_steps.length}',
                     style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.burundiGreen,
-                      fontSize: 15,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: Ds.muted(context),
                     ),
                   ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _completeOnboarding,
+                    child: Text(
+                      widget.isReplay ? l10n.close : l10n.skip,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Ds.green,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(Ds.rPill),
+                child: LinearProgressIndicator(
+                  value: _steps.isEmpty ? 0 : (_currentPage + 1) / _steps.length,
+                  minHeight: 4,
+                  backgroundColor: Ds.subtle(context),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Ds.green),
                 ),
               ),
             ),
-            // Pages
             Expanded(
               child: PageView.builder(
                 controller: _pageCtrl,
                 itemCount: _steps.length,
                 onPageChanged: (i) => setState(() => _currentPage = i),
                 itemBuilder: (context, index) {
-                  final step = _steps[index];
-                  final imageUrl = _resolveImage(step, isDark);
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                  final s = _steps[index];
+                  final imageUrl = _resolveImage(s, isDark);
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (imageUrl != null)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: Image.network(
-                              imageUrl,
-                              height: 260,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, _, _) => _buildIconPlaceholder(step),
-                            ),
-                          )
-                        else
-                          _buildIconPlaceholder(step),
-                        const SizedBox(height: 40),
-                        Text(
-                          step['title'] ?? '',
-                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
+                        AspectRatio(
+                          aspectRatio: 1.18,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(Ds.rCard + 4),
+                            child: imageUrl != null
+                                ? AppNetworkImage(
+                                    imageUrl: imageUrl,
+                                    fit: BoxFit.cover,
+                                    hero: true,
+                                    errorWidget: (_, _, _) => _buildIconPlaceholder(s),
+                                  )
+                                : _buildIconPlaceholder(s),
+                          ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 26),
+                        if (s['is_new'] == true) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Ds.goldTintOf(context),
+                              borderRadius: BorderRadius.circular(Ds.rPill),
+                            ),
+                            child: Text(
+                              l10n.translate('guide_new_badge').toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: Ds.goldInk,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         Text(
-                          step['description'] ?? '',
-                          style: TextStyle(fontSize: 16, color: Colors.grey[600], height: 1.5),
-                          textAlign: TextAlign.center,
+                          s['title'] ?? '',
+                          style: TextStyle(
+                            fontSize: 27,
+                            fontWeight: FontWeight.w800,
+                            height: 1.15,
+                            letterSpacing: -0.5,
+                            color: Ds.ink(context),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          s['description'] ?? '',
+                          style: TextStyle(
+                            fontSize: 15.5,
+                            color: Ds.body(context),
+                            height: 1.6,
+                          ),
                         ),
                       ],
                     ),
@@ -244,49 +261,58 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
               ),
             ),
-            // Page indicators
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(_steps.length, (i) {
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: _currentPage == i ? 24 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _currentPage == i ? AppColors.burundiGreen : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  );
-                }),
-              ),
-            ),
-            // Action button
-            Padding(
-              padding: const EdgeInsets.fromLTRB(40, 0, 40, 32),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isLastPage
-                      ? _completeOnboarding
-                      : () => _pageCtrl.nextPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
+                children: [
+                  // Only offered once there is somewhere to go back to.
+                  if (_currentPage > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: TextButton(
+                        onPressed: () => _pageCtrl.previousPage(
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeOutCubic,
+                        ),
+                        child: Text(
+                          l10n.translate('guide_back'),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: Ds.body(context),
                           ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.burundiGreen,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  Expanded(
+                    child: SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: isLastPage
+                            ? _completeOnboarding
+                            : () => _pageCtrl.nextPage(
+                                  duration: const Duration(milliseconds: 280),
+                                  curve: Curves.easeOutCubic,
+                                ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Ds.green,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(Ds.rTile + 2)),
+                        ),
+                        child: Text(
+                          isLastPage
+                              ? (widget.isReplay ? l10n.close : l10n.getStarted)
+                              : l10n.next,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: Colors.white),
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Text(
-                    isLastPage
-                        ? (widget.isReplay ? l10n.close : l10n.getStarted)
-                        : l10n.next,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-                  ),
-                ),
+                ],
               ),
             ),
           ],
@@ -295,27 +321,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  /// The panel behind each step when the CMS has no artwork for it. A solid
+  /// brand plate with the glyph carried large, rather than the old 10%-alpha
+  /// wash that read as a placeholder for a missing image.
+
   Widget _buildIconPlaceholder(Map<String, dynamic> step) {
     final icon = _resolveIcon(step);
 
     return Container(
-      width: 200,
-      height: 200,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            AppColors.burundiGreen.withValues(alpha: 0.1),
-            const Color(0xFFFFB74D).withValues(alpha: 0.1),
-          ],
+          colors: [Ds.greenDeep, Ds.green],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(32),
       ),
-      child: Icon(
-        icon,
-        size: 80,
-        color: AppColors.burundiGreen.withValues(alpha: 0.5),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // A soft off-centre highlight so the plate is not a flat block.
+          Positioned(
+            right: -40,
+            top: -40,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.07),
+              ),
+            ),
+          ),
+          Center(child: Icon(icon, size: 84, color: Colors.white)),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(height: 4, color: Ds.gold),
+          ),
+        ],
       ),
     );
   }

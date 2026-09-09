@@ -27,6 +27,11 @@ class SplashScreen extends StatefulWidget {
 
 /// Cinzel — Roman inscriptional capitals. One family carries the whole crest;
 /// weight and tracking do the work instead of a second typeface.
+/// Splash typography.
+///
+/// Cinzel is a Roman inscriptional face: every splash line came out looking
+/// like the same carved plaque, so the lines here use the system face with
+/// real tracking and the hierarchy comes from size and weight instead.
 TextStyle _carved({
   required double size,
   required double weight,
@@ -34,11 +39,27 @@ TextStyle _carved({
   double height = 1.0,
 }) =>
     TextStyle(
-      fontFamily: 'Cinzel',
       fontSize: size,
       height: height,
       color: color,
-      fontVariations: [FontVariation('wght', weight)],
+      fontWeight: FontWeight.values[
+          ((weight / 100).clamp(1, 9)).round() - 1],
+    );
+
+/// Supporting lines: overline, quote, loading label.
+TextStyle _splashSupport({
+  required double size,
+  required FontWeight weight,
+  required Color color,
+  double height = 1.0,
+  double tracking = 0.3,
+}) =>
+    TextStyle(
+      fontSize: size,
+      height: height,
+      color: color,
+      fontWeight: weight,
+      letterSpacing: tracking,
     );
 
 class _SplashScreenState extends State<SplashScreen>
@@ -237,10 +258,11 @@ class _SplashScreenState extends State<SplashScreen>
                           child: _Tracked(
                             'REPUBLIC OF BURUNDI',
                             spacing: 5.5,
-                            style: _carved(
+                            style: _splashSupport(
                               size: 11.5,
-                              weight: 600,
-                              color: AppColors.auGold.withValues(alpha: 0.95),
+                              weight: FontWeight.w600,
+                              color: Colors.white.withValues(alpha: 0.92),
+                              tracking: 0.6,
                             ),
                           ),
                         ),
@@ -260,9 +282,9 @@ class _SplashScreenState extends State<SplashScreen>
                                 final x = _sheen.value;
                                 return LinearGradient(
                                   colors: const [
-                                    AppColors.auGold,
-                                    Color(0xFFFFF3B0),
-                                    AppColors.auGold,
+                                    Colors.white,
+                                    Color(0xFFFFFFFF),
+                                    Colors.white,
                                   ],
                                   stops: [
                                     (x - 0.2).clamp(0.0, 0.98),
@@ -323,13 +345,14 @@ class _SplashScreenState extends State<SplashScreen>
                           begin: 0.18,
                           end: 0.60,
                           child: _Tracked(
-                            'CHAIRMANSHIP 2026',
+                            'CHAIRMANSHIP',
                             spacing: 4.5,
-                            style: _carved(
+                            style: _splashSupport(
                               size: 12.5,
-                              weight: 500,
+                              weight: FontWeight.w500,
                               color: AppColors.burundiWhite
                                   .withValues(alpha: 0.82),
+                              tracking: 0.4,
                             ),
                           ),
                         ),
@@ -363,13 +386,14 @@ class _SplashScreenState extends State<SplashScreen>
                               child: Text(
                                 '\u201CThe sacred drums resound from Burundi, the heart of Africa, so does our commitment to guide our continent toward the Africa we want.\u201D',
                                 textAlign: TextAlign.center,
-                                style: _carved(
-                                  size: 12,
-                                  weight: 400,
+                                style: _splashSupport(
+                                  size: 12.5,
+                                  weight: FontWeight.w400,
                                   color: AppColors.burundiWhite
-                                      .withValues(alpha: 0.75),
-                                  height: 1.9,
-                                ).copyWith(letterSpacing: 0.3),
+                                      .withValues(alpha: 0.78),
+                                  height: 1.75,
+                                  tracking: 0.2,
+                                ).copyWith(fontStyle: FontStyle.italic),
                               ),
                             ),
                           ),
@@ -404,7 +428,7 @@ class _SplashScreenState extends State<SplashScreen>
       child: Container(
         width: 7,
         height: 7,
-        decoration: const BoxDecoration(color: AppColors.auGold),
+        decoration: const BoxDecoration(color: Colors.white),
       ),
     );
   }
@@ -430,7 +454,7 @@ class _SplashScreenState extends State<SplashScreen>
                     height: 9,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.auGold
+                      color: Colors.white
                           .withValues(alpha: 0.55 + 0.45 * lift),
                     ),
                   ),
@@ -469,8 +493,8 @@ class _GoldRule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = [
-      AppColors.auGold.withValues(alpha: 0.0),
-      AppColors.auGold.withValues(alpha: 0.55),
+      Colors.white.withValues(alpha: 0.0),
+      Colors.white.withValues(alpha: 0.5),
     ];
     return Container(
       height: 1,
@@ -530,7 +554,9 @@ class _SplashPatternPainter extends CustomPainter {
     // Draw the motif into a layer so the mask below can fade it as one piece.
     canvas.saveLayer(rect, Paint());
 
-    final gold = AppColors.auGold;
+    // The imigongo lattice reads as texture behind the drum; white keeps it
+    // in the flag's palette instead of tinting the whole field gold.
+    final gold = Colors.white;
     final outer = Paint()
       ..color = gold
       ..style = PaintingStyle.stroke

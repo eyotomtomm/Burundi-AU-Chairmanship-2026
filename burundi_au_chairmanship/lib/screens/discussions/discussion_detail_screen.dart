@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
 import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -10,10 +11,11 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../utils/input_sanitizer.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
 import '../../config/app_ds.dart';
 import '../../config/environment.dart';
 import '../../widgets/verified_badge.dart';
+import '../../widgets/async_content_view.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import '../feature_card/media_video_player_screen.dart';
 import '../../services/share_service.dart';
@@ -28,12 +30,19 @@ class DiscussionDetailScreen extends StatefulWidget {
 }
 
 class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
   final ApiService _api = ApiService();
   final TextEditingController _replyCtrl = TextEditingController();
   final FocusNode _replyFocusNode = FocusNode();
   Map<String, dynamic>? _discussion;
   List<Map<String, dynamic>> _replies = [];
+  // Replies paginate at 50; without this a long thread stops at the first page.
+  int _repliesPage = 1;
+  bool _moreReplies = false;
+  bool _loadingReplies = false;
   bool _loading = true;
+  bool _loadFailed = false;
+  bool _posting = false;
   final LikeService _likeService = LikeService();
   VoidCallback? _removeLikeListener;
 
@@ -68,6 +77,21 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
         }
       });
     });
+  }
+
+  Future<void> _loadMoreReplies() async {
+    if (_loadingReplies) return;
+    setState(() => _loadingReplies = true);
+    try {
+      final next = await _api.getDiscussionReplies(widget.discussionId,
+          page: _repliesPage + 1);
+      _repliesPage += 1;
+      _replies = [..._replies, ...next];
+      _moreReplies = next.length >= 50;
+    } catch (_) {
+      _moreReplies = false;
+    }
+    if (mounted) setState(() => _loadingReplies = false);
   }
 
   Future<void> _recordView() async {
@@ -105,7 +129,12 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
         );
       }
       _replies = await _api.getDiscussionReplies(widget.discussionId);
-    } catch (_) {}
+      _repliesPage = 1;
+      _moreReplies = _replies.length >= 50;
+      _loadFailed = false;
+    } catch (_) {
+      _loadFailed = true;
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -222,7 +251,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
+                child: AppNetworkImage(
                   imageUrl: url,
                   width: 220,
                   fit: BoxFit.cover,
@@ -255,14 +284,31 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
       return;
     }
 
+    if (_posting) return;
+    setState(() => _posting = true);
     try {
       await _api.postDiscussionReply(widget.discussionId, text);
+      if (!mounted) return;
       _replyCtrl.clear();
       FocusScope.of(context).unfocus();
       _loadData();
     } on ApiException catch (e) {
       if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context).translate('generic_error'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _posting = false);
+    }
+  }
+
+  String _formatDate(BuildContext context, dynamic raw) {
+    final dt = DateTime.tryParse(raw?.toString() ?? '');
+    if (dt == null) return raw?.toString() ?? '';
+    return DateFormat.yMMMd(Localizations.localeOf(context).languageCode).add_jm().format(dt.toLocal());
   }
 
   @override
@@ -281,13 +327,13 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(
-        title: const Text('Discussion'),
+        title: Text(_l10n.translate('rs_discussion')),
         actions: [
           if (_discussion != null)
             Builder(
               builder: (btnContext) => IconButton(
                 icon: const Icon(Icons.share_rounded),
-                tooltip: 'Share',
+                tooltip: _l10n.translate('share'),
                 onPressed: () => ShareService.item(
                   btnContext,
                   kind: 'discussions',
@@ -303,7 +349,13 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _discussion == null
-              ? const Center(child: Text('Discussion not found'))
+              ? (_loadFailed
+                  ? AsyncContentView(
+                      state: AsyncContentState.error,
+                      onRetry: _loadData,
+                      child: const SizedBox.shrink(),
+                    )
+                  : Center(child: Text(_l10n.translate('rs_discussion_not_found'))))
               : Column(
                   children: [
                     Expanded(
@@ -348,7 +400,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                                               ],
                                             ],
                                           ),
-                                          Text(_discussion!['created_at'] ?? '', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                          Text(_formatDate(context, _discussion!['created_at']), style: TextStyle(fontSize: 12, color: Colors.grey[500])),
                                         ],
                                       ),
                                     ],
@@ -430,7 +482,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                             ),
                             const SizedBox(height: 20),
                             SizedBox(key: _commentsSectionKey, height: 0),
-                            Text('Replies (${_replies.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text('${_l10n.translate('rs_replies')} (${_replies.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
                             ..._replies.map((reply) {
                               final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -450,11 +502,28 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                                 onEdit: (content) => ApiService().editDiscussionReply(discussionId, reply['id'], content),
                               );
                             }),
+                            if (_moreReplies)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Center(
+                                  child: _loadingReplies
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2, color: Ds.green))
+                                      : TextButton(
+                                          onPressed: _loadMoreReplies,
+                                          child: Text(_l10n
+                                              .translate('rs_load_more_replies')),
+                                        ),
+                                ),
+                              ),
                             if (_replies.isEmpty)
                               Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 32),
                                 child: Center(
-                                  child: Text('No replies yet. Be the first!', style: TextStyle(color: Colors.grey[500])),
+                                  child: Text(_l10n.translate('rs_no_replies_yet'), style: TextStyle(color: Ds.muted(context))),
                                 ),
                               ),
                           ],
@@ -477,7 +546,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                                 focusNode: _replyFocusNode,
                                 maxLength: InputSanitizer.maxCommentLength,
                                 decoration: InputDecoration(
-                                  hintText: 'Write a reply...',
+                                  hintText: _l10n.translate('rs_write_reply_hint'),
                                   counterText: '',
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                                   filled: true,
@@ -489,7 +558,8 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                             ),
                             const SizedBox(width: 8),
                             IconButton(
-                              onPressed: _postReply,
+                              onPressed: _posting ? null : _postReply,
+                              tooltip: _l10n.translate('send'),
                               icon: const Icon(Icons.send, color: AppColors.burundiGreen),
                             ),
                           ],

@@ -3,7 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
@@ -20,6 +20,7 @@ import '../../widgets/async_content_view.dart';
 import '../../widgets/sliver_async_content_view.dart';
 import '../../services/like_service.dart';
 import 'article_detail_screen.dart';
+import '../../services/read_service.dart';
 
 class NewsScreen extends StatefulWidget {
   final bool isTab;
@@ -48,6 +49,8 @@ class _NewsScreenState extends State<NewsScreen> {
   @override
   void initState() {
     super.initState();
+    ReadService.instance.addListener(_onReadChanged);
+    ReadService.instance.load();
     _removeLikeListener = _likeService.addListener((key, state) {
       if (key.startsWith('article:') && mounted) setState(() {});
     });
@@ -57,6 +60,7 @@ class _NewsScreenState extends State<NewsScreen> {
 
   @override
   void dispose() {
+    ReadService.instance.removeListener(_onReadChanged);
     _removeLikeListener?.call();
     _featuredTimer?.cancel();
     _featuredController.dispose();
@@ -285,10 +289,11 @@ class _NewsScreenState extends State<NewsScreen> {
     );
   }
 
-  Widget _articleImage(Article article, {BoxFit fit = BoxFit.cover}) {
-    return CachedNetworkImage(
+  Widget _articleImage(Article article, {BoxFit fit = BoxFit.cover, bool hero = false}) {
+    return AppNetworkImage(
       imageUrl: Environment.fixMediaUrl(article.imageUrl),
       fit: fit,
+      hero: hero,
       placeholder: (_, _) => const DsImagePlaceholder(radius: 0),
       errorWidget: (_, _, _) =>
           const DsImagePlaceholder(radius: 0, icon: Icons.article_rounded),
@@ -369,7 +374,7 @@ class _NewsScreenState extends State<NewsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: 190, width: double.infinity, child: _articleImage(article)),
+          SizedBox(height: 190, width: double.infinity, child: _articleImage(article, hero: true)),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -379,7 +384,7 @@ class _NewsScreenState extends State<NewsScreen> {
                   children: [
                     DsPill(l10n.translate('featured').toUpperCase()),
                     const SizedBox(width: 8),
-                    Text(DateFormat('MMM d · HH:mm').format(article.publishDate),
+                    Text(DateFormat.MMMd(langCode).add_Hm().format(article.publishDate),
                         style: Ds.meta(context)),
                   ],
                 ),
@@ -426,8 +431,10 @@ class _NewsScreenState extends State<NewsScreen> {
   }
 
   Widget _buildArticleRow(Article article, String langCode) {
+    final l10n = AppLocalizations.of(context);
     final catLabel = article.category?.getDisplayName(langCode) ?? '';
-    final when = DateFormat('MMM d').format(article.publishDate);
+    final when = DateFormat.MMMd(langCode).format(article.publishDate);
+    final read = ReadService.instance.isRead(article.id);
 
     return DsCard(
       margin: const EdgeInsets.only(bottom: 10),
@@ -435,24 +442,64 @@ class _NewsScreenState extends State<NewsScreen> {
       onTap: () => _openDetail(article),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(Ds.rTile),
-            child: SizedBox(width: 92, height: 78, child: _articleImage(article)),
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(Ds.rTile),
+                child: SizedBox(width: 92, height: 78, child: _articleImage(article)),
+              ),
+              // A read item recedes rather than disappears — still findable,
+              // clearly behind you.
+              if (read)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(Ds.rTile),
+                      child: Container(
+                        color: Ds.bg(context).withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (article.isFeatured || read)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 5),
+                    child: Row(
+                      children: [
+                        if (article.isFeatured)
+                          _rowBadge(
+                            l10n.translate('featured'),
+                            Ds.goldInk,
+                            Ds.goldTintOf(context),
+                            Icons.star_rounded,
+                          ),
+                        if (article.isFeatured && read) const SizedBox(width: 6),
+                        if (read)
+                          _rowBadge(
+                            l10n.translate('read'),
+                            Ds.muted(context),
+                            Ds.subtle(context),
+                            Icons.check_rounded,
+                          ),
+                      ],
+                    ),
+                  ),
                 Text(
                   article.getTitle(langCode),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: read ? FontWeight.w500 : FontWeight.w600,
                       height: 1.35,
-                      color: Ds.ink(context)),
+                      color: read ? Ds.body(context) : Ds.ink(context)),
                 ),
                 const SizedBox(height: 5),
                 Text([if (catLabel.isNotEmpty) catLabel, when].join(' · '),
@@ -465,7 +512,39 @@ class _NewsScreenState extends State<NewsScreen> {
     );
   }
 
+  /// Small status chip used on a list row.
+  Widget _rowBadge(String label, Color ink, Color fill, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(Ds.rPill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: ink),
+          const SizedBox(width: 3),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+              color: ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onReadChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _openDetail(Article article) {
+    ReadService.instance.markRead(article.id);
     Navigator.push(
       context,
       CupertinoPageRoute(

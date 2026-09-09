@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:intl/intl.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
@@ -25,6 +26,10 @@ import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../services/share_service.dart';
+import '../../services/data_saver_service.dart';
+import '../../widgets/app_network_image.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/bookmark_button.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final EventRegistrationModel event;
@@ -37,9 +42,8 @@ class EventDetailScreen extends StatefulWidget {
 }
 
 class _EventDetailScreenState extends State<EventDetailScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
   late EventRegistrationModel _event;
-  Timer? _countdownTimer;
-  Duration? _timeLeft;
   bool _isSubmitting = false;
   bool _showProxyForm = false;
   final _formKey = GlobalKey<FormState>();
@@ -101,7 +105,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       if (key == 'event:${_event.id}' && mounted) setState(() {});
     });
     _initFormControllers();
-    _startCountdown();
     _loadSpeakers();
     _loadAgendaItems();
     if (_event.showComments) _loadComments();
@@ -140,7 +143,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final auth = context.read<AuthProvider>();
     if (!auth.isAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to like this event')),
+        SnackBar(content: Text(_l10n.translate('login_to_like'))),
       );
       return;
     }
@@ -225,24 +228,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
-  void _startCountdown() {
-    _updateTimeLeft();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      _updateTimeLeft();
-    });
-  }
-
-  void _updateTimeLeft() {
-    if (!mounted) return;
-    setState(() {
-      _timeLeft = _event.timeUntilEvent;
-    });
-  }
-
   @override
   void dispose() {
     _removeLikeListener?.call();
-    _countdownTimer?.cancel();
     for (final c in _formControllers.values) {
       c.dispose();
     }
@@ -280,9 +268,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 fit: StackFit.expand,
                 children: [
                   if (_event.eventPoster != null && _event.eventPoster!.isNotEmpty)
-                    CachedNetworkImage(
+                    AppNetworkImage(
                       imageUrl: Environment.fixMediaUrl(_event.eventPoster!),
                       fit: BoxFit.cover,
+                      hero: true,
                       placeholder: (context, url) => _posterFallback(),
                       errorWidget: (context, url, error) => _posterFallback(),
                     )
@@ -291,8 +280,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   Positioned(
                     left: 16,
                     top: MediaQuery.paddingOf(context).top + 8,
-                    child: _heroCircleButton(Icons.arrow_back_rounded,
-                        () => Navigator.pop(context)),
+                    child: Semantics(
+                      button: true,
+                      label: MaterialLocalizations.of(context).backButtonTooltip,
+                      child: _heroCircleButton(Icons.arrow_back_rounded,
+                          () => Navigator.pop(context)),
+                    ),
                   ),
                   Positioned(
                     right: 16,
@@ -360,11 +353,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Countdown timer
-                  EventCountdown(
-                    event: _event,
-                    timeLeft: _timeLeft,
-                    isDark: isDark,
-                  ),
+                  _LiveEventCountdown(event: _event, isDark: isDark),
                   const SizedBox(height: 20),
 
                   // Event info card
@@ -509,6 +498,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black87),
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -551,9 +541,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       // Background: poster image or festive gradient
                       if (_event.eventPoster != null && _event.eventPoster!.isNotEmpty)
                         Positioned.fill(
-                          child: CachedNetworkImage(
+                          child: AppNetworkImage(
                             imageUrl: Environment.fixMediaUrl(_event.eventPoster!),
                             fit: BoxFit.cover,
+                            hero: true,
                             placeholder: (context, url) => _greetingGradient(),
                             errorWidget: (context, url, error) => _greetingGradient(),
                           ),
@@ -626,7 +617,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 color: Colors.white,
                                 fontSize: 30,
                                 fontWeight: FontWeight.bold,
-                                fontFamily: 'HeatherGreen',
                                 height: 1.2,
                                 letterSpacing: 0.5,
                                 shadows: [
@@ -716,10 +706,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             // Action buttons below the card
             Row(
               children: [
+                Container(
+                  height: 44,
+                  width: 44,
+                  alignment: Alignment.center,
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: Ds.surface(context),
+                    border: Border.all(color: Ds.outline(context)),
+                    borderRadius: BorderRadius.circular(Ds.rTile),
+                  ),
+                  child: BookmarkButton(
+                    contentType: 'event',
+                    contentId: _event.id,
+                  ),
+                ),
                 Expanded(
                   child: _greetingActionButton(
                     icon: Icons.share_rounded,
-                    label: 'Share',
+                    label: _l10n.translate('share'),
                     color: AppColors.burundiGreen,
                     isDark: isDark,
                     onTap: () => ShareService.item(
@@ -735,7 +740,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   Expanded(
                     child: _greetingActionButton(
                       icon: Icons.favorite_rounded,
-                      label: 'Send Thanks',
+                      label: _l10n.translate('rs_evt_send_thanks'),
                       color: AppColors.burundiRed,
                       isDark: isDark,
                       onTap: () {
@@ -883,7 +888,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 160,
+          height: MediaQuery.textScalerOf(context).scale(160),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: _speakers.length,
@@ -1365,7 +1370,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               child: OutlinedButton.icon(
                 onPressed: () => _openTicket(),
                 icon: const Icon(Icons.confirmation_number_outlined, size: 18),
-                label: const Text('View Ticket'),
+                label: Text(_l10n.translate('rs_evt_view_ticket')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.burundiGreen,
                   side: const BorderSide(color: AppColors.burundiGreen),
@@ -1509,7 +1514,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           ),
                           if (_isUploadingFiles) ...[
                             const SizedBox(width: 10),
-                            const Text('Uploading files...', style: TextStyle(fontSize: 14, color: Colors.white)),
+                            Text(_l10n.translate('rs_evt_uploading_files'), style: const TextStyle(fontSize: 14, color: Colors.white)),
                           ],
                         ],
                       )
@@ -2186,7 +2191,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       child: OutlinedButton.icon(
         onPressed: _addToCalendar,
         icon: const Icon(Icons.calendar_month, size: 18),
-        label: const Text('Add to Calendar'),
+        label: Text(_l10n.translate('rs_evt_add_to_calendar')),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.burundiGreen,
           side: const BorderSide(color: AppColors.burundiGreen),
@@ -2338,38 +2343,44 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         uploadedFiles: uploadedFileUrls.isNotEmpty ? uploadedFileUrls : null,
       );
       if (!mounted) return;
-
-      // Refresh event data
-      final updated = await ApiService().getEventRegistration(_event.id);
-      if (!mounted) return;
-      setState(() {
-        _event = updated;
-        _isSubmitting = false;
-      });
+      setState(() => _isSubmitting = false);
 
       // Trigger confetti celebration
       HapticFeedback.mediumImpact();
       ConfettiOverlay.show(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registration successful!'),
+        SnackBar(
+          content: Text(_l10n.translate('rs_evt_registration_success')),
           backgroundColor: AppColors.burundiGreen,
         ),
       );
+
+      // Refresh event data — submission already succeeded, so a refresh
+      // failure must not be reported as a registration failure.
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          final updated = await ApiService().getEventRegistration(_event.id);
+          if (!mounted) return;
+          setState(() => _event = updated);
+          break;
+        } catch (_) {
+          await Future.delayed(const Duration(seconds: 2));
+        }
+      }
     } on ApiException catch (e) {
-      setState(() { _isSubmitting = false; _isUploadingFiles = false; });
       if (!mounted) return;
+      setState(() { _isSubmitting = false; _isUploadingFiles = false; });
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
       );
     } catch (e) {
-      setState(() { _isSubmitting = false; _isUploadingFiles = false; });
       if (!mounted) return;
+      setState(() { _isSubmitting = false; _isUploadingFiles = false; });
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registration failed. Try again.'), backgroundColor: AppColors.burundiRed),
+        SnackBar(content: Text(_l10n.translate('rs_evt_registration_failed')), backgroundColor: AppColors.burundiRed),
       );
     }
   }
@@ -2400,24 +2411,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
       HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Proxy registration submitted!'),
+        SnackBar(
+          content: Text(_l10n.translate('rs_evt_proxy_success')),
           backgroundColor: AppColors.burundiGreen,
         ),
       );
     } on ApiException catch (e) {
-      setState(() => _isSubmitting = false);
       if (!mounted) return;
+      setState(() => _isSubmitting = false);
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
       );
     } catch (e) {
-      setState(() => _isSubmitting = false);
       if (!mounted) return;
+      setState(() => _isSubmitting = false);
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Proxy registration failed. Try again.'), backgroundColor: AppColors.burundiRed),
+        SnackBar(content: Text(_l10n.translate('rs_evt_proxy_failed')), backgroundColor: AppColors.burundiRed),
       );
     }
   }
@@ -2425,11 +2436,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   // ── Helpers ───────────────────────────────────────────────
 
   String _formatFullDate(DateTime date) {
-    final months = ['January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'];
-    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
-    final amPm = date.hour >= 12 ? 'PM' : 'AM';
-    return '${months[date.month - 1]} ${date.day}, ${date.year} at $hour:${date.minute.toString().padLeft(2, '0')} $amPm';
+    final lang = Localizations.localeOf(context).languageCode;
+    return DateFormat.yMMMMd(lang).add_jm().format(date);
   }
 
   Color _getStatusColor(String status) {
@@ -2765,7 +2773,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to post comment'), backgroundColor: AppColors.burundiRed),
+          SnackBar(content: Text(_l10n.translate('rs_comment_post_failed')), backgroundColor: AppColors.burundiRed),
         );
       }
     } finally {
@@ -2777,17 +2785,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Comment'),
-        content: const Text('Are you sure you want to delete this comment?'),
+        title: Text(_l10n.translate('delete_comment')),
+        content: Text(_l10n.translate('delete_comment_confirm')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(_l10n.translate('cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.burundiRed),
-            child: const Text('Delete'),
+            child: Text(_l10n.translate('delete')),
           ),
         ],
       ),
@@ -2800,13 +2808,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       await _loadComments();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Comment deleted'), backgroundColor: AppColors.burundiGreen),
+          SnackBar(content: Text(_l10n.translate('comment_deleted')), backgroundColor: AppColors.burundiGreen),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete comment'), backgroundColor: AppColors.burundiRed),
+          SnackBar(content: Text(_l10n.translate('rs_comment_delete_failed')), backgroundColor: AppColors.burundiRed),
         );
       }
     }
@@ -2815,9 +2823,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   // ── Photos Section ────────────────────────────────────
 
   Widget _buildPhotosSection(bool isDark) {
-    final auth = context.watch<AuthProvider>();
-    final isLoggedIn = auth.isAuthenticated;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2901,7 +2906,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     borderRadius: BorderRadius.circular(12),
                     child: Stack(
                       children: [
-                        CachedNetworkImage(
+                        AppNetworkImage(
                           imageUrl: Environment.fixMediaUrl(imageUrl),
                           width: 140,
                           height: 140,
@@ -2975,6 +2980,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               child: CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(imageUrl),
                 fit: BoxFit.contain,
+                memCacheWidth: DataSaverService().fullImageCacheWidth,
                 placeholder: (_, _) => const SizedBox(
                   height: 300,
                   child: Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -3084,7 +3090,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           )
         else
           SizedBox(
-            height: 80,
+            height: MediaQuery.textScalerOf(context).scale(80),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _attendees.length,
@@ -3214,4 +3220,39 @@ class _CornerOrnamentPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Ticks once a second and rebuilds only itself (not the whole screen).
+class _LiveEventCountdown extends StatefulWidget {
+  final EventRegistrationModel event;
+  final bool isDark;
+  const _LiveEventCountdown({required this.event, required this.isDark});
+
+  @override
+  State<_LiveEventCountdown> createState() => _LiveEventCountdownState();
+}
+
+class _LiveEventCountdownState extends State<_LiveEventCountdown> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => EventCountdown(
+        event: widget.event,
+        timeLeft: widget.event.timeUntilEvent,
+        isDark: widget.isDark,
+      );
 }

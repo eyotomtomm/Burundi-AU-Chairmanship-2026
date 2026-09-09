@@ -665,7 +665,7 @@ class EventSubmissionAdmin(admin.ModelAdmin):
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Update</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -685,14 +685,14 @@ class EventSubmissionAdmin(admin.ModelAdmin):
         <p style="color:#4a5568;font-size:14px;line-height:1.6;margin:0;">{submission.admin_notes}</p>
       </div>'''
 
-        contact_email = submission.event_registration.contact_email or 'info@burundi4africa.com'
+        contact_email = submission.event_registration.contact_email or 'info@burundichairship.africa'
         html_message += f'''
       <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
         If you have any questions, please contact us at <a href="mailto:{contact_email}" style="color:#3182ce;">{contact_email}</a>
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa</p>
     </div>
   </div>
 </div>
@@ -804,9 +804,9 @@ class ArticleAdmin(admin.ModelAdmin):
     Articles marked as "featured" appear in a special section on the home screen.
     """
     inlines = [ArticleMediaInline]
-    list_display = ['title', 'content_type', 'category', 'is_featured', 'publish_date', 'view_count', 'like_count']
-    list_filter = ['content_type', 'is_featured', 'category', 'publish_date']
-    list_editable = ['content_type', 'is_featured']
+    list_display = ['title', 'category', 'is_featured', 'publish_date', 'view_count', 'like_count']
+    list_filter = ['is_featured', 'category', 'publish_date']
+    list_editable = ['is_featured']
     search_fields = ['title', 'title_fr', 'content']
     date_hierarchy = 'publish_date'
 
@@ -816,7 +816,6 @@ class ArticleAdmin(admin.ModelAdmin):
                 ('title', 'title_fr'),
                 'cover_image',
                 'category',
-                'content_type',
                 'content',
                 'content_fr',
             ],

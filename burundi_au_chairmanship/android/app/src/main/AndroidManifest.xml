@@ -10,22 +10,14 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
-    <!-- Location access for nearby embassies and events -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <!-- Contacts access for sharing embassy info -->
-    <uses-permission android:name="android.permission.READ_CONTACTS"/>
     <!-- Vibration for notifications -->
     <uses-permission android:name="android.permission.VIBRATE"/>
-    <!-- Calendar access for event reminders -->
-    <uses-permission android:name="android.permission.READ_CALENDAR"/>
-    <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
+    <!-- No location/contacts/calendar permissions: embassy directions open Google
+         Maps via intent and add_2_calendar uses the system calendar INSERT intent. -->
 
     <!-- Camera is optional — app still works without it -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
-    <!-- Location is optional -->
-    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
 
     <application
         android:label="B4Africa"
@@ -49,6 +41,15 @@
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
+              />
+            <!-- app_links owns incoming URLs. Flutter's built-in handling also
+                 receives them and pushes the URI's *path* as a named route —
+                 which for b4africa://magazine is empty, so it pushed '/' and
+                 sent the app back through the splash, wiping whatever the link
+                 had just opened. One handler only. -->
+            <meta-data
+              android:name="flutter_deeplinking_enabled"
+              android:value="false"
               />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -97,10 +98,10 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="default_channel" />
-        <!-- Default notification icon -->
+        <!-- Default notification icon: monochrome silhouette (Android tints it). -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
+            android:resource="@drawable/ic_stat_notification" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

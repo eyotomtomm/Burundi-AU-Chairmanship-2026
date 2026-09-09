@@ -1,9 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart' show navigatorKey;
-import '../providers/auth_provider.dart';
 import 'api_service.dart';
 import '../screens/news/article_detail_screen.dart';
 import '../screens/events/event_detail_screen.dart';
@@ -33,7 +31,6 @@ class DeepLinkRouter {
     'event': '/events',
     'gallery': '/gallery',
     'video': '/videos',
-    'discussion': '/discussions',
   };
 
   /// Priority agendas ship as three fixed screens, keyed by their backend slug.
@@ -58,11 +55,11 @@ class DeepLinkRouter {
     '/profile',
     '/profile-completion',
     '/email-verification',
+    '/priority-agenda',
     '/water-sanitation',
     '/arise-initiative',
     '/peace-security',
     '/gallery',
-    '/discussions',
     '/videos',
     '/social-media',
     '/notifications',
@@ -76,6 +73,11 @@ class DeepLinkRouter {
     '/youth-dialogue-apply',
     '/youth-dialogue-documents',
     '/youth-dialogue-credential',
+    '/qr-scanner',
+    '/yd-scan-history',
+    '/emergency',
+    '/polls',
+    '/bookmarks',
   };
 
   /// Navigate to the destination described by [url].
@@ -180,8 +182,6 @@ class DeepLinkRouter {
     String id,
   ) async {
     try {
-      final navContext = navigatorKey.currentContext;
-      final isAuth = navContext != null ? navContext.read<AuthProvider>().isAuthenticated : false;
       switch (section) {
         case 'news':
         case 'article':

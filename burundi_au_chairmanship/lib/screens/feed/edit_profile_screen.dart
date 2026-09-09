@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,6 +10,8 @@ import '../../config/app_ds.dart';
 import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/async_content_view.dart';
+import '../../widgets/app_network_image.dart';
 
 /// Who you are on Explore: photo, name, what you do and where you are from.
 ///
@@ -32,6 +33,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _avatarUrl;
   File? _newAvatar;
   bool _loading = true;
+  bool _loadFailed = false;
   bool _saving = false;
 
   @override
@@ -57,7 +59,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final nat = me['nationality'] as String?;
       _nationality = (nat == null || nat.isEmpty) ? null : nat;
       _avatarUrl = me['profile_picture'] as String?;
-    } catch (_) {}
+      _loadFailed = false;
+    } catch (_) {
+      // Saving over an unloaded profile would blank it out — block Save.
+      _loadFailed = true;
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -115,13 +121,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context, false),
-                  child: const SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: Icon(Icons.arrow_back_rounded,
-                        color: Colors.white, size: 22),
+                Semantics(
+                  button: true,
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context, false),
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Icon(Icons.arrow_back_rounded,
+                          color: Colors.white, size: 22),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -138,6 +148,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             child: _loading
                 ? const Center(
                     child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green))
+                : _loadFailed
+                    ? AsyncContentView(
+                        state: AsyncContentState.error,
+                        onRetry: () { setState(() => _loading = true); _load(); },
+                        child: const SizedBox.shrink(),
+                      )
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                     children: [
@@ -178,12 +194,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             padding: EdgeInsets.fromLTRB(
                 16, 0, 16, MediaQuery.viewPaddingOf(context).bottom + 16),
             child: GestureDetector(
-              onTap: _saving ? null : _save,
+              onTap: (_saving || _loading || _loadFailed) ? null : _save,
               child: Container(
                 height: 52,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Ds.green,
+                  color: (_loading || _loadFailed) ? Ds.muted(context) : Ds.green,
                   borderRadius: BorderRadius.circular(Ds.rPill),
                 ),
                 child: _saving
@@ -211,7 +227,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_newAvatar != null) {
       image = Image.file(_newAvatar!, fit: BoxFit.cover);
     } else if (url != null && url.isNotEmpty) {
-      image = CachedNetworkImage(
+      image = AppNetworkImage(
         imageUrl: Environment.fixMediaUrl(url),
         fit: BoxFit.cover,
         placeholder: (_, _) => Container(color: Ds.greenTint),

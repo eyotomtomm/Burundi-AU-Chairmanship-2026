@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from .models import (
     MagazineLike, ArticleLike, GalleryAlbumLike, VideoLike,
@@ -72,7 +73,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
                   'admin_sections', 'is_usher']
         read_only_fields = ['is_email_verified', 'is_government_official', 'is_verified', 'badge_type',
                             'email_verified_at', 'government_verified_at', 'verified_at',
-                            'verification_requested_at', 'is_usher']
+                            'verification_requested_at', 'is_usher', 'admin_sections',
+                            'receives_newsletter']
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -195,10 +197,18 @@ class MagazineImageSerializer(serializers.ModelSerializer):
 
 
 def get_recent_likers(like_model, content_field, obj, request):
-    """Return the 3 most recent likers with profile info."""
-    likes = like_model.objects.filter(
-        **{content_field: obj}
-    ).select_related('user', 'user__profile').order_by('-created_at')[:3]
+    """Return the 3 most recent likers with profile info.
+
+    List views prefetch these via views._recent_likes_prefetch (to_attr
+    ``recent_likes_prefetched``); the query below is the detail-view fallback.
+    """
+    likes = getattr(obj, 'recent_likes_prefetched', None)
+    if likes is None:
+        likes = like_model.objects.filter(
+            **{content_field: obj}
+        ).select_related('user', 'user__profile').order_by('-created_at')[:3]
+    else:
+        likes = sorted(likes, key=lambda l: l.created_at, reverse=True)[:3]
     result = []
     for like in likes:
         user = like.user
@@ -726,8 +736,12 @@ class LiveFeedSerializer(serializers.ModelSerializer):
     def get_speakers(self, obj):
         if not obj.event_id:
             return []
-        qs = obj.event.event_speakers.filter(is_active=True).order_by('order', 'name')
-        return EventSpeakerSerializer(qs, many=True, context=self.context).data
+        # event__event_speakers is prefetched by LiveFeedViewSet; filter in Python.
+        speakers = sorted(
+            (sp for sp in obj.event.event_speakers.all() if sp.is_active),
+            key=lambda sp: (sp.order, sp.name),
+        )
+        return EventSpeakerSerializer(speakers, many=True, context=self.context).data
 
     def get_recent_likers(self, obj):
         request = self.context.get('request')
@@ -1287,12 +1301,18 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
             if timezone.now() > obj.registration_deadline:
                 return False
         if obj.max_registrations > 0:
-            count = getattr(obj, '_submission_count', None)
-            if count is None:
-                count = obj.submissions.count()
-            if count >= obj.max_registrations:
+            if self._active_count(obj) >= obj.max_registrations:
                 return False
         return True
+
+    @staticmethod
+    def _active_count(obj):
+        """Seats taken: not waitlisted, not rejected (annotated in list views)."""
+        count = getattr(obj, '_non_waitlisted_count', None)
+        if count is None:
+            from .utils import active_registration_count
+            count = active_registration_count(obj)
+        return count
 
     def get_current_registration_count(self, obj):
         if hasattr(obj, '_submission_count'):
@@ -1312,12 +1332,7 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
     def get_spots_remaining(self, obj):
         if obj.max_registrations <= 0:
             return None  # Unlimited
-        if hasattr(obj, '_non_waitlisted_count'):
-            count = obj._non_waitlisted_count
-        else:
-            count = obj.submissions.filter(is_waitlisted=False).count()
-        remaining = obj.max_registrations - count
-        return max(0, remaining)
+        return max(0, obj.max_registrations - self._active_count(obj))
 
 
 class EventSubmissionSerializer(serializers.ModelSerializer):
@@ -1334,6 +1349,9 @@ class EventSubmissionSerializer(serializers.ModelSerializer):
                   'submitted_at', 'reviewed_at', 'reviewed_by']
         read_only_fields = ['id', 'user', 'is_waitlisted', 'checked_in_at', 'qr_ticket_hash',
                             'proxy_email_verified',
+                            # proxy registrations go through the register-proxy
+                            # action; status is set server-side
+                            'is_proxy', 'proxy_name', 'proxy_email', 'proxy_phone', 'status',
                             'submitted_at', 'reviewed_at', 'reviewed_by']
 
 
@@ -1370,8 +1388,10 @@ class SupportTicketListSerializer(serializers.ModelSerializer):
                   'created_at', 'updated_at', 'last_message', 'unread_count']
 
     def get_last_message(self, obj):
-        msg = obj.messages.order_by('-created_at').first()
-        if msg:
+        # obj.messages is prefetched by SupportTicketViewSet — stay in Python.
+        msgs = list(obj.messages.all())
+        if msgs:
+            msg = max(msgs, key=lambda m: m.created_at)
             return {
                 'message': msg.message[:100],
                 'is_admin_reply': msg.is_admin_reply,
@@ -1380,7 +1400,7 @@ class SupportTicketListSerializer(serializers.ModelSerializer):
         return None
 
     def get_unread_count(self, obj):
-        return obj.messages.filter(is_read=False, is_admin_reply=True).count()
+        return sum(1 for m in obj.messages.all() if not m.is_read and m.is_admin_reply)
 
 
 class SupportTicketDetailSerializer(serializers.ModelSerializer):
@@ -1461,32 +1481,33 @@ class BookmarkSerializer(serializers.ModelSerializer):
                   'content_image', 'created_at']
         read_only_fields = ['id', 'created_at']
 
+    _TARGETS = {'article': (Article, 'image'), 'magazine': (MagazineEdition, 'cover_image'),
+                'video': (Video, 'thumbnail')}
+
+    def _target(self, obj):
+        """Resolve the bookmarked object, loading each content type once per page."""
+        if not hasattr(self, '_target_cache'):
+            rows = self.parent.instance if isinstance(self.parent, serializers.ListSerializer) else [obj]
+            cache = {}
+            for ctype, (model, _) in self._TARGETS.items():
+                ids = {b.content_id for b in (rows or []) if b.content_type == ctype}
+                if ids:
+                    cache.update({(ctype, o.pk): o for o in model.objects.filter(pk__in=ids)})
+            self._target_cache = cache
+        return self._target_cache.get((obj.content_type, obj.content_id))
+
     def get_content_title(self, obj):
-        try:
-            if obj.content_type == 'article':
-                return Article.objects.get(pk=obj.content_id).title
-            elif obj.content_type == 'magazine':
-                return MagazineEdition.objects.get(pk=obj.content_id).title
-            elif obj.content_type == 'video':
-                return Video.objects.get(pk=obj.content_id).title
-        except Exception:
-            pass
-        return None
+        target = self._target(obj)
+        return target.title if target else None
 
     def get_content_image(self, obj):
         request = self.context.get('request')
-        try:
-            img = None
-            if obj.content_type == 'article':
-                img = Article.objects.get(pk=obj.content_id).image
-            elif obj.content_type == 'magazine':
-                img = MagazineEdition.objects.get(pk=obj.content_id).cover_image
-            elif obj.content_type == 'video':
-                img = Video.objects.get(pk=obj.content_id).thumbnail
-            if img and request:
-                return request.build_absolute_uri(img.url)
-        except Exception:
-            pass
+        target = self._target(obj)
+        if target is None or obj.content_type not in self._TARGETS:
+            return None
+        img = getattr(target, self._TARGETS[obj.content_type][1], None)
+        if img and request:
+            return request.build_absolute_uri(img.url)
         return None
 
 
@@ -1533,7 +1554,8 @@ class ArticleSeriesSerializer(serializers.ModelSerializer):
                   'cover_image', 'article_count', 'is_active', 'order']
 
     def get_article_count(self, obj):
-        return obj.articles.count()
+        count = getattr(obj, '_article_count', None)
+        return count if count is not None else obj.articles.count()
 
 
 class TrendingContentSerializer(serializers.ModelSerializer):
@@ -1545,16 +1567,13 @@ class TrendingContentSerializer(serializers.ModelSerializer):
                   'content_title', 'period_start', 'period_end']
 
     def get_content_title(self, obj):
+        model = {'article': Article, 'magazine': MagazineEdition, 'video': Video}.get(obj.content_type)
+        if model is None:
+            return None
         try:
-            if obj.content_type == 'article':
-                return Article.objects.get(pk=obj.content_id).title
-            elif obj.content_type == 'magazine':
-                return MagazineEdition.objects.get(pk=obj.content_id).title
-            elif obj.content_type == 'video':
-                return Video.objects.get(pk=obj.content_id).title
-        except Exception:
-            pass
-        return None
+            return model.objects.only('title').get(pk=obj.content_id).title
+        except ObjectDoesNotExist:
+            return None
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1647,15 +1666,17 @@ class ConversationSerializer(serializers.ModelSerializer):
         ]
 
     def get_last_message(self, obj):
-        msg = obj.messages.order_by('-created_at').first()
-        if msg:
+        # obj.messages is prefetched by ConversationViewSet — stay in Python.
+        msgs = list(obj.messages.all())
+        if msgs:
+            msg = max(msgs, key=lambda m: m.created_at)
             return {'content': msg.content[:100], 'sender_id': msg.sender_id, 'created_at': msg.created_at}
         return None
 
     def get_unread_count(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return obj.messages.filter(is_read=False).exclude(sender=request.user).count()
+            return sum(1 for m in obj.messages.all() if not m.is_read and m.sender_id != request.user.id)
         return 0
 
 
@@ -1718,12 +1739,55 @@ class PostPollSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return None
+        # The feed prefetches the viewer's own votes; the query below is only
+        # for one-off lookups outside it.
+        prefetched = getattr(obj, 'viewer_votes', None)
+        if prefetched is not None:
+            return prefetched[0].option_id if prefetched else None
         vote = PollVote.objects.filter(poll=obj, user=request.user).first()
         return vote.option_id if vote else None
 
     def get_has_ended(self, obj):
         from django.utils import timezone
         return bool(obj.expires_at and timezone.now() > obj.expires_at)
+
+
+class QuotedPostSerializer(serializers.ModelSerializer):
+    """The shared post inside a repost.
+
+    Deliberately thin: the quoted card draws an author, a timestamp and the
+    text, so serializing it through the full DiscussionSerializer only bought
+    a like lookup, a repost count and a poll fetch per repost in the feed.
+    """
+    author_name = serializers.SerializerMethodField()
+    author_handle = serializers.SerializerMethodField()
+    author_avatar = serializers.SerializerMethodField()
+    author_badge = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Discussion
+        fields = ['id', 'title', 'content', 'author', 'author_name',
+                  'author_handle', 'author_avatar', 'author_badge', 'created_at']
+
+    def get_author_name(self, obj):
+        from .utils import user_handle
+        return f'{obj.author.first_name} {obj.author.last_name}'.strip() or user_handle(obj.author)
+
+    def get_author_handle(self, obj):
+        from .utils import user_handle
+        return user_handle(obj.author)
+
+    def get_author_avatar(self, obj):
+        profile = getattr(obj.author, 'profile', None)
+        if not profile or not profile.profile_picture:
+            return None
+        request = self.context.get('request')
+        url = profile.profile_picture.url
+        return request.build_absolute_uri(url) if request else url
+
+    def get_author_badge(self, obj):
+        profile = getattr(obj.author, 'profile', None)
+        return profile.badge_type if profile and profile.is_verified else None
 
 
 class DiscussionSerializer(serializers.ModelSerializer):
@@ -1737,6 +1801,10 @@ class DiscussionSerializer(serializers.ModelSerializer):
     reposted_post = serializers.SerializerMethodField()
     poll = PostPollSerializer(read_only=True)
     topic_title = serializers.CharField(source='topic.title', read_only=True, default=None)
+    # Replies have always been capped; posts were unbounded text.
+    content = serializers.CharField(
+        max_length=Discussion.MAX_CONTENT_LENGTH, allow_blank=True, required=False)
+    title = serializers.CharField(max_length=300, allow_blank=True, required=False)
 
     class Meta:
         model = Discussion
@@ -1744,9 +1812,12 @@ class DiscussionSerializer(serializers.ModelSerializer):
                   'author_handle', 'author_avatar', 'author_badge', 'is_pinned',
                   'is_locked', 'view_count', 'like_count', 'is_liked',
                   'reply_count', 'repost_of', 'reposted_post', 'repost_count',
-                  'poll', 'topic', 'topic_title', 'last_reply_at', 'created_at', 'media']
+                  'poll', 'topic', 'topic_title', 'last_reply_at', 'created_at',
+                  'edited_at', 'media']
         read_only_fields = ['id', 'author', 'view_count', 'like_count',
-                            'reply_count', 'last_reply_at', 'created_at']
+                            'reply_count', 'last_reply_at', 'created_at', 'edited_at',
+                            # moderation flags / repost set via dedicated endpoints
+                            'is_pinned', 'is_locked', 'repost_of']
 
     def get_author_handle(self, obj):
         from .utils import user_handle
@@ -1779,9 +1850,7 @@ class DiscussionSerializer(serializers.ModelSerializer):
         the original rather than recursing."""
         if not obj.repost_of:
             return None
-        inner = DiscussionSerializer(obj.repost_of, context=self.context).data
-        inner.pop('reposted_post', None)
-        return inner
+        return QuotedPostSerializer(obj.repost_of, context=self.context).data
 
     def get_author_name(self, obj):
         from .utils import user_handle
@@ -1934,7 +2003,8 @@ class LiveQASessionSerializer(serializers.ModelSerializer):
                   'question_count', 'started_at', 'ended_at']
 
     def get_question_count(self, obj):
-        return obj.questions.filter(is_approved=True).count()
+        count = getattr(obj, '_question_count', None)
+        return count if count is not None else obj.questions.filter(is_approved=True).count()
 
 
 class LiveQAQuestionSerializer(serializers.ModelSerializer):
@@ -2372,38 +2442,21 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
     def get_quick_access_icon_url(self, obj):
         return self._build_url(obj.quick_access_icon)
 
+    # .all() reads the prefetch cache when the view prefetched, else queries once.
     def get_roles(self, obj):
-        # Use prefetch cache if available, otherwise query
-        try:
-            all_roles = obj.roles.all()
-            roles = [r for r in all_roles if r.is_active]
-        except Exception:
-            roles = obj.roles.filter(is_active=True)
+        roles = [r for r in obj.roles.all() if r.is_active]
         return YouthDialogueRoleSerializer(roles, many=True).data
 
     def get_side_events(self, obj):
-        try:
-            all_side_events = obj.side_events.all()
-            active = [se for se in all_side_events if se.is_active]
-        except Exception:
-            active = obj.side_events.filter(is_active=True)
+        active = [se for se in obj.side_events.all() if se.is_active]
         return YouthDialogueSideEventSerializer(active, many=True).data
 
     def get_media(self, obj):
-        # Use prefetch cache if available (already filtered & ordered)
-        try:
-            items = list(obj.media_items.all())
-            items = [i for i in items if i.is_published]
-        except Exception:
-            items = obj.media_items.filter(is_published=True).order_by('display_order', '-created_at')
+        items = [i for i in obj.media_items.all() if i.is_published]
         return YouthDialogueMediaSerializer(items, many=True, context=self.context).data
 
     def get_promotional_video(self, obj):
-        try:
-            items = list(obj.media_items.all())
-            promo = next((i for i in items if i.is_published and i.is_promotional), None)
-        except Exception:
-            promo = obj.media_items.filter(is_published=True, is_promotional=True).first()
+        promo = next((i for i in obj.media_items.all() if i.is_published and i.is_promotional), None)
         if promo:
             return YouthDialogueMediaSerializer(promo, context=self.context).data
         return None

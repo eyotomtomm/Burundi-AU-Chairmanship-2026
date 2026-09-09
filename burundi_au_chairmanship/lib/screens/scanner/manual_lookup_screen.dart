@@ -3,6 +3,7 @@ import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import 'qr_scan_result_screen.dart';
 import '../../config/app_ds.dart';
+import '../../l10n/app_localizations.dart';
 
 class ManualLookupScreen extends StatefulWidget {
   final String? mode;
@@ -59,7 +60,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
   Future<void> _lookupByCode() async {
     final code = _codeController.text.trim();
     if (code.isEmpty) {
-      setState(() => _error = 'Please enter a participant code or ticket ID.');
+      setState(() => _error = AppLocalizations.of(context).translate('scan_enter_code_error'));
       return;
     }
     await _performLookup(lookupType: 'code', code: code);
@@ -69,7 +70,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     if (name.isEmpty || email.isEmpty) {
-      setState(() => _error = 'Both name and email are required.');
+      setState(() => _error = AppLocalizations.of(context).translate('scan_name_email_required'));
       return;
     }
     await _performLookup(lookupType: 'name_email', name: name, email: email);
@@ -78,7 +79,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
   Future<void> _lookupByName() async {
     final name = _nameSearchController.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Please enter a name to search.');
+      setState(() => _error = AppLocalizations.of(context).translate('scan_enter_name_error'));
       return;
     }
     final nationality = _nationalityController.text.trim();
@@ -131,7 +132,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
       setState(() => _error = e.message);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'Something went wrong. Please try again.');
+      setState(() => _error = AppLocalizations.of(context).translate('generic_error'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -182,7 +183,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
-                    'Multiple matches found',
+                    AppLocalizations.of(context).translate('scan_multiple_matches'),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -193,7 +194,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                   child: Text(
-                    'Select the person to view their details.',
+                    AppLocalizations.of(context).translate('scan_select_person'),
                     style: TextStyle(
                       fontSize: 14,
                       color: isDark ? Colors.white54 : Colors.black54,
@@ -205,7 +206,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
                   child: ListView.separated(
                     controller: scrollController,
                     itemCount: matches.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (_, i) {
                       final m = matches[i];
                       final isYd = m['match_type'] == 'youth_dialogue';
@@ -240,7 +241,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
                         ),
                         isThreeLine: true,
                         trailing: Text(
-                          isYd ? 'Credential' : 'Ticket',
+                          AppLocalizations.of(context).translate(isYd ? 'scan_credential' : 'scan_ticket'),
                           style: TextStyle(
                             fontSize: 12,
                             color: isYd ? AppColors.burundiGreen : Colors.blue,
@@ -270,20 +271,21 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(
-        title: const Text('Manual Lookup'),
+        title: Text(l10n.translate('scan_manual_lookup')),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
-          tabs: const [
-            Tab(text: 'By ID / Code'),
-            Tab(text: 'By Name & Email'),
-            Tab(text: 'By Name'),
+          tabs: [
+            Tab(text: l10n.translate('scan_tab_code')),
+            Tab(text: l10n.translate('scan_tab_name_email')),
+            Tab(text: l10n.translate('scan_tab_name')),
           ],
         ),
       ),
@@ -299,13 +301,14 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
   }
 
   Widget _buildCodeTab(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Enter participant code or ticket ID',
+            l10n.translate('scan_enter_code_title'),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -314,7 +317,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'e.g. YD-2026-0001 or submission number',
+            l10n.translate('scan_code_example'),
             style: TextStyle(
               fontSize: 13,
               color: isDark ? Colors.white38 : Colors.black45,
@@ -326,7 +329,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
             textInputAction: TextInputAction.search,
             onSubmitted: (_) => _lookupByCode(),
             decoration: InputDecoration(
-              hintText: 'Participant code or ticket ID',
+              hintText: l10n.translate('scan_code_hint'),
               prefixIcon: const Icon(Icons.confirmation_number_rounded),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -341,9 +344,9 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: Ds.redTintOf(context),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: Ds.red.withValues(alpha: 0.4)),
               ),
               child: Text(
                 _error!,
@@ -368,7 +371,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
                     )
                   : const Icon(Icons.search_rounded),
               label: Text(
-                _loading ? 'Looking up...' : 'Look Up',
+                l10n.translate(_loading ? 'scan_looking_up' : 'scan_look_up'),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
@@ -386,13 +389,14 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
   }
 
   Widget _buildNameEmailTab(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Search by name and email',
+            l10n.translate('scan_search_name_email'),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -401,7 +405,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Enter the person\'s full name and email address.',
+            l10n.translate('scan_search_name_email_sub'),
             style: TextStyle(
               fontSize: 13,
               color: isDark ? Colors.white38 : Colors.black45,
@@ -413,7 +417,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
-              hintText: 'Full name',
+              hintText: l10n.translate('full_name'),
               prefixIcon: const Icon(Icons.person_rounded),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -429,7 +433,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
             keyboardType: TextInputType.emailAddress,
             onSubmitted: (_) => _lookupByNameEmail(),
             decoration: InputDecoration(
-              hintText: 'Email address',
+              hintText: l10n.translate('more_email_address'),
               prefixIcon: const Icon(Icons.email_rounded),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -444,9 +448,9 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: Ds.redTintOf(context),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: Ds.red.withValues(alpha: 0.4)),
               ),
               child: Text(
                 _error!,
@@ -471,7 +475,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
                     )
                   : const Icon(Icons.search_rounded),
               label: Text(
-                _loading ? 'Searching...' : 'Search',
+                l10n.translate(_loading ? 'scan_searching' : 'search'),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
@@ -489,13 +493,14 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
   }
 
   Widget _buildNameSearchTab(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Search by name',
+            l10n.translate('scan_search_by_name'),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -504,7 +509,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Enter the person\'s name. Optionally filter by nationality or role.',
+            l10n.translate('scan_search_by_name_sub'),
             style: TextStyle(
               fontSize: 13,
               color: isDark ? Colors.white38 : Colors.black45,
@@ -516,7 +521,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
-              hintText: 'Name (required)',
+              hintText: l10n.translate('scan_name_required_hint'),
               prefixIcon: const Icon(Icons.person_rounded),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -531,7 +536,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.characters,
             decoration: InputDecoration(
-              hintText: 'Nationality (optional, e.g. BI, RW, KE)',
+              hintText: l10n.translate('scan_nationality_hint'),
               prefixIcon: const Icon(Icons.flag_rounded),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -547,7 +552,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
             textCapitalization: TextCapitalization.words,
             onSubmitted: (_) => _lookupByName(),
             decoration: InputDecoration(
-              hintText: 'Role (optional, e.g. Participant, Moderator)',
+              hintText: l10n.translate('scan_role_hint'),
               prefixIcon: const Icon(Icons.badge_rounded),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -562,9 +567,9 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: Ds.redTintOf(context),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: Ds.red.withValues(alpha: 0.4)),
               ),
               child: Text(
                 _error!,
@@ -589,7 +594,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
                     )
                   : const Icon(Icons.search_rounded),
               label: Text(
-                _loading ? 'Searching...' : 'Search',
+                l10n.translate(_loading ? 'scan_searching' : 'search'),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(

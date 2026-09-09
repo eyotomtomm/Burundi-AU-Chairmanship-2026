@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../config/app_colors.dart';
 import '../../../providers/language_provider.dart';
 import '../../../services/api_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 Future<void> showSupportOptionsModal(BuildContext context, {String? prefilledSubject}) async {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -149,7 +150,7 @@ Future<void> showSupportOptionsModal(BuildContext context, {String? prefilledSub
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to start live chat: $e'), backgroundColor: AppColors.error),
+                            SnackBar(content: Text(AppLocalizations.of(context).translate('live_chat_start_failed')), backgroundColor: AppColors.error),
                           );
                         }
                       }

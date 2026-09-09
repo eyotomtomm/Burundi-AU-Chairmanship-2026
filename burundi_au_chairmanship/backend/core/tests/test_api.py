@@ -3,6 +3,8 @@ Smoke tests for the highest-risk API paths.
 
 Run with:  python manage.py test core -v2
 """
+from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -10,7 +12,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import (
+from core.models import (
     AppSettings, Article, Category, DeviceToken, Event,
     EventRegistration, EventSubmission, FeatureCard, HeroSlide,
     UserProfile,
@@ -232,13 +234,13 @@ class FCMTokenRegistrationTests(TestCase):
 
     def test_register_anonymous_token(self):
         resp = self.client.post('/api/register-fcm-token/', {
-            'fcm_token': 'fake-fcm-token-abc123',
+            'fcm_token': 'fake-fcm-token-abc123' + 'x' * 130,
             'device_type': 'iPhone 15',
             'device_os': 'iOS 18',
             'preferred_language': 'fr',
         }, content_type='application/json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        token = DeviceToken.objects.get(token='fake-fcm-token-abc123')
+        token = DeviceToken.objects.get(token='fake-fcm-token-abc123' + 'x' * 130)
         self.assertIsNone(token.user)
         self.assertTrue(token.is_active)
         self.assertEqual(token.preferred_language, 'fr')
@@ -250,12 +252,12 @@ class FCMTokenRegistrationTests(TestCase):
 
     def test_register_token_invalid_language_defaults_to_en(self):
         resp = self.client.post('/api/register-fcm-token/', {
-            'fcm_token': 'token-lang-test',
+            'fcm_token': 'token-lang-test' + 'x' * 130,
             'preferred_language': 'xx',
         }, content_type='application/json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            DeviceToken.objects.get(token='token-lang-test').preferred_language,
+            DeviceToken.objects.get(token='token-lang-test' + 'x' * 130).preferred_language,
             'en',
         )
 
@@ -374,6 +376,59 @@ class PublicEndpointTests(TestCase):
         self.assertIn('hero_slides', data)
         self.assertIn('feature_cards', data)
         self.assertIn('settings', data)
+
+    def test_home_feed_hides_everything_but_published_articles(self):
+        # The admin status dropdown sets status='draft' while leaving the
+        # legacy is_draft flag False, so a filter on is_draft alone served
+        # drafts to every phone on the home screen.
+        AppSettings.objects.create(summit_year='2026')
+        now = timezone.now()
+        live = Article.objects.create(
+            title='Live', content='x', publish_date=now,
+            content_type='news', status='published')
+        for title, kwargs in (
+            ('Dropdown draft', {'status': 'draft'}),
+            ('Archived', {'status': 'archived'}),
+            ('Legacy draft', {'status': 'published', 'is_draft': True}),
+            ('Expired', {'status': 'published',
+                         'expires_at': now - timedelta(days=1)}),
+            ('Scheduled', {'status': 'published',
+                           'scheduled_publish_at': now + timedelta(days=1)}),
+        ):
+            Article.objects.create(
+                title=title, content='x', publish_date=now,
+                content_type='news', **kwargs)
+
+        resp = self.client.get('/api/home-feed/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        titles = {a['title'] for a in resp.json()['news_items']}
+        self.assertEqual(titles, {live.title})
+
+    def test_news_and_articles_are_one_feed(self):
+        # content_type defaulted to 'article' and the admin form preselected
+        # it, so the split only recorded which option happened to be
+        # highlighted. Both surfaces — and old app builds still sending
+        # ?content_type=news — must now see every published post.
+        AppSettings.objects.create(summit_year='2026')
+        now = timezone.now()
+        for title, ctype in (('Tagged news', 'news'), ('Tagged article', 'article')):
+            Article.objects.create(title=title, content='x', publish_date=now,
+                                   content_type=ctype, status='published')
+
+        listed = self.client.get('/api/articles/').json()
+        titles = {a['title'] for a in listed.get('results', listed)}
+        self.assertEqual(titles, {'Tagged news', 'Tagged article'})
+
+        # An installed build still sends the old filter; it must be ignored.
+        legacy = self.client.get('/api/articles/?content_type=news').json()
+        self.assertEqual(
+            {a['title'] for a in legacy.get('results', legacy)}, titles)
+
+        feed = self.client.get('/api/home-feed/').json()
+        self.assertEqual({a['title'] for a in feed['news_items']}, titles)
+        # Old builds concatenate news_items + articles, so articles must stay
+        # empty or every post shows twice.
+        self.assertEqual(feed['articles'], [])
 
     def test_app_settings(self):
         AppSettings.objects.create(summit_year='2026')

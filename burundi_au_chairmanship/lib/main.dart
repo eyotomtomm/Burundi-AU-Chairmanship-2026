@@ -47,6 +47,7 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/profile/profile_completion_screen.dart';
 import 'screens/agenda/water_sanitation_screen.dart';
 import 'screens/agenda/arise_initiative_screen.dart';
+import 'screens/agenda/priority_agenda_hub_screen.dart';
 import 'screens/agenda/peace_security_screen.dart';
 import 'screens/gallery/gallery_screen.dart';
 import 'screens/videos/videos_screen.dart';
@@ -66,8 +67,8 @@ import 'screens/maintenance/maintenance_screen.dart';
 import 'screens/scanner/qr_scanner_screen.dart';
 import 'screens/scanner/yd_scan_history_screen.dart';
 import 'screens/emergency/emergency_screen.dart';
-import 'screens/discussions/discussions_screen.dart';
 import 'screens/polls/polls_screen.dart';
+import 'screens/bookmarks/bookmarks_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -271,30 +272,29 @@ void main() async {
   };
 
   // Graceful error widget: show a friendly UI instead of crashing on widget build errors
+  // Plain Material (not a nested MaterialApp) so it can live inside any subtree.
   ErrorWidget.builder = (FlutterErrorDetails details) {
-    return MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                const Text(
-                  'Something went wrong',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Please restart the app and try again.',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
+    return Material(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              const Text(
+                'Something went wrong',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Please restart the app and try again.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),
@@ -307,7 +307,7 @@ void main() async {
       (options) {
         options.dsn = Environment.sentryDsn;
         options.environment = Environment.displayName.toLowerCase();
-        options.release = 'burundi-au-app@1.0.0+1';
+        options.release = 'burundi-au-app@${AppConstants.appVersion}';
         options.tracesSampleRate = Environment.sentryTracesSampleRate;
         options.profilesSampleRate = Environment.sentryProfilesSampleRate;
         options.sendDefaultPii = false;
@@ -386,6 +386,8 @@ class BurundiAUApp extends StatelessWidget {
                 '/profile': (context) => const ProfileScreen(),
                 '/profile-completion': (context) => const ProfileCompletionScreen(),
                 '/email-verification': (context) => const EmailVerificationScreen(),
+                '/priority-agenda': (context) =>
+                    const PriorityAgendaHubScreen(),
                 '/water-sanitation': (context) => const WaterSanitationScreen(),
                 '/arise-initiative': (context) => const AriseInitiativeScreen(),
                 '/peace-security': (context) => const PeaceSecurityScreen(),
@@ -406,8 +408,8 @@ class BurundiAUApp extends StatelessWidget {
                 '/qr-scanner': (context) => const QrScannerScreen(),
                 '/yd-scan-history': (context) => const YdScanHistoryScreen(),
                 '/emergency': (context) => const EmergencyScreen(),
-                '/discussions': (context) => const DiscussionsScreen(),
                 '/polls': (context) => const PollsScreen(),
+                '/bookmarks': (context) => const BookmarksScreen(),
               };
 
               // Handle maintenance route with arguments

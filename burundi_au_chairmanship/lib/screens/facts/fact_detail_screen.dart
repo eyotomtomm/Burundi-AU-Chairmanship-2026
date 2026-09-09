@@ -6,6 +6,8 @@ import '../../models/fact_model.dart';
 import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
 import '../../services/share_service.dart';
+import '../../widgets/app_network_image.dart';
+import '../../l10n/app_localizations.dart';
 
 class FactDetailScreen extends StatefulWidget {
   final int factId;
@@ -75,18 +77,20 @@ class _FactDetailScreenState extends State<FactDetailScreen> {
               fit: StackFit.expand,
               children: [
                 if (fact.image.isNotEmpty)
-                  Image.network(
-                    fact.image,
+                  AppNetworkImage(
+                    imageUrl: fact.image,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const DsImagePlaceholder(radius: 0),
+                    hero: true,
+                    errorWidget: (_, _, _) => const DsImagePlaceholder(radius: 0),
                   )
                 else
                   const DsImagePlaceholder(radius: 0),
                 Positioned(
                   left: 16,
                   top: MediaQuery.paddingOf(context).top + 8,
-                  child: _circleButton(
-                      Icons.arrow_back_rounded, () => Navigator.pop(context)),
+                  child: _circleButton(Icons.arrow_back_rounded,
+                      () => Navigator.pop(context),
+                      MaterialLocalizations.of(context).backButtonTooltip),
                 ),
                 Positioned(
                   right: 16,
@@ -103,7 +107,7 @@ class _FactDetailScreenState extends State<FactDetailScreen> {
                             : fact.getTitle(langCode),
                         note: fact.isQuote ? null : fact.getContent(langCode),
                       );
-                    }),
+                    }, AppLocalizations.of(context).translate('share')),
                   ),
                 ),
               ],
@@ -198,7 +202,11 @@ class _FactDetailScreenState extends State<FactDetailScreen> {
     );
   }
 
-  Widget _circleButton(IconData icon, VoidCallback onTap) => GestureDetector(
+  Widget _circleButton(IconData icon, VoidCallback onTap, String label) =>
+      Semantics(
+        button: true,
+        label: label,
+        child: GestureDetector(
         onTap: onTap,
         child: Container(
           width: 40,
@@ -208,6 +216,7 @@ class _FactDetailScreenState extends State<FactDetailScreen> {
             shape: BoxShape.circle,
           ),
           child: Icon(icon, size: 20, color: Colors.white),
+        ),
         ),
       );
 }

@@ -3,9 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
@@ -19,10 +17,13 @@ import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/translate_button.dart';
 import '../../widgets/comment_tile.dart';
+import '../feature_card/media_video_player_screen.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
 import '../../utils/input_sanitizer.dart';
 import '../../services/share_service.dart';
+import '../../widgets/app_network_image.dart';
+import '../../services/read_service.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
@@ -51,7 +52,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   int _savedProgressPercent = 0;
   bool _showContinueReading = false;
   bool _restoredPosition = false;
-  double _readingProgress = 0.0;
+  final ValueNotifier<double> _readingProgress = ValueNotifier(0.0);
+  bool? _isBookmarked; // null = unknown / not logged in
+  bool _bookmarkBusy = false;
   final LikeService _likeService = LikeService();
   VoidCallback? _removeLikeListener;
 
@@ -91,7 +94,11 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     _loadComments();
     _loadRelatedArticles();
     _loadReadingProgress();
+    // Opening the article is enough to mark it read in the lists; the
+    // percentage-based progress below refines it for cross-device sync.
+    ReadService.instance.markRead(_article.id);
     _scrollController.addListener(_onScroll);
+    _loadBookmarkState();
     if (widget.scrollToComments) {
       _scheduleScrollToComments();
     }
@@ -120,6 +127,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     _saveReadingProgressNow();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _readingProgress.dispose();
     _commentController.dispose();
     _commentFocusNode.dispose();
     _removeLikeListener?.call();
@@ -134,8 +142,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       final maxScroll = _scrollController.position.maxScrollExtent;
       if (maxScroll > 0) {
         final progress = (_scrollController.offset / maxScroll).clamp(0.0, 1.0);
-        if ((progress - _readingProgress).abs() > 0.005) {
-          setState(() => _readingProgress = progress);
+        if ((progress - _readingProgress.value).abs() > 0.005) {
+          _readingProgress.value = progress;
         }
       }
     }
@@ -319,7 +327,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       if (mounted) {
         setState(() => _postingComment = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text(AppLocalizations.of(context).translate('generic_error'))),
         );
       }
     }
@@ -358,9 +366,50 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text(e is ApiException ? e.message : AppLocalizations.of(context).translate('generic_error'))),
         );
       }
+    }
+  }
+
+  // ── Bookmark ─────────────────────────────────────────────
+
+  Future<void> _loadBookmarkState() async {
+    if (!_authProvider.isAuthenticated) return;
+    try {
+      final res = await ApiService().checkBookmark('article', int.parse(_article.id));
+      if (mounted) setState(() => _isBookmarked = res['is_bookmarked'] == true);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (!_authProvider.isAuthenticated) {
+      Navigator.pushNamed(context, '/auth');
+      return;
+    }
+    if (_bookmarkBusy) return;
+    final was = _isBookmarked ?? false;
+    setState(() { _isBookmarked = !was; _bookmarkBusy = true; }); // optimistic
+    HapticService.light();
+    try {
+      final id = int.parse(_article.id);
+      if (was) {
+        // check/ endpoint has no bookmark id; find it in the user's list.
+        final list = await ApiService().get('bookmarks/?content_type=article', auth: true);
+        final items = list is Map ? (list['results'] as List? ?? const []) : (list as List);
+        final match = items.cast<Map>().where((b) => b['content_id'] == id).toList();
+        if (match.isNotEmpty) await ApiService().removeBookmark(match.first['id'] as int);
+      } else {
+        await ApiService().addBookmark('article', id);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isBookmarked = was);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e is ApiException ? e.message : AppLocalizations.of(context).translate('generic_error'))),
+      );
+    } finally {
+      if (mounted) setState(() => _bookmarkBusy = false);
     }
   }
 
@@ -388,7 +437,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     final l10n = AppLocalizations.of(context);
     final langCode = Provider.of<LanguageProvider>(context).languageCode;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final auth = Provider.of<AuthProvider>(context);
+    final isAuthenticated = context.select<AuthProvider, bool>((a) => a.isAuthenticated);
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
@@ -456,15 +505,14 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               actions: [
                 DsHeaderAction(
                   Icons.headphones_rounded,
+                  label: l10n.translate('art_listen'),
                   onTap: () {
                     Clipboard.setData(
                         ClipboardData(text: _article.getContent(langCode)));
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          langCode == 'fr'
-                              ? 'Texte copié — utilisez la synthèse vocale de votre appareil'
-                              : "Text copied — use your device's text-to-speech feature to listen",
+                          l10n.translate('art_text_copied_tts'),
                           style: const TextStyle(fontSize: 13),
                         ),
                         duration: const Duration(seconds: 4),
@@ -474,9 +522,16 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   },
                 ),
                 const SizedBox(width: 8),
+                DsHeaderAction(
+                  _isBookmarked == true ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                  label: l10n.translate('bookmark'),
+                  onTap: _toggleBookmark,
+                ),
+                const SizedBox(width: 8),
                 Builder(
                   builder: (btnContext) => DsHeaderAction(
                     Icons.share_rounded,
+                    label: l10n.translate('share'),
                     onTap: () => ShareService.item(
                       btnContext,
                       kind: 'articles',
@@ -495,11 +550,14 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               height: 3,
               color: Ds.outline(context),
               alignment: Alignment.centerLeft,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                height: 3,
-                width: MediaQuery.of(context).size.width * _readingProgress,
-                color: Ds.green,
+              child: ValueListenableBuilder<double>(
+                valueListenable: _readingProgress,
+                builder: (context, progress, _) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  height: 3,
+                  width: MediaQuery.of(context).size.width * progress,
+                  color: Ds.green,
+                ),
               ),
             ),
           ),
@@ -522,7 +580,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                       ],
                       Expanded(
                         child: Text(
-                          DateFormat('MMMM d, yyyy · HH:mm').format(_article.publishDate),
+                          DateFormat.yMMMMd(langCode).add_Hm().format(_article.publishDate),
                           style: Ds.meta(context),
                         ),
                       ),
@@ -617,8 +675,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(Ds.rCard)),
-                child: CachedNetworkImage(
+                child: AppNetworkImage(
                   imageUrl: Environment.fixMediaUrl(_article.imageUrl),
+                  hero: true,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   placeholder: (_, _) => const DsImagePlaceholder(radius: 0),
@@ -695,8 +754,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                 },
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: CachedNetworkImage(
+                                  child: AppNetworkImage(
                                     imageUrl: Environment.fixMediaUrl(m.imageUrl),
+                                    hero: true,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
                                     placeholder: (_, _) => Container(
@@ -730,12 +790,18 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: GestureDetector(
-                            onTap: () async {
-                              final uri = Uri.parse(m.videoUrl);
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri, mode: LaunchMode.externalApplication);
-                              }
-                            },
+                            // Play in-app, as discussions and feature cards
+                            // already do, rather than handing the viewer off
+                            // to an external browser.
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MediaVideoPlayerScreen(
+                                  videoUrl: m.videoUrl,
+                                  caption: m.caption,
+                                ),
+                              ),
+                            ),
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
@@ -846,7 +912,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   const SizedBox(height: 16),
 
                   // Comment input or login prompt
-                  if (auth.isAuthenticated)
+                  if (isAuthenticated)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -917,6 +983,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                             ),
                             const SizedBox(width: 8),
                             IconButton(
+                              tooltip: AppLocalizations.of(context).translate('send'),
                               onPressed: _postingComment ? null : _postComment,
                               icon: _postingComment
                                   ? const SizedBox(
@@ -986,7 +1053,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                         c.toMap(),
                         key: ValueKey(c.id),
                         isReply: false,
-                        isAuthenticated: auth.isAuthenticated,
+                        isAuthenticated: isAuthenticated,
                         onReply: () => _startReply(c),
                         onPostReply: (content, parentId) async {
                           try {
@@ -1008,7 +1075,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                             reply,
                             key: ValueKey(rc.id),
                             isReply: true,
-                            isAuthenticated: auth.isAuthenticated,
+                            isAuthenticated: isAuthenticated,
                             onDelete: () => _deleteComment(rc),
                             onToggleLike: () => ApiService().toggleArticleCommentLike(
                               widget.article.id, rc.id),
@@ -1062,7 +1129,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
             // Image
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: CachedNetworkImage(
+              child: AppNetworkImage(
                 imageUrl: Environment.fixMediaUrl(article.imageUrl),
                 height: 110,
                 width: double.infinity,
@@ -1111,7 +1178,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          DateFormat('MMM d').format(article.publishDate),
+                          DateFormat.MMMd(langCode).format(article.publishDate),
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,

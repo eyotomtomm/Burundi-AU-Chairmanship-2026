@@ -4,16 +4,17 @@ import 'package:provider/provider.dart';
 import '../../config/app_ds.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Flags a post or a person for moderator review.
 class ReportSheet {
   static const _reasons = [
-    {'value': 'spam', 'label': 'Spam or misleading'},
-    {'value': 'harassment', 'label': 'Harassment or hate'},
-    {'value': 'violence', 'label': 'Violence or threats'},
-    {'value': 'sexual', 'label': 'Sexual content'},
-    {'value': 'misinformation', 'label': 'False information'},
-    {'value': 'other', 'label': 'Something else'},
+    {'value': 'spam', 'label': 'w_reason_spam'},
+    {'value': 'harassment', 'label': 'w_reason_harassment'},
+    {'value': 'violence', 'label': 'w_reason_violence'},
+    {'value': 'sexual', 'label': 'w_reason_sexual'},
+    {'value': 'misinformation', 'label': 'w_reason_misinformation'},
+    {'value': 'other', 'label': 'w_reason_other'},
   ];
 
   static Future<void> open(
@@ -43,20 +44,20 @@ class ReportSheet {
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
               child: Text(
                 discussionId != null
-                    ? 'Report this post'
-                    : 'Report ${targetName.isEmpty ? 'this account' : targetName}',
+                    ? AppLocalizations.of(ctx).translate('w_report_this_post')
+                    : '${AppLocalizations.of(ctx).translate('w_report')} ${targetName.isEmpty ? AppLocalizations.of(ctx).translate('w_this_account') : targetName}',
                 style: TextStyle(
                     fontSize: 16, fontWeight: FontWeight.w700, color: Ds.ink(ctx)),
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-              child: Text('What is wrong with it?',
+              child: Text(AppLocalizations.of(ctx).translate('w_what_is_wrong'),
                   style: TextStyle(fontSize: 13, color: Ds.body(ctx))),
             ),
             for (final r in _reasons)
               ListTile(
-                title: Text(r['label']!,
+                title: Text(AppLocalizations.of(ctx).translate(r['label']!),
                     style: TextStyle(fontSize: 15, color: Ds.ink(ctx))),
                 trailing: Icon(Icons.chevron_right_rounded, color: Ds.chevron),
                 onTap: () => Navigator.pop(ctx, r['value']),

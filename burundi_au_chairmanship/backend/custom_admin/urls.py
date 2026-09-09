@@ -8,6 +8,9 @@ urlpatterns = [
     path('', views.admin_login, name='login'),
     path('logout/', views.admin_logout, name='logout'),
     path('force-password-change/', views.force_password_change, name='force_password_change'),
+    path('2fa/setup/', views.two_factor_setup, name='2fa_setup'),
+    path('2fa/verify/', views.two_factor_verify, name='2fa_verify'),
+    path('ping/', views.ping, name='ping'),
 
     # Dashboard
     path('dashboard/', views.dashboard, name='dashboard'),
@@ -109,6 +112,8 @@ urlpatterns = [
     path('content-reports/', views.content_reports_list, name='content_reports_list'),
     path('content-reports/<int:pk>/status/<str:new_status>/', views.content_report_set_status, name='content_report_set_status'),
     path('content-reports/<int:pk>/delete-post/', views.content_report_delete_post, name='content_report_delete_post'),
+    path('content-reports/<int:pk>/ban-author/', views.content_report_ban_author, name='content_report_ban_author'),
+    path('content-reports/<int:pk>/restore-post/', views.content_report_restore_post, name='content_report_restore_post'),
 
     path('emergency-contacts/', views.emergency_contacts_list, name='emergency_contacts_list'),
     path('emergency-contacts/create/', views.emergency_contact_create, name='emergency_contact_create'),
@@ -343,6 +348,7 @@ urlpatterns = [
 
     # Comments Management
     path('comments/', views.comments_list, name='comments_list'),
+    path('comments/engagement/', views.comment_engagement, name='comment_engagement'),
     path('comments/<int:pk>/delete/', views.comment_delete, name='comment_delete'),
     path('comments/bulk-delete/', views.comment_bulk_delete, name='comment_bulk_delete'),
     path('comments/<int:user_pk>/toggle-ban/', views.comment_toggle_ban, name='comment_toggle_ban'),

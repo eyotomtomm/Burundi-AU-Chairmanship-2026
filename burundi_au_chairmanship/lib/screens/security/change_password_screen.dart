@@ -40,7 +40,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text(e is ApiException
+                  ? e.message
+                  : AppLocalizations.of(context).translate('sec_could_not_change_password')),
+              backgroundColor: Colors.red),
         );
       }
     }
@@ -58,9 +62,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(
@@ -76,7 +77,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[850] : Colors.white,
+                  color: Ds.surface(context),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
                 ),
@@ -98,6 +99,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         labelText: l10n.translate('current_password'),
                         prefixIcon: const Icon(Icons.lock),
                         suffixIcon: IconButton(
+                          tooltip: l10n.translate(_showCurrent ? 'sec_hide_password' : 'sec_show_password'),
                           icon: Icon(_showCurrent ? Icons.visibility_off : Icons.visibility),
                           onPressed: () => setState(() => _showCurrent = !_showCurrent),
                         ),
@@ -114,6 +116,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         labelText: l10n.translate('new_password'),
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
+                          tooltip: l10n.translate(_showNew ? 'sec_hide_password' : 'sec_show_password'),
                           icon: Icon(_showNew ? Icons.visibility_off : Icons.visibility),
                           onPressed: () => setState(() => _showNew = !_showNew),
                         ),

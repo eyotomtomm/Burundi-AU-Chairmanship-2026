@@ -26,6 +26,10 @@ errorlog = "-"
 loglevel = "info"
 
 # Security
+# DigitalOcean App Platform's router is the only peer; trust its
+# X-Forwarded-* headers so REMOTE_ADDR/scheme reflect the forwarded client.
+# CloudflareProxyMiddleware then resolves the true client from the hop chain.
+forwarded_allow_ips = '*'
 limit_request_line = 4094
 limit_request_fields = 100
 limit_request_field_size = 8190

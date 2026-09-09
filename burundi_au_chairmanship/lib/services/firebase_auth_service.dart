@@ -108,7 +108,7 @@ class FirebaseAuthService {
       final message = e.toString();
       if (message.contains('NullPointerException') ||
           message.contains('SignInHubActivity')) {
-        await _googleSignIn.disconnect().catchError((_) {});
+        await _googleSignIn.disconnect().catchError((_) => null);
       }
       throw FirebaseAuthException(
         code: 'ERROR_GOOGLE_SIGN_IN_FAILED',

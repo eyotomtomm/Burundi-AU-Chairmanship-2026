@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_ds.dart';
 import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/language_provider.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../news/article_detail_screen.dart';
@@ -49,20 +50,27 @@ class _TrendingScreenState extends State<TrendingScreen> {
     }
   }
 
+  int? _openingId;
+
   Future<void> _navigateToArticle(int contentId) async {
+    if (_openingId != null) return;
+    setState(() => _openingId = contentId);
     try {
-      final articles = await ApiService().getArticles();
-      final match = articles.where((a) => a.id == contentId.toString()).toList();
-      if (match.isNotEmpty && mounted) {
-        Navigator.push(
-          context,
-          CupertinoPageRoute(
-            builder: (_) => ArticleDetailScreen(article: match.first, scrollToComments: false),
-          ),
-        );
-      }
-    } catch (_) {
-      // Silently fail
+      final article = await ApiService().getArticle(contentId.toString());
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        CupertinoPageRoute(
+          builder: (_) => ArticleDetailScreen(article: article, scrollToComments: false),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e is ApiException ? e.message : AppLocalizations.of(context).translate('generic_error'))),
+      );
+    } finally {
+      if (mounted) setState(() => _openingId = null);
     }
   }
 
@@ -155,8 +163,9 @@ class _TrendingScreenState extends State<TrendingScreen> {
         ? ''
         : contentType[0].toUpperCase() + contentType.substring(1);
 
+    final navigable = contentType == 'article';
     return DsCard(
-      onTap: contentType == 'article' ? () => _navigateToArticle(contentId) : null,
+      onTap: navigable ? () => _navigateToArticle(contentId) : null,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       child: Row(
         children: [
@@ -182,7 +191,12 @@ class _TrendingScreenState extends State<TrendingScreen> {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, size: 20, color: Ds.chevron),
+          if (_openingId == contentId)
+            const SizedBox(
+                width: 18, height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green))
+          else if (navigable)
+            const Icon(Icons.chevron_right_rounded, size: 20, color: Ds.chevron),
         ],
       ),
     );

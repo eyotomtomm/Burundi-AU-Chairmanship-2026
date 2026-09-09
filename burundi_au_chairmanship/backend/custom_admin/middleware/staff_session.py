@@ -18,8 +18,11 @@ logger = logging.getLogger('custom_admin')
 
 # 24 hours — override in settings with STAFF_SESSION_MAX_AGE if needed
 DEFAULT_MAX_AGE = 60 * 60 * 24
+# 30 minutes idle — override with STAFF_SESSION_IDLE_TIMEOUT
+DEFAULT_IDLE_TIMEOUT = 60 * 30
 
 SESSION_CREATED_KEY = '_staff_session_created'
+LAST_ACTIVITY_KEY = '_staff_last_activity'
 
 
 class StaffSessionLifetimeMiddleware:
@@ -28,6 +31,7 @@ class StaffSessionLifetimeMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.max_age = getattr(settings, 'STAFF_SESSION_MAX_AGE', DEFAULT_MAX_AGE)
+        self.idle_timeout = getattr(settings, 'STAFF_SESSION_IDLE_TIMEOUT', DEFAULT_IDLE_TIMEOUT)
 
     def __call__(self, request):
         # Only enforce on authenticated staff users with a session
@@ -37,15 +41,23 @@ class StaffSessionLifetimeMiddleware:
             and request.user.is_staff
             and hasattr(request, 'session')
         ):
+            now = time.time()
             created = request.session.get(SESSION_CREATED_KEY)
+            last_activity = request.session.get(LAST_ACTIVITY_KEY)
+
+            if last_activity is not None and now - last_activity > self.idle_timeout:
+                logger.info('Staff session idle-expired (%ds) for user %s', self.idle_timeout, request.user.username)
+                logout(request)
+                return redirect('custom_admin:login')
+            request.session[LAST_ACTIVITY_KEY] = now
 
             if created is None:
                 # Legacy session created before this middleware existed —
                 # stamp it now so it expires max_age from *this* request,
                 # giving the user one more window instead of locking them out
                 # immediately on deploy.
-                request.session[SESSION_CREATED_KEY] = time.time()
-            elif time.time() - created > self.max_age:
+                request.session[SESSION_CREATED_KEY] = now
+            elif now - created > self.max_age:
                 logger.info(
                     'Staff session expired (hard cap %ds) for user %s',
                     self.max_age,

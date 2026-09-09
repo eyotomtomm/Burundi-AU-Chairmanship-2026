@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
+import '../../widgets/async_content_view.dart';
 
 class ActiveSessionsScreen extends StatefulWidget {
   const ActiveSessionsScreen({super.key});
@@ -16,6 +18,7 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
   final ApiService _api = ApiService();
   List<Map<String, dynamic>> _sessions = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -24,24 +27,34 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       _sessions = await _api.getActiveSessions();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        _error = e is ApiException
+            ? e.message
+            : AppLocalizations.of(context).translate('sec_could_not_load_sessions');
+      }
+    }
     if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _revokeSession(int sessionId) async {
+    final l10n = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Revoke Session'),
-        content: const Text('This will sign out this device. Continue?'),
+        title: Text(l10n.translate('sec_revoke_session')),
+        content: Text(l10n.translate('sec_revoke_confirm')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.translate('cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Revoke', style: TextStyle(color: Colors.red)),
+            child: Text(l10n.translate('sec_revoke'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -50,25 +63,51 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
     try {
       await _api.revokeSession(sessionId);
       _load();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e is ApiException ? e.message : l10n.translate('sec_could_not_revoke')),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    }
+  }
+
+  String _formatTime(BuildContext context, dynamic iso) {
+    if (iso == null) return AppLocalizations.of(context).translate('unknown');
+    try {
+      final date = DateTime.parse(iso.toString()).toLocal();
+      return DateFormat.yMMMd(Localizations.localeOf(context).toString()).add_Hm().format(date);
+    } catch (_) {
+      return iso.toString();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final state = _loading
+        ? AsyncContentState.loading
+        : _error != null
+            ? AsyncContentState.error
+            : _sessions.isEmpty
+                ? AsyncContentState.empty
+                : AsyncContentState.content;
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(l10n.translate('active_sessions')),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _sessions.isEmpty
-              ? const Center(child: Text('No active sessions'))
-              : RefreshIndicator(
+      body: AsyncContentView(
+        state: state,
+        loadingWidget: const Center(child: CircularProgressIndicator()),
+        errorSubtitle: _error,
+        emptyIcon: Icons.devices_rounded,
+        emptyMessage: l10n.translate('sec_no_active_sessions'),
+        onRetry: _load,
+        onRefresh: _load,
+        child: RefreshIndicator(
                   onRefresh: () async {
                     HapticFeedback.mediumImpact();
                     await _load();
@@ -83,7 +122,7 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.grey[850] : Colors.white,
+                          color: Ds.surface(context),
                           borderRadius: BorderRadius.circular(14),
                           border: isCurrent
                               ? Border.all(color: AppColors.burundiGreen, width: 2)
@@ -114,7 +153,7 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          session['device_name'] ?? 'Unknown Device',
+                                          session['device_name'] ?? l10n.translate('sec_unknown_device'),
                                           style: const TextStyle(fontWeight: FontWeight.w600),
                                         ),
                                       ),
@@ -125,22 +164,22 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
                                             color: AppColors.burundiGreen.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
-                                          child: const Text('Current', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.burundiGreen)),
+                                          child: Text(l10n.translate('sec_current'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.burundiGreen)),
                                         ),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
                                   if (session['ip_address'] != null)
-                                    Text('IP: ${session['ip_address']}', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-                                  Text('Last active: ${session['last_active'] ?? 'Unknown'}', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                    Text('IP: ${session['ip_address']}', style: TextStyle(fontSize: 12, color: Ds.muted(context))),
+                                  Text('${l10n.translate('sec_last_active')}: ${_formatTime(context, session['last_active'])}', style: TextStyle(fontSize: 12, color: Ds.muted(context))),
                                 ],
                               ),
                             ),
-                            if (!isCurrent)
+                            if (!isCurrent && session['id'] is int)
                               IconButton(
-                                onPressed: () => _revokeSession(session['id']),
+                                onPressed: () => _revokeSession(session['id'] as int),
                                 icon: const Icon(Icons.logout, color: Colors.red),
-                                tooltip: 'Revoke',
+                                tooltip: l10n.translate('sec_revoke'),
                               ),
                           ],
                         ),
@@ -148,6 +187,7 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
                     },
                   ),
                 ),
+      ),
     );
   }
 }

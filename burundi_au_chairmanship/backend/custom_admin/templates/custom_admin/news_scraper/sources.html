@@ -16,6 +16,36 @@
     </a>
   </div>
 
+  <!-- X session -->
+  <form method="post" class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="x_cookies">
+    <div class="flex items-center gap-2.5 mb-1">
+      <h3>X session</h3>
+      {% if x_session_set %}
+      <span class="pill bg-emerald-50 text-emerald-700">Active &middot; {{ x_session_len }} chars</span>
+      {% else %}
+      <span class="pill bg-amber-50 text-amber-700">Not set</span>
+      {% endif %}
+    </div>
+    <p class="text-[11px] text-on-surface-variant mb-3">
+      X only returns recent posts to a signed-in session. Paste a
+      <b>cookies.txt</b> below and X sources switch to the full, date-bounded fetch.
+      Without it they fall back to a public sample that reaches nothing newer than early 2025.
+      Leave the box empty and save to clear the session.
+    </p>
+    <textarea name="x_cookies" rows="4" spellcheck="false"
+              placeholder="{% if x_session_set %}A session is saved. Paste a new cookies.txt to replace it, or save empty to clear.{% else %}.x.com	TRUE	/	TRUE	1799999999	auth_token	…{% endif %}"
+              class="w-full py-2.5 px-3.5 font-mono text-[11px]"></textarea>
+    <div class="flex items-center justify-between gap-4 mt-3">
+      <p class="text-[11px] text-on-surface-variant">
+        Use a <b>throwaway X account</b>, not a personal one — this is a live login session, not a scoped key.
+        It does not need to be the account you are reading. Expires every few months; paste a fresh one here when X sources go quiet.
+      </p>
+      <button type="submit" class="bg-primary-container shrink-0">Save session</button>
+    </div>
+  </form>
+
   <!-- Add a source -->
   <form method="post" class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6">
     {% csrf_token %}
@@ -47,7 +77,19 @@
           {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
         </select>
       </div>
+      <div>
+        <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Daily fetch at (hour)</label>
+        <input type="number" name="auto_fetch_hour" value="6" min="0" max="23" class="w-full py-2.5 px-3.5">
+      </div>
+      <div>
+        <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Looking back (days)</label>
+        <input type="number" name="auto_fetch_days" value="2" min="1" max="90" class="w-full py-2.5 px-3.5">
+      </div>
       <div class="flex items-end gap-5 xl:col-span-2">
+        <label class="inline-flex items-center gap-2 text-[12px] pb-2.5">
+          <input type="checkbox" name="auto_fetch" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+          Fetch daily
+        </label>
         <label class="inline-flex items-center gap-2 text-[12px] pb-2.5">
           <input type="checkbox" name="is_own_content" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
           Our own posts
@@ -60,6 +102,7 @@
       </div>
     </div>
     <p class="text-[11px] text-on-surface-variant mt-4">
+      <b>Fetch daily</b> pulls this source once a day at the hour you set, straight into the review queue — still nothing publishes until you approve it.
       Leave <b>Our own posts</b> off for a repost — approved articles then carry a &ldquo;via &lt;credit line&gt;&rdquo; line and link back to the original.
     </p>
   </form>
@@ -67,6 +110,7 @@
   <!-- Existing sources -->
   {% if sources %}
   <div class="bg-surface-container-lowest border border-slate-200 rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
     <table class="w-full">
       <thead>
         <tr>
@@ -74,6 +118,7 @@
           <th class="text-left">Type</th>
           <th class="text-left">Target</th>
           <th class="text-left">Use</th>
+          <th class="text-left">Daily</th>
           <th class="text-left">Last fetched</th>
           <th class="text-right">Action</th>
         </tr>
@@ -94,6 +139,23 @@
             <span class="pill bg-amber-50 text-amber-700">via {{ s.attribution|default:s.name }}</span>
             {% endif %}
           </td>
+          <td>
+            <form method="post" class="flex items-center gap-1.5">
+              {% csrf_token %}
+              <input type="hidden" name="pk" value="{{ s.pk }}">
+              <input type="hidden" name="action" value="schedule">
+              <input type="checkbox" name="auto_fetch" {% if s.auto_fetch %}checked{% endif %}
+                     title="Fetch this source once a day"
+                     class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+              <input type="number" name="auto_fetch_hour" value="{{ s.auto_fetch_hour }}" min="0" max="23"
+                     title="Hour of day" class="w-[58px] py-1 px-1.5 text-[11px]">
+              <input type="number" name="auto_fetch_days" value="{{ s.auto_fetch_days }}" min="1" max="90"
+                     title="Days to look back" class="w-[58px] py-1 px-1.5 text-[11px]">
+              <button type="submit" class="p-1.5 rounded-lg text-amber-700 hover:bg-amber-50 transition-colors" title="Save schedule">
+                <span class="material-symbols-rounded text-[18px]">save</span>
+              </button>
+            </form>
+          </td>
           <td class="font-label text-[11px] text-on-surface-variant">{{ s.last_fetched_at|date:"d M Y H:i"|default:"—" }}</td>
           <td>
             <form method="post" class="flex justify-end"
@@ -110,6 +172,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   {% endif %}
 </div>

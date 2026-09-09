@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'django_otp.plugins.otp_totp',
     'drf_spectacular',
     'rest_framework',
+    'django_filters',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',  # For token revocation
     'corsheaders',
@@ -139,6 +140,20 @@ else:
 
 # ─── Caching (Redis/Valkey in production, LocMem for dev) ────
 REDIS_URL = os.environ.get('REDIS_URL', '')
+
+# DigitalOcean's managed Redis speaks TLS only, and hands out a rediss:// URL
+# signed by DigitalOcean's own CA rather than a public one. Two consequences:
+#   * kombu refuses a rediss:// broker outright unless ssl_cert_reqs is in the
+#     URL — without this the Celery worker crash-loops on boot.
+#   * 'required' would fail anyway, since the CA is not in the system trust
+#     store and App Platform has no persistent disk to put a CA bundle on.
+# So verification is off while the traffic stays encrypted. This link is
+# component-to-component inside DigitalOcean's private network and never
+# crosses the internet. To tighten it, mount DO's CA bundle and switch to
+# ssl_cert_reqs=required&ssl_ca_certs=<path>.
+if REDIS_URL.startswith('rediss://') and 'ssl_cert_reqs' not in REDIS_URL:
+    REDIS_URL += ('&' if '?' in REDIS_URL else '?') + 'ssl_cert_reqs=none'
+
 if not REDIS_URL and not DEBUG:
     import logging as _redis_log
     _redis_log.getLogger('django').warning(
@@ -251,7 +266,12 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# Django 5.x STORAGES (replaces STATICFILES_STORAGE / DEFAULT_FILE_STORAGE).
+# 'default' is swapped to DigitalOcean Spaces below when not DEBUG.
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
+}
 
 # ─── Media Files ───────────────────────────────────────────────
 MEDIA_URL = '/media/'
@@ -276,7 +296,7 @@ if not DEBUG:
     AWS_S3_SIGNATURE_VERSION = 's3v4'  # SigV2 is legacy; sign private URLs with v4
     AWS_S3_FILE_OVERWRITE = False
     AWS_LOCATION = 'media'
-    DEFAULT_FILE_STORAGE = 'config.storage_backends.SpacesMediaStorage'
+    STORAGES['default'] = {'BACKEND': 'config.storage_backends.SpacesMediaStorage'}
     MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/'
     # CDN: serve media from the Spaces edge instead of the fra1 origin.
     # Defaults to the CDN that is enabled on the burundi-au-media Space, so no
@@ -374,6 +394,11 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # Without this every viewset's `filterset_fields` is dead: ?category=,
+    # ?is_featured= and friends were accepted and then ignored.
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
@@ -391,8 +416,13 @@ REST_FRAMEWORK = {
         'proxy_registration': '5/hour',  # 5 proxy registrations per hour per user
         'weather': '60/hour',  # 60 weather proxy requests per hour per user/IP
     },
-    # Use real client IP behind Cloudflare / reverse proxies
-    'NUM_PROXIES': 1,
+    # CloudflareProxyMiddleware already resolves the real client into
+    # REMOTE_ADDR (and mirrors it into X-Forwarded-For only when trusted).
+    # NUM_PROXIES=0 makes DRF throttles read REMOTE_ADDR, so a forged
+    # X-Forwarded-For on a direct-to-origin request cannot pick the throttle key.
+    'NUM_PROXIES': 0,
+    # Guarantee every error body carries `detail` (the key the Flutter app reads).
+    'EXCEPTION_HANDLER': 'core.exceptions.detail_exception_handler',
     # OpenAPI schema generation
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
@@ -428,6 +458,10 @@ SIMPLE_JWT = {
 SESSION_COOKIE_AGE = 60 * 60 * 24          # 24 hours (cookie level)
 SESSION_SAVE_EVERY_REQUEST = True           # Refresh cookie Max-Age on every request
 STAFF_SESSION_MAX_AGE = 60 * 60 * 24       # 24 hours — hard cap enforced by middleware
+# Admin TOTP. Off by default; set ADMIN_2FA_REQUIRED=True to enforce enrolment
+# and per-login verification. The setup/verify views stay reachable either way,
+# so admins can enrol voluntarily before it is switched on.
+ADMIN_2FA_REQUIRED = os.environ.get('ADMIN_2FA_REQUIRED', 'False').lower() in ('true', '1', 'yes')
 # Note: SESSION_EXPIRE_AT_BROWSER_CLOSE intentionally NOT set (defaults to False).
 # Setting it to True caused "Remember me" to be ignored in some edge cases.
 
@@ -486,29 +520,60 @@ else:
         'EMAIL_BACKEND',
         'core.email_backend.LoggingEmailBackend'
     )
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+# Primary SMTP: the chairmanship domain's own server. OTP and system mail send
+# from info@burundichairship.africa, and that host is SPF/DKIM-aligned for the
+# address, so the From matches who actually sent it.
+def _smtp_security(tls_var, ssl_var, port):
+    """Resolve (use_tls, use_ssl) so they can never both be on.
+
+    Django raises outright if both are set, and an environment that states only
+    one of them — which is most of them — would otherwise inherit a default for
+    the other and break every outgoing email. Whichever is stated wins; if
+    neither is, the port decides: 465 is implicit SSL, everything else STARTTLS.
+    """
+    def flag(name):
+        raw = os.environ.get(name)
+        return None if raw is None else raw.lower() in ('true', '1', 'yes')
+
+    tls, ssl = flag(tls_var), flag(ssl_var)
+    if tls is None and ssl is None:
+        ssl = port == 465
+        tls = not ssl
+    elif ssl is None:
+        ssl = not tls
+    elif tls is None:
+        tls = not ssl
+    elif tls and ssl:
+        # Both explicitly on is a misconfiguration; the port breaks the tie.
+        ssl = port == 465
+        tls = not ssl
+    return tls, ssl
+
+
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.burundichairship.africa')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '465'))
+EMAIL_USE_TLS, EMAIL_USE_SSL = _smtp_security('EMAIL_USE_TLS', 'EMAIL_USE_SSL', EMAIL_PORT)
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'info@burundichairship.africa')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 'yes')
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL',
-    'Be 4 Africa <info@burundi4africa.com>'
+    'Be 4 Africa <info@burundichairship.africa>'
 )
 
-# ─── Fallback SMTP (used when primary Gmail SMTP fails) ──────
-# If the primary EMAIL_HOST fails (e.g. Gmail auth error), OTP emails
-# will automatically retry via this fallback server.
-FALLBACK_EMAIL_HOST = os.environ.get('FALLBACK_EMAIL_HOST', 'smtp.burundichairship.africa')
-FALLBACK_EMAIL_PORT = int(os.environ.get('FALLBACK_EMAIL_PORT', '465'))
-FALLBACK_EMAIL_USE_TLS = os.environ.get('FALLBACK_EMAIL_USE_TLS', 'False').lower() in ('true', '1', 'yes')
-FALLBACK_EMAIL_USE_SSL = os.environ.get('FALLBACK_EMAIL_USE_SSL', 'True').lower() in ('true', '1', 'yes')
-FALLBACK_EMAIL_HOST_USER = os.environ.get('FALLBACK_EMAIL_HOST_USER', 'info@burundichairship.africa')
+# ─── Fallback SMTP (used when the primary host fails) ────────
+# Gmail, kept as the safety net: if smtp.burundichairship.africa refuses the
+# connection, OTPs still go out rather than the sign-up dead-ending. The From
+# changes with the host, because Gmail is authenticated as the other address
+# and sending burundichairship.africa through it would fail DMARC.
+FALLBACK_EMAIL_HOST = os.environ.get('FALLBACK_EMAIL_HOST', 'smtp.gmail.com')
+FALLBACK_EMAIL_PORT = int(os.environ.get('FALLBACK_EMAIL_PORT', '587'))
+FALLBACK_EMAIL_USE_TLS, FALLBACK_EMAIL_USE_SSL = _smtp_security(
+    'FALLBACK_EMAIL_USE_TLS', 'FALLBACK_EMAIL_USE_SSL', FALLBACK_EMAIL_PORT)
+FALLBACK_EMAIL_HOST_USER = os.environ.get('FALLBACK_EMAIL_HOST_USER', 'info@burundi4africa.com')
 FALLBACK_EMAIL_HOST_PASSWORD = os.environ.get('FALLBACK_EMAIL_HOST_PASSWORD', '')
 FALLBACK_FROM_EMAIL = os.environ.get(
     'FALLBACK_FROM_EMAIL',
-    'Be 4 Africa <info@burundichairship.africa>'
+    'Be 4 Africa <info@burundi4africa.com>'
 )
 
 # ─── Campaign / Newsletter SMTP (separate account) ──────────
@@ -600,7 +665,13 @@ if SENTRY_DSN:
         profiles_sample_rate=float(os.environ.get('SENTRY_PROFILES_SAMPLE_RATE', '0.1')),
         send_default_pii=False,
         environment=os.environ.get('SENTRY_ENVIRONMENT', 'development' if DEBUG else 'production'),
-        release=os.environ.get('SENTRY_RELEASE', 'burundi-au-backend@1.0.0'),
+        # SENTRY_RELEASE wins; else derive from the deploy's git SHA (GIT_SHA, or
+        # DO's ${_self.COMMIT_HASH} bound in app.yaml); else the legacy static tag.
+        release=(
+            os.environ.get('SENTRY_RELEASE')
+            or (f"burundi-au-backend@{os.environ['GIT_SHA'][:12]}" if os.environ.get('GIT_SHA') else None)
+            or 'burundi-au-backend@1.0.0'
+        ),
         before_send=_sentry_before_send,
         # Attach server name for multi-server debugging
         server_name=os.environ.get('SENTRY_SERVER_NAME', ''),
@@ -655,6 +726,23 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'core.tasks.transition_live_feed_statuses',
         'schedule': 60,  # Every minute
     },
+    'publish-scheduled-content': {
+        'task': 'core.tasks.publish_scheduled_content',
+        'schedule': 60,  # Every minute
+    },
+    'promote-waitlist': {
+        'task': 'core.tasks.promote_waitlist_task',
+        'schedule': 60,  # Every minute
+    },
+    'purge-old-user-sessions': {
+        'task': 'core.tasks.purge_old_user_sessions',
+        'schedule': 86400,  # Every 24 hours
+    },
+    # Hourly, but each source only fetches on its own configured hour.
+    'auto-fetch-news-sources': {
+        'task': 'core.tasks.auto_fetch_news_sources',
+        'schedule': 3600,
+    },
 }
 
 # ─── GraphQL (graphene-django) — REMOVED ─────────────────────
@@ -694,6 +782,20 @@ TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
 
 # ─── Gemini API (AI Translation) ─────────────────────────────
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+# Model id for every Gemini call (admin auto-translate, scraper headlines).
+# Google retires these on a schedule — the 2.0 family went in June 2026 — so
+# it is one env var to bump rather than a code change in two places.
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash')
 
 # ─── Database Backup Configuration ────────────────────────────
 BACKUP_DIR = os.path.join(BASE_DIR, 'backups')
+
+# --- Security hardening (2026-09) ---
+# Outbound SMTP must not hang a worker.
+EMAIL_TIMEOUT = 10
+# DigitalOcean App Platform: the TCP peer is DO's router, not Cloudflare.
+# CloudflareProxyMiddleware uses the X-Forwarded-For hop chain when this is on.
+TRUST_PLATFORM_PROXY = os.environ.get('TRUST_PLATFORM_PROXY', str(not DEBUG)).lower() in ('true', '1', 'yes')
+# DatabaseCache has no default cap; bound it so the table cannot grow unbounded.
+if CACHES['default']['BACKEND'].endswith('DatabaseCache'):
+    CACHES['default'].setdefault('OPTIONS', {}).update({'MAX_ENTRIES': 50000, 'CULL_FREQUENCY': 10})

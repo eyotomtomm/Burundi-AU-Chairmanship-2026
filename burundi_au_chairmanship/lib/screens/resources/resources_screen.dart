@@ -1,7 +1,13 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
 import '../../providers/auth_provider.dart';
@@ -79,22 +85,20 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.folder_outlined, size: 56, color: Colors.grey[300]),
+                            Icon(Icons.folder_outlined, size: 56, color: Ds.muted(context)),
                             const SizedBox(height: 16),
                             Text(
-                              langCode == 'fr' ? 'Ressources en cours de publication' : 'Resources coming soon',
+                              l10n.translate('res_coming_soon'),
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey,
+                                color: Ds.body(context),
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              langCode == 'fr'
-                                  ? 'Les documents et ressources du sommet seront disponibles ici.'
-                                  : 'Summit documents and resources will be available here.',
+                              l10n.translate('res_coming_soon_desc'),
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+                              style: TextStyle(fontSize: 14, color: Ds.muted(context), height: 1.5),
                             ),
                           ],
                         ),
@@ -227,13 +231,14 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
   }
 
   Widget _buildError() {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.cloud_off, size: 64, color: AppColors.burundiGreen.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
-          const Text('Could not load resources'),
+          Text(l10n.translate('res_could_not_load')),
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: () {
@@ -243,7 +248,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
               });
               _loadData();
             },
-            child: const Text('Retry'),
+            child: Text(l10n.translate('retry')),
           ),
         ],
       ),
@@ -283,6 +288,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
   Widget _buildResourceItem(BuildContext context, ApiResource item, Color accentColor, String langCode) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -338,43 +344,77 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
             IconButton(
               icon: const Icon(Icons.visibility_outlined),
               color: accentColor,
-              onPressed: () {
-                // Record view in backend
-                ApiService().recordResourceView(item.id).catchError((_) => <String, dynamic>{});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Opening: ${item.getTitle(langCode)}'),
-                    backgroundColor: AppColors.burundiGreen,
-                  ),
-                );
-              },
-              tooltip: 'View',
+              onPressed: () => _view(item),
+              tooltip: l10n.translate('res_view'),
             ),
-            IconButton(
-              icon: const Icon(Icons.download_outlined),
-              color: accentColor,
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Downloading: ${item.getTitle(langCode)}'),
-                    backgroundColor: AppColors.burundiGreen,
-                    action: SnackBarAction(
-                      label: 'Cancel',
-                      textColor: Colors.white,
-                      onPressed: () {
-                        // Dismiss the snackbar
-                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                      },
-                    ),
+            _downloading.contains(item.id)
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                        width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.download_outlined),
+                    color: accentColor,
+                    onPressed: () => _download(item),
+                    tooltip: l10n.translate('download'),
                   ),
-                );
-              },
-              tooltip: 'Download',
-            ),
           ],
         ),
       ),
     );
+  }
+
+  final Set<int> _downloading = {};
+
+  void _snack(String key, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(AppLocalizations.of(context).translate(key)),
+      backgroundColor: error ? AppColors.error : AppColors.burundiGreen,
+    ));
+  }
+
+  Future<void> _view(ApiResource item) async {
+    if (item.file.isEmpty) {
+      _snack('res_file_not_available', error: true);
+      return;
+    }
+    ApiService().recordResourceView(item.id).catchError((_) => <String, dynamic>{});
+    final uri = Uri.parse(Environment.fixMediaUrl(item.file));
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      _snack('res_could_not_open_file', error: true);
+    }
+  }
+
+  /// Same Dio → temp dir → OpenFilex flow as the magazine PDF viewer.
+  Future<void> _download(ApiResource item) async {
+    if (item.file.isEmpty) {
+      _snack('res_file_not_available', error: true);
+      return;
+    }
+    setState(() => _downloading.add(item.id));
+    try {
+      final url = Environment.fixMediaUrl(item.file);
+      final name = Uri.parse(url).pathSegments.lastOrNull ?? 'resource_${item.id}';
+      final dir = await getApplicationDocumentsDirectory();
+      final path = '${dir.path}/resources/$name';
+      await Directory('${dir.path}/resources').create(recursive: true);
+      if (!File(path).existsSync()) {
+        await Dio(BaseOptions(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 120),
+        )).download(url, path);
+      }
+      final result = await OpenFilex.open(path);
+      if (result.type != ResultType.done) {
+        _snack('res_downloaded_no_app');
+      }
+    } catch (_) {
+      _snack('res_download_failed', error: true);
+    } finally {
+      if (mounted) setState(() => _downloading.remove(item.id));
+    }
   }
 
   IconData _getTypeIcon(String type) {

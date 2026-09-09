@@ -3,11 +3,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../config/app_ds.dart';
+import '../../config/environment.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
@@ -99,6 +101,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
         _upcomingFeeds = upcoming;
         _recordedFeeds = [...pastUpcoming, ...results[2]];
         _isLoading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -379,8 +382,8 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                 height: 220,
                 width: double.infinity,
                 child: feed.thumbnail.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: feed.thumbnail,
+                    ? AppNetworkImage(
+                        imageUrl: Environment.fixMediaUrl(feed.thumbnail),
                         fit: BoxFit.cover,
                         placeholder: (_, _) => Container(
                           decoration: const BoxDecoration(
@@ -660,8 +663,8 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
             children: [
               // Thumbnail
               feed.thumbnail.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: feed.thumbnail,
+                  ? AppNetworkImage(
+                      imageUrl: Environment.fixMediaUrl(feed.thumbnail),
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(color: AppColors.burundiRed.withValues(alpha: 0.3)),
                       errorWidget: (_, _, _) => Container(
@@ -782,8 +785,8 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                   fit: StackFit.expand,
                   children: [
                     feed.thumbnail.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: feed.thumbnail,
+                        ? AppNetworkImage(
+                            imageUrl: Environment.fixMediaUrl(feed.thumbnail),
                             fit: BoxFit.cover,
                             placeholder: (_, _) => Container(
                               color: AppColors.auGold.withValues(alpha: 0.15),
@@ -967,8 +970,8 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                 fit: StackFit.expand,
                 children: [
                   feed.thumbnail.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: feed.thumbnail,
+                      ? AppNetworkImage(
+                          imageUrl: Environment.fixMediaUrl(feed.thumbnail),
                           fit: BoxFit.cover,
                           placeholder: (_, _) => const DsImagePlaceholder(radius: 0),
                           errorWidget: (_, _, _) => const DsImagePlaceholder(
@@ -1126,8 +1129,8 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   void _openFeed(ApiLiveFeed feed) {
     if (feed.streamUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No stream URL available for this feed'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).translate('no_stream_url')),
           backgroundColor: AppColors.error,
         ),
       );
@@ -1532,8 +1535,8 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   Future<void> _addToCalendar(ApiLiveFeed feed) async {
     if (feed.scheduledTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No scheduled time available for this event'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).translate('no_scheduled_time')),
           backgroundColor: AppColors.error,
         ),
       );
@@ -1591,7 +1594,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add reminder: $e'),
+            content: Text(AppLocalizations.of(context).translate('reminder_add_failed')),
             backgroundColor: AppColors.error,
           ),
         );

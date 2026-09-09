@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
@@ -106,6 +107,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   /// Apply normalized weather API response to a city object.
   void _applyWeatherData(_CityWeather city, Map<String, dynamic> data) {
+    city.fetchFailed = false;
     final current = data['current'] as Map<String, dynamic>? ?? {};
     city.currentTemp = (current['temp_c'] as num?)?.toDouble() ?? 0;
     city.feelsLike = (current['feels_like_c'] as num?)?.toDouble() ?? 0;
@@ -138,8 +140,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
       _isLoading = true;
       _hasError = false;
     });
-    int failCount = 0;
-    for (final city in _cities) {
+    // Fetch all cities in parallel; each city records its own failure.
+    await Future.wait(_cities.map((city) async {
       try {
         Map<String, dynamic>? data;
         if (city.cityId != null) {
@@ -150,13 +152,14 @@ class _WeatherScreenState extends State<WeatherScreen> {
         if (data != null) {
           _applyWeatherData(city, data);
         } else {
-          failCount++;
+          city.fetchFailed = true;
         }
       } catch (e) {
         if (kDebugMode) debugPrint('Weather fetch failed for ${city.name}: $e');
-        failCount++;
+        city.fetchFailed = true;
       }
-    }
+    }));
+    final failCount = _cities.where((c) => c.fetchFailed).length;
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -171,9 +174,11 @@ class _WeatherScreenState extends State<WeatherScreen> {
       final data = await ApiService().getWeatherByCoordinates(city.lat, city.lon);
       if (data != null) {
         _applyWeatherData(city, data);
+      } else {
+        city.fetchFailed = true;
       }
     } catch (_) {
-      // Use fallback data
+      city.fetchFailed = true;
     }
     if (mounted) setState(() {});
   }
@@ -194,16 +199,18 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   void _showRemoveCityDialog(int index) {
     final city = _cities[index];
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Remove City'),
-        content: Text('Remove ${city.name} from your weather list?'),
+        title: Text(l10n.translate('wx_remove_city')),
+        content: Text(
+            '${l10n.translate('wx_remove_city_prefix')} ${city.name} ${l10n.translate('wx_remove_city_suffix')}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(l10n.translate('cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -217,7 +224,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
               setState(() => _cities.removeAt(index));
               _saveCustomCities();
             },
-            child: const Text('Remove'),
+            child: Text(l10n.translate('remove')),
           ),
         ],
       ),
@@ -236,7 +243,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
           if (!_isLoading)
             IconButton(
               icon: const Icon(Icons.add_rounded),
-              tooltip: 'Add city',
+              tooltip: l10n.translate('wx_add_city'),
               onPressed: _showAddCityDialog,
             ),
           const SizedBox(width: 4),
@@ -253,17 +260,17 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       children: [
                         Icon(Icons.cloud_off_rounded, size: 56, color: Ds.muted(context)),
                         const SizedBox(height: 16),
-                        Text('Could not load weather data',
+                        Text(l10n.translate('wx_could_not_load'),
                             style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
                                 color: Ds.ink(context))),
                         const SizedBox(height: 8),
-                        Text('Please check your connection and try again.',
+                        Text(l10n.translate('error_loading_subtitle'),
                             textAlign: TextAlign.center,
                             style: TextStyle(fontSize: 13, color: Ds.body(context))),
                         const SizedBox(height: 20),
-                        DsOutlineButton('Retry',
+                        DsOutlineButton(l10n.translate('retry'),
                             radius: Ds.rPill, onTap: _loadCitiesAndFetch),
                       ],
                     ),
@@ -286,7 +293,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                 child: _buildCityCard(_cities[i]),
                               ),
                       if (_lastUpdated != null)
-                        DsFootnote('Updated ${_formatTime(_lastUpdated!)}', center: true),
+                        DsFootnote('${l10n.translate('sup_updated')} ${_formatTime(_lastUpdated!)}', center: true),
                     ],
                   ),
                 ),
@@ -294,6 +301,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 
   Widget _buildCityCard(_CityWeather city) {
+    final l10n = AppLocalizations.of(context);
     final advisory = _getRainAdvisory(city, false);
     final hi = city.forecast.isNotEmpty ? city.forecast.first.maxTemp : city.currentTemp;
     final lo = city.forecast.isNotEmpty ? city.forecast.first.minTemp : city.currentTemp;
@@ -349,7 +357,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${city.currentTemp.toStringAsFixed(0)}°',
+                    city.fetchFailed ? '--°' : '${city.currentTemp.toStringAsFixed(0)}°',
                     style: const TextStyle(
                         fontSize: 52,
                         fontWeight: FontWeight.w800,
@@ -362,7 +370,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
-                        '${_getWeatherDescription(city.weatherCode, city.conditionText)}\nH ${hi.toStringAsFixed(0)}° · L ${lo.toStringAsFixed(0)}°',
+                        '${_getWeatherDescription(city.weatherCode, city.conditionText)}\n${l10n.translate('wx_high')} ${hi.toStringAsFixed(0)}° · ${l10n.translate('wx_low')} ${lo.toStringAsFixed(0)}°',
                         style: TextStyle(
                             fontSize: 14,
                             height: 1.35,
@@ -460,6 +468,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 
   ({IconData icon, Color color, Color bgColor, String text}) _getRainAdvisory(_CityWeather city, bool isDark) {
+    final l10n = AppLocalizations.of(context);
     final currentRain = _isRainyCode(city.weatherCode);
     final forecastRain = city.forecast.any((d) => _isRainyCode(d.weatherCode));
     // Use the highest chance_of_rain from the forecast
@@ -472,7 +481,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
         icon: Icons.umbrella_rounded,
         color: AppColors.burundiRed,
         bgColor: AppColors.burundiRed.withValues(alpha: isDark ? 0.12 : 0.08),
-        text: 'Rain right now — carry an umbrella!',
+        text: l10n.translate('wx_rain_now'),
       );
     }
     if (forecastRain || maxChance >= 50) {
@@ -481,15 +490,15 @@ class _WeatherScreenState extends State<WeatherScreen> {
         color: AppColors.warning,
         bgColor: AppColors.warning.withValues(alpha: isDark ? 0.12 : 0.08),
         text: maxChance > 0
-            ? '$maxChance% chance of rain in the next few days — pack an umbrella.'
-            : 'Rain expected in the next few days — pack an umbrella.',
+            ? '$maxChance% ${l10n.translate('wx_rain_chance')}'
+            : l10n.translate('wx_rain_expected'),
       );
     }
     return (
       icon: Icons.wb_sunny_rounded,
       color: AppColors.burundiGreen,
       bgColor: AppColors.burundiGreen.withValues(alpha: isDark ? 0.1 : 0.06),
-      text: 'No rain expected — clear skies ahead.',
+      text: l10n.translate('wx_no_rain'),
     );
   }
 
@@ -529,16 +538,9 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 
   String _formatDayAbbrev(String dateStr) {
-    try {
-      final dt = DateTime.parse(dateStr);
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return days[dt.weekday - 1];
-    } catch (_) {
-      final parts = dateStr.split('-');
-      final months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      final month = int.tryParse(parts[1]) ?? 1;
-      return '${months[month]} ${parts[2]}';
-    }
+    final dt = DateTime.tryParse(dateStr);
+    if (dt == null) return dateStr;
+    return DateFormat.E(Localizations.localeOf(context).languageCode).format(dt);
   }
 
   /// Map WeatherAPI.com condition codes to Material icons.
@@ -560,7 +562,9 @@ class _WeatherScreenState extends State<WeatherScreen> {
     if (code == 1066 || code == 1069 || code == 1072 ||
         code == 1114 || code == 1117 ||
         (code >= 1204 && code <= 1237) ||
-        (code >= 1255 && code <= 1264)) return Icons.ac_unit_rounded;
+        (code >= 1255 && code <= 1264)) {
+      return Icons.ac_unit_rounded;
+    }
     // Rain showers (1240-1246)
     if (code >= 1240 && code <= 1246) return Icons.water_drop_rounded;
     // Snow showers (1249-1258) — already covered above
@@ -574,20 +578,21 @@ class _WeatherScreenState extends State<WeatherScreen> {
   /// Use condition_text from API when available, fall back to code-based description.
   String _getWeatherDescription(int code, [String conditionText = '']) {
     if (conditionText.isNotEmpty) return conditionText;
+    final t = AppLocalizations.of(context).translate;
     // Fallback mapping for WeatherAPI.com codes
-    if (code == 1000) return 'Clear';
-    if (code == 1003) return 'Partly cloudy';
-    if (code == 1006) return 'Cloudy';
-    if (code == 1009) return 'Overcast';
-    if (code == 1030) return 'Mist';
-    if (code == 1135 || code == 1147) return 'Foggy';
-    if (code >= 1150 && code <= 1171) return 'Drizzle';
-    if (code >= 1180 && code <= 1201) return 'Rain';
-    if (code >= 1204 && code <= 1237) return 'Snow';
-    if (code >= 1240 && code <= 1246) return 'Rain showers';
-    if (code >= 1255 && code <= 1264) return 'Snow showers';
-    if (code == 1087 || code >= 1273) return 'Thunderstorm';
-    return 'Unknown';
+    if (code == 1000) return t('wx_clear');
+    if (code == 1003) return t('wx_partly_cloudy');
+    if (code == 1006) return t('wx_cloudy');
+    if (code == 1009) return t('wx_overcast');
+    if (code == 1030) return t('wx_mist');
+    if (code == 1135 || code == 1147) return t('wx_foggy');
+    if (code >= 1150 && code <= 1171) return t('wx_drizzle');
+    if (code >= 1180 && code <= 1201) return t('wx_rain');
+    if (code >= 1204 && code <= 1237) return t('wx_snow');
+    if (code >= 1240 && code <= 1246) return t('wx_rain_showers');
+    if (code >= 1255 && code <= 1264) return t('wx_snow_showers');
+    if (code == 1087 || code >= 1273) return t('wx_thunderstorm');
+    return t('unknown');
   }
 }
 
@@ -658,9 +663,10 @@ class _AddCityDialogState extends State<_AddCityDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Add City'),
+      title: Text(l10n.translate('wx_add_city')),
       content: SizedBox(
         width: double.maxFinite,
         child: Column(
@@ -670,8 +676,8 @@ class _AddCityDialogState extends State<_AddCityDialog> {
               controller: _controller,
               autofocus: true,
               decoration: InputDecoration(
-                labelText: 'City name',
-                hintText: 'Search for a city...',
+                labelText: l10n.translate('wx_city_name'),
+                hintText: l10n.translate('wx_search_city'),
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -694,11 +700,11 @@ class _AddCityDialogState extends State<_AddCityDialog> {
                 ),
               )
             else if (_hasSearched && _results.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Text(
-                  'No results found',
-                  style: TextStyle(color: Colors.grey),
+                  l10n.translate('wx_no_results'),
+                  style: TextStyle(color: Ds.muted(context)),
                 ),
               )
             else if (_results.isNotEmpty)
@@ -736,7 +742,7 @@ class _AddCityDialogState extends State<_AddCityDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(l10n.translate('cancel')),
         ),
       ],
     );
@@ -761,6 +767,8 @@ class _CityWeather {
   final int? cityId;
   final String? backgroundImageUrl;
   double currentTemp = 0;
+  /// Last fetch failed — render a placeholder instead of a fake 0°.
+  bool fetchFailed = false;
   int humidity = 0;
   double windSpeed = 0;
   int weatherCode = 0;

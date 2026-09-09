@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_ds.dart';
+import '../../widgets/async_content_view.dart';
 
 class LoginHistoryScreen extends StatefulWidget {
   const LoginHistoryScreen({super.key});
@@ -15,6 +17,7 @@ class _LoginHistoryScreenState extends State<LoginHistoryScreen> {
   final ApiService _api = ApiService();
   List<Map<String, dynamic>> _history = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -23,10 +26,19 @@ class _LoginHistoryScreenState extends State<LoginHistoryScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       _history = await _api.getLoginHistory();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        _error = e is ApiException
+            ? e.message
+            : AppLocalizations.of(context).translate('sec_could_not_load_history');
+      }
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -39,22 +51,41 @@ class _LoginHistoryScreenState extends State<LoginHistoryScreen> {
     }
   }
 
+  String _formatTime(BuildContext context, dynamic iso) {
+    if (iso == null) return '';
+    try {
+      final date = DateTime.parse(iso.toString()).toLocal();
+      return DateFormat.yMMMd(Localizations.localeOf(context).toString()).add_Hm().format(date);
+    } catch (_) {
+      return iso.toString();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final state = _loading
+        ? AsyncContentState.loading
+        : _error != null
+            ? AsyncContentState.error
+            : _history.isEmpty
+                ? AsyncContentState.empty
+                : AsyncContentState.content;
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(l10n.translate('login_history')),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _history.isEmpty
-              ? const Center(child: Text('No login history'))
-              : RefreshIndicator(
+      body: AsyncContentView(
+        state: state,
+        loadingWidget: const Center(child: CircularProgressIndicator()),
+        errorSubtitle: _error,
+        emptyIcon: Icons.history_rounded,
+        emptyMessage: l10n.translate('sec_no_login_history'),
+        onRetry: _load,
+        onRefresh: _load,
+        child: RefreshIndicator(
                   onRefresh: () async {
                     HapticFeedback.mediumImpact();
                     await _load();
@@ -69,7 +100,7 @@ class _LoginHistoryScreenState extends State<LoginHistoryScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.grey[850] : Colors.white,
+                          color: Ds.surface(context),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: success
@@ -98,28 +129,28 @@ class _LoginHistoryScreenState extends State<LoginHistoryScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(_methodIcon(entry['method'] ?? ''), size: 16, color: Colors.grey[600]),
+                                      Icon(_methodIcon(entry['method'] ?? ''), size: 16, color: Ds.muted(context)),
                                       const SizedBox(width: 6),
                                       Text(
                                         (entry['method'] ?? 'email').toString().replaceAll('_', ' ').toUpperCase(),
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey[600]),
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Ds.muted(context)),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    entry['created_at'] ?? '',
+                                    _formatTime(context, entry['created_at']),
                                     style: const TextStyle(fontWeight: FontWeight.w500),
                                   ),
                                   if (entry['ip_address'] != null)
-                                    Text('IP: ${entry['ip_address']}', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                    Text('IP: ${entry['ip_address']}', style: TextStyle(fontSize: 12, color: Ds.muted(context))),
                                   if (entry['device_info'] != null && entry['device_info'].toString().isNotEmpty)
-                                    Text(entry['device_info'], style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                    Text(entry['device_info'], style: TextStyle(fontSize: 12, color: Ds.muted(context))),
                                 ],
                               ),
                             ),
                             Text(
-                              success ? 'Success' : 'Failed',
+                              l10n.translate(success ? 'success' : 'sec_failed'),
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -132,6 +163,7 @@ class _LoginHistoryScreenState extends State<LoginHistoryScreen> {
                     },
                   ),
                 ),
+      ),
     );
   }
 }

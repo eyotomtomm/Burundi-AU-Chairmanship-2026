@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../widgets/app_network_image.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -28,7 +29,6 @@ import '../../../services/data_saver_service.dart';
 import '../../../services/like_service.dart';
 import '../../../utils/color_utils.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
-import '../../articles/articles_screen.dart';
 import '../../news/article_detail_screen.dart';
 import '../../events/event_detail_screen.dart';
 import '../../magazine/magazine_detail_screen.dart';
@@ -445,7 +445,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     final preloaded = SplashPreloader.instance.consume();
     if (preloaded != null) {
       _cacheHomeFeed(preloaded.homeFeed);
-      _applyHomeFeedData(
+      await _applyHomeFeedData(
         preloaded.homeFeed,
         preloaded.priorityAgendas,
         preloaded.heroTextContent,
@@ -460,7 +460,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     //    then refresh in the background.
     final cachedFeed = _loadCachedHomeFeed();
     if (cachedFeed != null) {
-      _applyHomeFeedData(cachedFeed, [], [], []);
+      await _applyHomeFeedData(cachedFeed, [], [], []);
       _fetchYouthDialogueData();
       // Continue to fetch fresh data in the background (don't return)
     }
@@ -481,7 +481,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       final homeFeed = results[0] as Map<String, dynamic>;
       _cacheHomeFeed(homeFeed);
       final qaData = results[3] as Map<String, dynamic>;
-      _applyHomeFeedData(
+      await _applyHomeFeedData(
         homeFeed,
         results[1] as List<Map<String, dynamic>>,
         results[2] as List<Map<String, dynamic>>,
@@ -575,101 +575,41 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     }
   }
 
-  void _applyHomeFeedData(
+  /// Parses the feed off the UI thread, then applies it. Shape of the
+  /// resulting state is identical to the old synchronous version.
+  Future<void> _applyHomeFeedData(
     Map<String, dynamic> homeFeed,
     List<Map<String, dynamic>> priorityAgendas,
     List<Map<String, dynamic>> heroTextData,
     List<Map<String, dynamic>> quickAccessMenu, {
     Map<String, String> quickAccessBadges = const {},
-  }) {
-    final heroSlides = (homeFeed['hero_slides'] as List<dynamic>?)
-        ?.map((j) => HeroSlide.fromJson(j as Map<String, dynamic>))
-        .toList();
-    final articles = (homeFeed['articles'] as List<dynamic>?)
-        ?.map((j) => Article.fromJson(j as Map<String, dynamic>))
-        .toList();
-    final newsItems = (homeFeed['news_items'] as List<dynamic>?)
-        ?.map((j) => Article.fromJson(j as Map<String, dynamic>))
-        .toList();
-
+  }) async {
     final langCode = mounted ? Localizations.localeOf(context).languageCode : 'en';
-    final featureCardIcons = [Icons.stars, Icons.travel_explore, Icons.gavel, Icons.auto_stories];
-    final rawCards = homeFeed['feature_cards'] as List<dynamic>? ?? [];
-    final featureCards = rawCards.asMap().entries.map((entry) {
-      final j = entry.value as Map<String, dynamic>;
-      final gradStart = hexToColor(j['gradient_start'] ?? '#409843');
-      final gradEnd = hexToColor(j['gradient_end'] ?? '#4CAF50');
-      IconData icon = featureCardIcons[entry.key % featureCardIcons.length];
-      final iconName = j['icon_name'] as String?;
-      if (iconName != null && iconName.isNotEmpty) icon = _getIconFromName(iconName);
-      return <String, dynamic>{
-        'title': langCode == 'fr' ? (j['title_fr'] ?? j['title'] ?? '') : (j['title'] ?? ''),
-        'description': langCode == 'fr' ? (j['description_fr'] ?? j['description'] ?? '') : (j['description'] ?? ''),
-        'icon': icon,
-        'iconImageUrl': j['icon_image'] ?? '',
-        'gradient': [gradStart, gradEnd],
-        'imageUrl': j['image'] ?? '',
-        'actionType': j['action_type'] ?? 'none',
-        'actionValue': j['action_value'] ?? '',
-        'gradient_start': j['gradient_start'] ?? '#409843',
-        'gradient_end': j['gradient_end'] ?? '#4CAF50',
-        'overview': j['overview'] ?? '',
-        'overview_fr': j['overview_fr'] ?? '',
-        'key_points': j['key_points'] ?? [],
-        'key_points_fr': j['key_points_fr'] ?? [],
-        'impact_areas': j['impact_areas'] ?? [],
-        'impact_areas_fr': j['impact_areas_fr'] ?? [],
-        'extra_content': j['extra_content'] ?? '',
-        'extra_content_fr': j['extra_content_fr'] ?? '',
-        'media': j['media'] ?? [],
-        'title_raw': j['title'] ?? '',
-        'title_fr': j['title_fr'] ?? '',
-      };
-    }).toList();
-
-    // Use hero text from separate API call, or fall back to home feed bundle
-    final heroTextSource = heroTextData.isNotEmpty
-        ? heroTextData
-        : (homeFeed['hero_text_content'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>();
-    final heroTextMap = <String, String>{};
-    for (final item in heroTextSource) {
-      final key = item['key'] as String?;
-      if (key == null) continue;
-      heroTextMap[key] = langCode == 'fr' && item['text_fr'] != null && (item['text_fr'] as String).isNotEmpty
-          ? item['text_fr'] as String
-          : item['text_en'] as String;
-    }
-
-    final eventCards = (homeFeed['event_cards'] as List<dynamic>? ?? [])
-        .map((j) => EventRegistrationModel.fromJson(j as Map<String, dynamic>)).toList();
-    final magazines = (homeFeed['magazines'] as List<dynamic>? ?? [])
-        .map((j) => MagazineEdition.fromJson(j as Map<String, dynamic>)).toList();
-    final videos = (homeFeed['videos'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>();
-    final facts = (homeFeed['facts'] as List<dynamic>? ?? [])
-        .map((j) => Fact.fromJson(j as Map<String, dynamic>)).toList();
-
-    final settingsData = homeFeed['settings'] as Map<String, dynamic>? ?? {};
-    _cacheFeatureFlags(settingsData);
+    final p = await compute(_parseHomeFeed, <String, dynamic>{
+      'homeFeed': homeFeed,
+      'heroTextData': heroTextData,
+      'langCode': langCode,
+    });
+    if (!mounted) return;
+    _cacheFeatureFlags(p.settings);
 
     setState(() {
-      _appSettings = settingsData;
-      _apiHeroSlides = heroSlides;
-      _apiArticles = articles;
-      _apiNewsItems = newsItems;
-      _apiFeatureCards = featureCards;
-      _apiMagazines = magazines;
-      _apiVideos = videos;
+      _appSettings = p.settings;
+      _apiHeroSlides = p.heroSlides;
+      _apiArticles = p.articles;
+      _apiNewsItems = p.newsItems;
+      _apiFeatureCards = p.featureCards;
+      _apiMagazines = p.magazines;
+      _apiVideos = p.videos;
       _apiPriorityAgendas = priorityAgendas;
-      _apiEventCards = eventCards
+      _apiEventCards = p.eventCards
         ..sort((a, b) {
           if (a.isYouthDialogue != b.isYouthDialogue) {
             return a.isYouthDialogue ? -1 : 1;
           }
           return (a.eventDate ?? DateTime(2099)).compareTo(b.eventDate ?? DateTime(2099));
         });
-      _apiFacts = facts;
+      _apiFacts = p.facts;
       _quickAccessItems = quickAccessMenu;
       _quickAccessBadges = quickAccessBadges;
       _isLoading = false;
@@ -688,32 +628,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
         }
       } catch (_) {}
     });
-  }
-
-
-  IconData _getIconFromName(String iconName) {
-    const iconMap = {
-      'stars': Icons.stars, 'travel_explore': Icons.travel_explore,
-      'gavel': Icons.gavel, 'security': Icons.security,
-      'public': Icons.public, 'handshake': Icons.handshake,
-      'groups': Icons.groups, 'policy': Icons.policy,
-      'auto_stories': Icons.auto_stories, 'campaign': Icons.campaign,
-      'flag': Icons.flag, 'workspace_premium': Icons.workspace_premium,
-      'play_circle_filled': Icons.play_circle_filled_rounded,
-      'folder_copy': Icons.folder_copy_rounded, 'article': Icons.article_rounded,
-      'translate': Icons.translate_rounded, 'cloud': Icons.cloud_rounded,
-      'calendar_month': Icons.calendar_month_rounded,
-      'live_tv': Icons.live_tv, 'menu_book': Icons.menu_book,
-      'sos': Icons.sos, 'local_police': Icons.local_police,
-      'local_fire_department': Icons.local_fire_department,
-      'medical_services': Icons.medical_services,
-      'local_hospital': Icons.local_hospital,
-      'health_and_safety': Icons.health_and_safety,
-      'support_agent': Icons.support_agent,
-      'emergency': Icons.emergency, 'shield': Icons.shield,
-      'phone': Icons.phone,
-    };
-    return iconMap[iconName] ?? Icons.stars;
   }
 
   @override
@@ -869,7 +783,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
             ),
           ],
 
-          // --- Latest news (news + articles are one feed) ---
+          // --- Latest news ---
           if (_articles.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: Padding(
@@ -877,7 +791,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                 child: SectionTitle(
                   title: _appSettings?[langCode == 'fr' ? 'section_title_news_fr' : 'section_title_news'] ?? (langCode == 'fr' ? 'Récents' : 'Latest'),
                   showSeeAll: true,
-                  onSeeAll: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ArticlesScreen())),
+                  onSeeAll: () => widget.onSwitchTab?.call(1),
                 ),
               ),
             ),
@@ -1048,6 +962,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               const SizedBox(width: 8),
               DsHeaderAction(
                 Icons.notifications_rounded,
+                label: l10n.translate('notifications'),
                 badge: _unreadBadgeCount,
                 onTap: () async {
                   await Navigator.pushNamed(context, '/notifications');
@@ -1258,7 +1173,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                     if (item.image.isEmpty)
                       const DsImagePlaceholder(radius: 0)
                     else
-                      CachedNetworkImage(
+                      AppNetworkImage(
                         imageUrl: Environment.fixMediaUrl(item.image),
                         fit: BoxFit.cover,
                         placeholder: (_, _) => const DsImagePlaceholder(radius: 0),
@@ -1590,3 +1505,124 @@ class _DiscoverRail extends StatelessWidget {
     );
   }
 }
+
+/// Result of [_parseHomeFeed]; plain data so it can cross the isolate boundary.
+class _ParsedHomeFeed {
+  final List<HeroSlide>? heroSlides;
+  final List<Article>? articles;
+  final List<Article>? newsItems;
+  final List<Map<String, dynamic>> featureCards;
+  final List<EventRegistrationModel> eventCards;
+  final List<MagazineEdition> magazines;
+  final List<Map<String, dynamic>> videos;
+  final List<Fact> facts;
+  final Map<String, dynamic> settings;
+
+  _ParsedHomeFeed({
+    required this.heroSlides,
+    required this.articles,
+    required this.newsItems,
+    required this.featureCards,
+    required this.eventCards,
+    required this.magazines,
+    required this.videos,
+    required this.facts,
+    required this.settings,
+  });
+}
+
+/// Top-level so [compute] can run it in a background isolate.
+_ParsedHomeFeed _parseHomeFeed(Map<String, dynamic> args) {
+    final homeFeed = args['homeFeed'] as Map<String, dynamic>;
+    final langCode = args['langCode'] as String;
+
+    final heroSlides = (homeFeed['hero_slides'] as List<dynamic>?)
+        ?.map((j) => HeroSlide.fromJson(j as Map<String, dynamic>))
+        .toList();
+    final articles = (homeFeed['articles'] as List<dynamic>?)
+        ?.map((j) => Article.fromJson(j as Map<String, dynamic>))
+        .toList();
+    final newsItems = (homeFeed['news_items'] as List<dynamic>?)
+        ?.map((j) => Article.fromJson(j as Map<String, dynamic>))
+        .toList();
+
+    final featureCardIcons = [Icons.stars, Icons.travel_explore, Icons.gavel, Icons.auto_stories];
+    final rawCards = homeFeed['feature_cards'] as List<dynamic>? ?? [];
+    final featureCards = rawCards.asMap().entries.map((entry) {
+      final j = entry.value as Map<String, dynamic>;
+      final gradStart = hexToColor(j['gradient_start'] ?? '#409843');
+      final gradEnd = hexToColor(j['gradient_end'] ?? '#4CAF50');
+      IconData icon = featureCardIcons[entry.key % featureCardIcons.length];
+      final iconName = j['icon_name'] as String?;
+      if (iconName != null && iconName.isNotEmpty) icon = _getIconFromName(iconName);
+      return <String, dynamic>{
+        'title': langCode == 'fr' ? (j['title_fr'] ?? j['title'] ?? '') : (j['title'] ?? ''),
+        'description': langCode == 'fr' ? (j['description_fr'] ?? j['description'] ?? '') : (j['description'] ?? ''),
+        'icon': icon,
+        'iconImageUrl': j['icon_image'] ?? '',
+        'gradient': [gradStart, gradEnd],
+        'imageUrl': j['image'] ?? '',
+        'actionType': j['action_type'] ?? 'none',
+        'actionValue': j['action_value'] ?? '',
+        'gradient_start': j['gradient_start'] ?? '#409843',
+        'gradient_end': j['gradient_end'] ?? '#4CAF50',
+        'overview': j['overview'] ?? '',
+        'overview_fr': j['overview_fr'] ?? '',
+        'key_points': j['key_points'] ?? [],
+        'key_points_fr': j['key_points_fr'] ?? [],
+        'impact_areas': j['impact_areas'] ?? [],
+        'impact_areas_fr': j['impact_areas_fr'] ?? [],
+        'extra_content': j['extra_content'] ?? '',
+        'extra_content_fr': j['extra_content_fr'] ?? '',
+        'media': j['media'] ?? [],
+        'title_raw': j['title'] ?? '',
+        'title_fr': j['title_fr'] ?? '',
+      };
+    }).toList();
+
+    final eventCards = (homeFeed['event_cards'] as List<dynamic>? ?? [])
+        .map((j) => EventRegistrationModel.fromJson(j as Map<String, dynamic>)).toList();
+    final magazines = (homeFeed['magazines'] as List<dynamic>? ?? [])
+        .map((j) => MagazineEdition.fromJson(j as Map<String, dynamic>)).toList();
+    final videos = (homeFeed['videos'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>();
+    final facts = (homeFeed['facts'] as List<dynamic>? ?? [])
+        .map((j) => Fact.fromJson(j as Map<String, dynamic>)).toList();
+
+    return _ParsedHomeFeed(
+      heroSlides: heroSlides,
+      articles: articles,
+      newsItems: newsItems,
+      featureCards: featureCards,
+      eventCards: eventCards,
+      magazines: magazines,
+      videos: videos,
+      facts: facts,
+      settings: homeFeed['settings'] as Map<String, dynamic>? ?? {},
+    );
+}
+
+IconData _getIconFromName(String iconName) {
+    const iconMap = {
+      'stars': Icons.stars, 'travel_explore': Icons.travel_explore,
+      'gavel': Icons.gavel, 'security': Icons.security,
+      'public': Icons.public, 'handshake': Icons.handshake,
+      'groups': Icons.groups, 'policy': Icons.policy,
+      'auto_stories': Icons.auto_stories, 'campaign': Icons.campaign,
+      'flag': Icons.flag, 'workspace_premium': Icons.workspace_premium,
+      'play_circle_filled': Icons.play_circle_filled_rounded,
+      'folder_copy': Icons.folder_copy_rounded, 'article': Icons.article_rounded,
+      'translate': Icons.translate_rounded, 'cloud': Icons.cloud_rounded,
+      'calendar_month': Icons.calendar_month_rounded,
+      'live_tv': Icons.live_tv, 'menu_book': Icons.menu_book,
+      'sos': Icons.sos, 'local_police': Icons.local_police,
+      'local_fire_department': Icons.local_fire_department,
+      'medical_services': Icons.medical_services,
+      'local_hospital': Icons.local_hospital,
+      'health_and_safety': Icons.health_and_safety,
+      'support_agent': Icons.support_agent,
+      'emergency': Icons.emergency, 'shield': Icons.shield,
+      'phone': Icons.phone,
+    };
+    return iconMap[iconName] ?? Icons.stars;
+  }

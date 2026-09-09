@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
+import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
+import '../../utils/color_utils.dart';
+import 'package:intl/intl.dart';
 
 class QrScanResultScreen extends StatelessWidget {
   final Map<String, dynamic> result;
@@ -12,15 +15,10 @@ class QrScanResultScreen extends StatelessWidget {
 
   bool get _isYdMode => mode == 'youth_dialogue';
 
-  Color _parseHexColor(String hex) {
-    hex = hex.replaceFirst('#', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.parse(hex, radix: 16));
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
     final isValid = result['valid'] == true;
     final isDuplicate = result['is_duplicate'] == true;
     final scanCount = result['scan_count'] as int? ?? 0;
@@ -38,7 +36,7 @@ class QrScanResultScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: Text(_isYdMode ? 'Credential Result' : 'Scan Result'),
+        title: Text(l10n.translate(_isYdMode ? 'scan_credential_result' : 'scan_result')),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -61,7 +59,7 @@ class QrScanResultScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
                   color: isDuplicate
-                      ? (scanCount >= 3 ? Colors.red.shade50 : Colors.orange.shade50)
+                      ? (scanCount >= 3 ? Ds.redTintOf(context) : Colors.orange.withValues(alpha: 0.15))
                       : AppColors.burundiGreen.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
@@ -71,7 +69,7 @@ class QrScanResultScreen extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  'Scanned $scanCount time${scanCount == 1 ? '' : 's'}',
+                  scanCount == 1 ? l10n.translate('scan_scanned_once') : '${l10n.translate('scan_scanned')} $scanCount ${l10n.translate('scan_times')}',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -90,10 +88,10 @@ class QrScanResultScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: scanCount >= 3 ? Colors.red.shade50 : Colors.orange.shade50,
+                  color: scanCount >= 3 ? Ds.redTintOf(context) : Colors.orange.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: scanCount >= 3 ? Colors.red.shade300 : Colors.orange.shade200,
+                    color: scanCount >= 3 ? Ds.red.withValues(alpha: 0.5) : Colors.orange.withValues(alpha: 0.5),
                     width: scanCount >= 3 ? 2 : 1,
                   ),
                 ),
@@ -111,9 +109,9 @@ class QrScanResultScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            scanCount >= 3
-                                ? 'Multiple Duplicate Scans'
-                                : 'Duplicate Scan Detected',
+                            l10n.translate(scanCount >= 3
+                                ? 'scan_multi_dup_title'
+                                : 'scan_dup_title'),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
@@ -123,10 +121,10 @@ class QrScanResultScreen extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             scanCount >= 3
-                                ? 'This credential has been scanned $scanCount times. '
-                                  'This is unusual — please verify the person\'s identity manually.'
-                                : 'This code has been scanned $scanCount time${scanCount == 1 ? '' : 's'}. '
-                                  'It may have already been used for check-in.',
+                                ? '${l10n.translate('scan_credential_scanned')} $scanCount ${l10n.translate('scan_times')}. '
+                                  '${l10n.translate('scan_multi_dup_body')}'
+                                : '${l10n.translate('scan_code_scanned')} $scanCount ${l10n.translate(scanCount == 1 ? 'scan_time' : 'scan_times')}. '
+                                  '${l10n.translate('scan_dup_used')}',
                             style: TextStyle(
                               fontSize: 13,
                               color: scanCount >= 3 ? Colors.red.shade800 : Colors.orange.shade800,
@@ -149,7 +147,7 @@ class QrScanResultScreen extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Reset & Scan Again', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                label: Text(l10n.translate('scan_reset_again'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.burundiGreen,
                   foregroundColor: Colors.white,
@@ -176,6 +174,7 @@ class QrScanResultScreen extends StatelessWidget {
     String detail,
     Map<String, dynamic>? details,
   ) {
+    final l10n = AppLocalizations.of(context);
     final organization = details?['organization'] as String? ?? '';
     final nationality = details?['nationality'] as String? ?? '';
     final title = details?['title'] as String? ?? '';
@@ -230,7 +229,7 @@ class QrScanResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  isValid ? 'VERIFIED' : 'INVALID',
+                  l10n.translate(isValid ? 'scan_verified' : 'scan_invalid'),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -348,26 +347,26 @@ class QrScanResultScreen extends StatelessWidget {
 
                 // Info rows
                 if (organization.isNotEmpty)
-                  _credentialRow(Icons.business_rounded, 'Organization', organization, isDark),
+                  _credentialRow(Icons.business_rounded, l10n.translate('scan_organization'), organization, isDark),
                 if (nationality.isNotEmpty)
-                  _credentialRow(Icons.flag_rounded, 'Nationality', nationality, isDark),
+                  _credentialRow(Icons.flag_rounded, l10n.translate('scan_nationality'), nationality, isDark),
                 if (email.isNotEmpty)
-                  _credentialRow(Icons.email_rounded, 'Email', email, isDark),
+                  _credentialRow(Icons.email_rounded, l10n.translate('email'), email, isDark),
                 if (phone.isNotEmpty)
-                  _credentialRow(Icons.phone_rounded, 'Phone', phone, isDark),
+                  _credentialRow(Icons.phone_rounded, l10n.translate('scan_phone'), phone, isDark),
                 if (eventVenue.isNotEmpty)
-                  _credentialRow(Icons.location_on_rounded, 'Venue', eventVenue, isDark),
+                  _credentialRow(Icons.location_on_rounded, l10n.translate('scan_venue'), eventVenue, isDark),
                 if (eventDate != null || eventEndDate != null)
-                  _credentialRow(Icons.calendar_today_rounded, 'Date',
-                      _formatEventDates(eventDate, eventEndDate), isDark),
+                  _credentialRow(Icons.calendar_today_rounded, l10n.translate('scan_date'),
+                      _formatEventDates(context, eventDate, eventEndDate), isDark),
                 if (checkedInAt != null)
-                  _credentialRow(Icons.login_rounded, 'Checked In', _formatDateTime(checkedInAt), isDark,
+                  _credentialRow(Icons.login_rounded, l10n.translate('scan_checked_in'), _formatDateTime(context, checkedInAt), isDark,
                       valueColor: AppColors.burundiGreen),
                 if (details?['is_proxy'] == true)
-                  _credentialRow(Icons.person_add_rounded, 'Registration', 'Proxy', isDark,
+                  _credentialRow(Icons.person_add_rounded, l10n.translate('scan_registration'), l10n.translate('scan_proxy'), isDark,
                       valueColor: Colors.orange),
                 if (details?['is_waitlisted'] == true)
-                  _credentialRow(Icons.hourglass_top_rounded, 'Waitlisted', 'Yes', isDark,
+                  _credentialRow(Icons.hourglass_top_rounded, l10n.translate('scan_waitlisted'), l10n.translate('yes'), isDark,
                       valueColor: Colors.orange),
               ],
             ),
@@ -386,11 +385,12 @@ class QrScanResultScreen extends StatelessWidget {
     Map<String, dynamic> details,
     String detail,
   ) {
+    final l10n = AppLocalizations.of(context);
     final statusColor = isValid ? AppColors.burundiGreen : Colors.red.shade700;
     final idPhotoUrl = details['id_photo_url'] as String? ?? '';
-    final role = details['role'] as String? ?? 'Participant';
+    final role = details['role'] as String? ?? l10n.translate('scan_participant');
     final roleColorHex = details['role_color'] as String? ?? '#4CAF50';
-    final roleColor = _parseHexColor(roleColorHex);
+    final roleColor = hexToColor(roleColorHex);
     final nationality = details['nationality'] as String? ?? '';
     final nationalityFlag = details['nationality_flag'] as String? ?? '';
     final organization = details['organization'] as String? ?? '';
@@ -443,7 +443,7 @@ class QrScanResultScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    isValid ? 'VERIFIED' : qrStatus.toUpperCase(),
+                    isValid ? l10n.translate('scan_verified') : qrStatus.toUpperCase(),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
@@ -485,7 +485,7 @@ class QrScanResultScreen extends StatelessWidget {
                     ),
                     child: ClipOval(
                       child: idPhotoUrl.isNotEmpty
-                          ? CachedNetworkImage(
+                          ? AppNetworkImage(
                               imageUrl: idPhotoUrl,
                               width: 104,
                               height: 104,
@@ -548,26 +548,26 @@ class QrScanResultScreen extends StatelessWidget {
 
                 // Info rows (with visibility checks)
                 if (isFieldVisible('nationality') && nationality.isNotEmpty)
-                  _credentialRow(Icons.flag_rounded, 'Nationality', '$nationalityFlag $nationality', isDark),
+                  _credentialRow(Icons.flag_rounded, l10n.translate('scan_nationality'), '$nationalityFlag $nationality', isDark),
                 if (isFieldVisible('organization') && organization.isNotEmpty)
-                  _credentialRow(Icons.business_rounded, 'Organization', organization, isDark),
+                  _credentialRow(Icons.business_rounded, l10n.translate('scan_organization'), organization, isDark),
                 if (isFieldVisible('event_dates') && (eventStartDate != null || eventEndDate != null))
-                  _credentialRow(Icons.calendar_today_rounded, 'Event Dates',
-                      _formatEventDates(eventStartDate, eventEndDate), isDark),
+                  _credentialRow(Icons.calendar_today_rounded, l10n.translate('scan_event_dates'),
+                      _formatEventDates(context, eventStartDate, eventEndDate), isDark),
                 if (isFieldVisible('event_location') && eventLocation.isNotEmpty)
-                  _credentialRow(Icons.location_on_rounded, 'Location', eventLocation, isDark),
+                  _credentialRow(Icons.location_on_rounded, l10n.translate('scan_location'), eventLocation, isDark),
                 if (isFieldVisible('email') && email.isNotEmpty)
-                  _credentialRow(Icons.email_rounded, 'Email', email, isDark),
+                  _credentialRow(Icons.email_rounded, l10n.translate('email'), email, isDark),
                 if (isFieldVisible('participant_code') && participantCode.isNotEmpty)
-                  _credentialRow(Icons.confirmation_number_rounded, 'Participant Code', participantCode, isDark),
+                  _credentialRow(Icons.confirmation_number_rounded, l10n.translate('scan_participant_code'), participantCode, isDark),
                 if (isFieldVisible('reference_id') && referenceId.isNotEmpty)
-                  _credentialRow(Icons.tag_rounded, 'Reference ID', referenceId, isDark),
+                  _credentialRow(Icons.tag_rounded, l10n.translate('scan_reference_id'), referenceId, isDark),
                 if (isFieldVisible('credential_issued_at') && credentialIssuedAt != null)
-                  _credentialRow(Icons.verified_rounded, 'Credential Issued', _formatDateTime(credentialIssuedAt), isDark),
+                  _credentialRow(Icons.verified_rounded, l10n.translate('scan_credential_issued'), _formatDateTime(context, credentialIssuedAt), isDark),
                 if (isFieldVisible('side_event') && sideEvent.isNotEmpty)
-                  _credentialRow(Icons.event_rounded, 'Side Event', sideEvent, isDark),
+                  _credentialRow(Icons.event_rounded, l10n.translate('scan_side_event'), sideEvent, isDark),
                 if (revokedReason.isNotEmpty)
-                  _credentialRow(Icons.block_rounded, 'Revocation Reason', revokedReason, isDark,
+                  _credentialRow(Icons.block_rounded, l10n.translate('scan_revocation_reason'), revokedReason, isDark,
                       valueColor: Colors.red.shade700),
               ],
             ),
@@ -627,20 +627,19 @@ class QrScanResultScreen extends StatelessWidget {
     }
   }
 
-  String _formatDateTime(String iso) {
+  String _formatDateTime(BuildContext context, String iso) {
     final dt = DateTime.tryParse(iso);
     if (dt == null) return iso;
-    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} at ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return DateFormat.yMMMd(Localizations.localeOf(context).languageCode).add_Hm().format(dt.toLocal());
   }
 
-  String _formatEventDates(String? startDate, String? endDate) {
-    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  String _formatEventDates(BuildContext context, String? startDate, String? endDate) {
+    final lang = Localizations.localeOf(context).languageCode;
 
     String formatDate(String iso) {
       final dt = DateTime.tryParse(iso);
       if (dt == null) return iso;
-      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+      return DateFormat.yMMMd(lang).format(dt);
     }
 
     if (startDate != null && endDate != null) {
@@ -648,7 +647,7 @@ class QrScanResultScreen extends StatelessWidget {
     } else if (startDate != null) {
       return formatDate(startDate);
     } else if (endDate != null) {
-      return 'Until ${formatDate(endDate)}';
+      return '${AppLocalizations.of(context).translate('scan_until')} ${formatDate(endDate)}';
     }
     return '';
   }

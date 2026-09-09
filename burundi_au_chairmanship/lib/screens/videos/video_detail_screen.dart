@@ -17,6 +17,7 @@ import '../../widgets/comment_ban_dialog.dart';
 import '../../utils/input_sanitizer.dart';
 import '../../widgets/fullscreen_back_button.dart';
 import '../../services/share_service.dart';
+import '../../widgets/bookmark_button.dart';
 
 class VideoDetailScreen extends StatefulWidget {
   final Map<String, dynamic> video;
@@ -667,6 +668,21 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                 ],
                               ),
                             ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Ds.surface(context),
+                            border: Border.all(color: Ds.outline(context)),
+                            borderRadius: BorderRadius.circular(Ds.rPill),
+                          ),
+                          child: BookmarkButton(
+                            contentType: 'video',
+                            contentId:
+                                (widget.video['id'] as num?)?.toInt() ?? 0,
+                            size: 17,
                           ),
                         ),
                         if (_subtitles.isNotEmpty)

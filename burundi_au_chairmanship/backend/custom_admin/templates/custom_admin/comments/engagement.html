@@ -1,0 +1,96 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Add Likes & Comments - Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="flex items-center gap-4 mb-8">
+    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg">
+      <span class="material-symbols-outlined text-3xl text-white">favorite</span>
+    </div>
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 font-headline">Likes &amp; Comments</h1>
+      <p class="text-sm text-slate-500 mt-1">Set the like count or post a comment on any piece of content</p>
+    </div>
+    <a href="{% url 'custom_admin:comments_list' %}" class="ml-auto text-sm font-semibold text-indigo-600 hover:text-indigo-700">All comments →</a>
+  </div>
+
+  {% if messages %}
+  <div class="mb-6 space-y-2">
+    {% for message in messages %}
+    <div class="flex items-center gap-3 px-4 py-3 rounded-lg border {% if message.tags == 'success' %}bg-emerald-50 border-emerald-200 text-emerald-800{% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800{% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+      <span class="material-symbols-outlined text-lg">{% if message.tags == 'success' %}check_circle{% elif message.tags == 'error' %}error{% else %}info{% endif %}</span>
+      <span class="text-sm font-medium">{{ message }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Pick the post -->
+  <form method="get" class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mb-6">
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Content type</label>
+        <select name="type" onchange="this.form.submit()" class="w-full rounded-lg border-slate-200 text-sm">
+          {% for t in types %}
+          <option value="{{ t }}" {% if t == current_type %}selected{% endif %}>{{ t|capfirst }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Post</label>
+        <select name="content" onchange="this.form.submit()" class="w-full rounded-lg border-slate-200 text-sm">
+          <option value="">— select —</option>
+          {% for p in posts %}
+          <option value="{{ p.pk }}" {% if post and post.pk == p.pk %}selected{% endif %}>{{ p.label|truncatechars:70 }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </form>
+
+  {% if post %}
+  <div class="grid sm:grid-cols-2 gap-6">
+    <!-- Likes -->
+    <form method="post" class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      {% csrf_token %}
+      <input type="hidden" name="type" value="{{ current_type }}">
+      <input type="hidden" name="content" value="{{ post.pk }}">
+      <input type="hidden" name="action" value="likes">
+      <h2 class="text-lg font-bold text-slate-900 mb-1">Likes</h2>
+      <p class="text-xs text-slate-500 mb-4">{{ post_label|truncatechars:60 }}</p>
+      <input type="number" name="like_count" min="0" value="{{ post.like_count }}"
+             class="w-full rounded-lg border-slate-200 text-sm mb-4">
+      <button type="submit" class="w-full px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Save like count</button>
+    </form>
+
+    <!-- Comment -->
+    <form method="post" class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      {% csrf_token %}
+      <input type="hidden" name="type" value="{{ current_type }}">
+      <input type="hidden" name="content" value="{{ post.pk }}">
+      <input type="hidden" name="action" value="comment">
+      <h2 class="text-lg font-bold text-slate-900 mb-1">Add a comment</h2>
+      <p class="text-xs text-slate-500 mb-4">Leave the username blank to post as yourself.</p>
+      <input type="text" name="username" placeholder="Post as username (optional)"
+             class="w-full rounded-lg border-slate-200 text-sm mb-3">
+      <textarea name="comment_text" rows="3" required placeholder="Comment text"
+                class="w-full rounded-lg border-slate-200 text-sm mb-4"></textarea>
+      <button type="submit" class="w-full px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">Post comment</button>
+    </form>
+  </div>
+
+  {% if comments %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 mt-6 divide-y divide-slate-100">
+    <p class="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Latest comments</p>
+    {% for c in comments %}
+    <div class="px-6 py-3">
+      <p class="text-sm text-slate-800">{{ c.text }}</p>
+      <p class="text-xs text-slate-400 mt-1">{{ c.username }} · {{ c.created_at|date:"M j, Y H:i" }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

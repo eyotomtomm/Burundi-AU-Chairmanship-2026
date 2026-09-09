@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../config/app_ds.dart';
@@ -11,6 +11,10 @@ import 'post_body_text.dart';
 import 'post_poll.dart';
 import 'report_sheet.dart';
 import '../../services/share_service.dart';
+import '../../l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 
 /// One post in the Explore feed — the card drawn in `B4Africa Social Feed`.
 ///
@@ -25,6 +29,12 @@ class PostCard extends StatefulWidget {
   final void Function(String tag)? onTagTap;
   final void Function(int topicId, String title)? onTopicTap;
 
+  /// The post changed server-side — swap it in place rather than refetching.
+  final void Function(Map<String, dynamic> updated)? onChanged;
+
+  /// The post is gone: deleted by its author, or its author was blocked.
+  final VoidCallback? onDeleted;
+
   const PostCard({
     super.key,
     required this.post,
@@ -33,6 +43,8 @@ class PostCard extends StatefulWidget {
     this.onRepost,
     this.onTagTap,
     this.onTopicTap,
+    this.onChanged,
+    this.onDeleted,
   });
 
   @override
@@ -66,6 +78,12 @@ class _PostCardState extends State<PostCard> {
   }
 
   /// "2h", "5d" — the feed never needs more precision than this.
+  /// "· edited", appended once an author has changed the text.
+  static String _editedSuffix(BuildContext context, Map<String, dynamic> post) =>
+      post['edited_at'] == null
+          ? ''
+          : ' · ${AppLocalizations.of(context).translate('w_edited')}';
+
   static String _age(String? iso) {
     final at = DateTime.tryParse(iso ?? '');
     if (at == null) return '';
@@ -157,7 +175,7 @@ class _PostCardState extends State<PostCard> {
   Widget _authorRow(BuildContext context, Map<String, dynamic> post) {
     final name = post['author_name'] as String? ?? 'Anonymous';
     final handle = post['author_handle'] as String? ?? '';
-    final age = _age(post['created_at'] as String?);
+    final age = _age(post['created_at'] as String?) + _editedSuffix(context, post);
     final category = post['category'] as String? ?? '';
 
     return Row(
@@ -236,7 +254,6 @@ class _PostCardState extends State<PostCard> {
     final title = post['topic_title'] as String? ?? '';
     if (topicId == null || title.isEmpty) return const SizedBox.shrink();
 
-    final fr = Localizations.localeOf(context).languageCode == 'fr';
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: GestureDetector(
@@ -257,7 +274,7 @@ class _PostCardState extends State<PostCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      fr ? 'EN RÉPONSE À' : 'ANSWERING',
+                      AppLocalizations.of(context).translate('w_answering'),
                       style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
@@ -283,27 +300,120 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
+  bool _isMine(BuildContext context) =>
+      context.read<AuthProvider>().userId == widget.post['author'];
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.translate('w_delete_post')),
+        content: Text(l10n.translate('w_delete_post_body')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.translate('cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.translate('delete'),
+                  style: const TextStyle(color: Ds.red))),
+        ],
+      ),
+    );
+    if (go != true || !context.mounted) return;
+    try {
+      await ApiService().deleteDiscussion(_id);
+      widget.onDeleted?.call();
+    } on ApiException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  Future<void> _confirmBlock(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final name = widget.post['author_name'] as String? ?? '';
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${l10n.translate('w_block')} $name'),
+        content: Text(l10n.translate('w_block_body')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.translate('cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.translate('w_block'),
+                  style: const TextStyle(color: Ds.red))),
+        ],
+      ),
+    );
+    if (go != true || !context.mounted) return;
+    try {
+      await ApiService().toggleBlock(widget.post['author'] as int);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.translate('w_blocked_done'))));
+      }
+      widget.onDeleted?.call();
+    } on ApiException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
   Widget _overflowMenu(BuildContext context, Map<String, dynamic> post) {
+    final mine = _isMine(context);
     return SizedBox(
       width: 32,
       child: PopupMenuButton<String>(
         padding: EdgeInsets.zero,
         icon: Icon(Icons.more_vert_rounded, size: 18, color: Ds.chevron),
         onSelected: (value) {
-          if (value == 'report_post') {
-            ReportSheet.open(context, discussionId: post['id'] as int);
-          } else if (value == 'report_user') {
-            ReportSheet.open(
-              context,
-              userId: post['author'] as int,
-              targetName: post['author_name'] as String? ?? '',
-            );
+          switch (value) {
+            case 'delete_post':
+              _confirmDelete(context);
+            case 'block_user':
+              _confirmBlock(context);
+            case 'report_post':
+              ReportSheet.open(context, discussionId: post['id'] as int);
+            case 'report_user':
+              ReportSheet.open(
+                context,
+                userId: post['author'] as int,
+                targetName: post['author_name'] as String? ?? '',
+              );
           }
         },
-        itemBuilder: (_) => const [
-          PopupMenuItem(value: 'report_post', child: Text('Report post')),
-          PopupMenuItem(value: 'report_user', child: Text('Report account')),
-        ],
+        itemBuilder: (ctx) {
+          final l10n = AppLocalizations.of(ctx);
+          if (mine) {
+            return [
+              PopupMenuItem(
+                  value: 'delete_post',
+                  child: Text(l10n.translate('w_delete_post'),
+                      style: const TextStyle(color: Ds.red))),
+            ];
+          }
+          return [
+            PopupMenuItem(
+                value: 'report_post',
+                child: Text(l10n.translate('w_report_post'))),
+            PopupMenuItem(
+                value: 'report_user',
+                child: Text(l10n.translate('w_report_account'))),
+            PopupMenuItem(
+                value: 'block_user',
+                child: Text(l10n.translate('w_block_account'),
+                    style: const TextStyle(color: Ds.red))),
+          ];
+        },
       ),
     );
   }
@@ -340,7 +450,7 @@ class _PostCardState extends State<PostCard> {
       );
     }
     return ClipOval(
-      child: CachedNetworkImage(
+      child: AppNetworkImage(
         imageUrl: fixed,
         width: size,
         height: size,
@@ -443,7 +553,7 @@ class _PostCardState extends State<PostCard> {
                     ),
                   ),
                 ),
-                child: CachedNetworkImage(
+                child: AppNetworkImage(
                   imageUrl: url,
                   fit: BoxFit.cover,
                   placeholder: (_, _) => Container(color: Ds.subtle(context)),

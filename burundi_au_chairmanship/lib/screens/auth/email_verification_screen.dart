@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../providers/auth_provider.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Email verification gate:
 ///   Sends OTP to user's registration email and verifies it before proceeding.
@@ -68,13 +69,14 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           _startResendCountdown();
         } else {
           setState(() {
-            _errorMessage = authProvider.errorMessage ?? 'Failed to send OTP';
+            _errorMessage = authProvider.errorMessage ??
+                AppLocalizations.of(context).translate('auth_otp_send_failed');
           });
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() { _isSending = false; _errorMessage = 'Failed to send verification code. Try again.'; });
+        setState(() { _isSending = false; _errorMessage = AppLocalizations.of(context).translate('auth_otp_send_failed'); });
       }
     }
   }
@@ -82,7 +84,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   Future<void> _verifyEmailOtp() async {
     final code = _emailOtpController.text.trim();
     if (code.length != 6) {
-      setState(() => _errorMessage = 'Please enter the 6-digit code');
+      setState(() => _errorMessage =
+          AppLocalizations.of(context).translate('auth_enter_6_digit_code'));
       return;
     }
     setState(() { _isVerifying = true; _errorMessage = null; });
@@ -97,13 +100,14 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         } else {
           setState(() {
             _isVerifying = false;
-            _errorMessage = authProvider.errorMessage ?? 'Invalid code. Try again.';
+            _errorMessage = authProvider.errorMessage ??
+                AppLocalizations.of(context).translate('auth_invalid_code');
           });
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() { _isVerifying = false; _errorMessage = 'Verification failed. Try again.'; });
+        setState(() { _isVerifying = false; _errorMessage = AppLocalizations.of(context).translate('auth_verification_failed'); });
       }
     }
   }
@@ -112,16 +116,17 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     final email = context.watch<AuthProvider>().userEmail ?? '';
+    final l10n = AppLocalizations.of(context);
 
     return PopScope(
       canPop: false,
       child: Scaffold(
         backgroundColor: Ds.bg(context),
         appBar: AppBar(
-          title: const Text('Verify email'),
+          title: Text(l10n.translate('auth_verify_email')),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
-            tooltip: 'Back to sign in',
+            tooltip: l10n.translate('auth_back_to_sign_in'),
             onPressed: _backToSignIn,
           ),
         ),
@@ -139,7 +144,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            Text('Check your inbox',
+            Text(l10n.translate('auth_check_inbox'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 19,
@@ -150,9 +155,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               TextSpan(
                 children: [
                   TextSpan(
-                      text: _emailOtpSent
-                          ? 'We sent a 6-digit code to\n'
-                          : 'We need to verify your email address\n'),
+                      text: '${l10n.translate(_emailOtpSent ? 'auth_sent_code_to' : 'auth_need_verify_email')}\n'),
                   TextSpan(
                       text: email,
                       style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -167,7 +170,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               const Center(
                   child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green)),
               const SizedBox(height: 16),
-              Text('Sending verification code…',
+              Text(l10n.translate('auth_sending_code'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: Ds.body(context))),
             ] else ...[
@@ -177,7 +180,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 const Center(
                     child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green))
               else
-                DsPrimaryButton('Verify', radius: 14, onTap: _verifyEmailOtp),
+                DsPrimaryButton(l10n.translate('auth_verify'), radius: 14, onTap: _verifyEmailOtp),
               const SizedBox(height: 18),
               Center(
                 child: GestureDetector(
@@ -185,11 +188,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   child: Text.rich(
                     TextSpan(
                       children: [
-                        const TextSpan(text: "Didn't get it? "),
+                        TextSpan(text: l10n.translate('auth_didnt_get_it')),
                         TextSpan(
                           text: _resendCountdown > 0
-                              ? 'Resend in 0:${_resendCountdown.toString().padLeft(2, '0')}'
-                              : 'Resend code',
+                              ? '${l10n.translate('auth_resend_in')} 0:${_resendCountdown.toString().padLeft(2, '0')}'
+                              : l10n.translate('auth_resend_code'),
                           style: TextStyle(
                               fontWeight: FontWeight.w700,
                               color: _resendCountdown > 0
@@ -206,7 +209,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               Center(
                 child: GestureDetector(
                   onTap: _backToSignIn,
-                  child: Text('Use a different email',
+                  child: Text(l10n.translate('auth_use_different_email'),
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -217,8 +220,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
             _buildErrorBox(),
             const SizedBox(height: 24),
-            DsFootnote(
-                'Email verification is required to access the app. Check your inbox and spam folder.',
+            DsFootnote(l10n.translate('auth_email_verification_footnote'),
                 center: true),
           ],
         ),
@@ -272,6 +274,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         // Transparent capture field sits on top of the boxes.
         Opacity(
           opacity: 0,
+          alwaysIncludeSemantics: true,
           child: SizedBox(
             height: 54,
             child: TextField(

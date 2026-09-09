@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
-import '../../config/app_ds.dart';
+import '../../l10n/app_localizations.dart';
 
 class EventFeedbackScreen extends StatefulWidget {
   final int eventId;
@@ -132,7 +132,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
     if (_rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please select a rating'),
+          content: Text(AppLocalizations.of(context).translate('rs_fb_select_rating')),
           backgroundColor: AppColors.burundiRed,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -159,7 +159,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Thank you for your feedback!'),
+          content: Text(AppLocalizations.of(context).translate('rs_fb_thanks')),
           backgroundColor: AppColors.burundiGreen,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -181,7 +181,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Failed to submit feedback. Please try again.'),
+          content: Text(AppLocalizations.of(context).translate('rs_fb_submit_failed')),
           backgroundColor: AppColors.burundiRed,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -193,14 +193,13 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final langCode = context.watch<LanguageProvider>().languageCode;
-    final isFrench = langCode == 'fr';
+    context.watch<LanguageProvider>(); // rebuild on language change
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: Text(
-          isFrench ? 'Votre avis' : 'Event Feedback',
+          AppLocalizations.of(context).translate('rs_fb_title'),
           style: TextStyle(
             color: isDark ? AppColors.darkText : AppColors.lightText,
             fontWeight: FontWeight.bold,
@@ -211,11 +210,11 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
           color: isDark ? AppColors.darkText : AppColors.lightText,
         ),
       ),
-      body: _hasSubmitted ? _buildSuccessView(isDark, isFrench) : _buildFeedbackForm(isDark, isFrench),
+      body: _hasSubmitted ? _buildSuccessView(isDark) : _buildFeedbackForm(isDark),
     );
   }
 
-  Widget _buildSuccessView(bool isDark, bool isFrench) {
+  Widget _buildSuccessView(bool isDark) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -236,7 +235,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
             ),
             const SizedBox(height: 24),
             Text(
-              isFrench ? 'Merci !' : 'Thank You!',
+              AppLocalizations.of(context).translate('rs_fb_thank_you'),
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -245,9 +244,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
             ),
             const SizedBox(height: 12),
             Text(
-              isFrench
-                  ? 'Votre avis a ete soumis avec succes.'
-                  : 'Your feedback has been submitted successfully.',
+              AppLocalizations.of(context).translate('rs_fb_submitted'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -270,7 +267,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
                   elevation: 0,
                 ),
                 child: Text(
-                  isFrench ? 'Retour' : 'Go Back',
+                  AppLocalizations.of(context).translate('rs_go_back'),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -281,7 +278,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
     );
   }
 
-  Widget _buildFeedbackForm(bool isDark, bool isFrench) {
+  Widget _buildFeedbackForm(bool isDark) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -318,7 +315,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isFrench ? 'Evenement' : 'Event',
+                        AppLocalizations.of(context).translate('event'),
                         style: TextStyle(
                           fontSize: 12,
                           color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -356,7 +353,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
             child: Column(
               children: [
                 Text(
-                  isFrench ? 'Comment etait cet evenement ?' : 'How was this event?',
+                  AppLocalizations.of(context).translate('rs_fb_how_was'),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -365,7 +362,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  isFrench ? 'Appuyez sur une etoile pour noter' : 'Tap a star to rate',
+                  AppLocalizations.of(context).translate('rs_fb_tap_star'),
                   style: TextStyle(
                     fontSize: 14,
                     color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -446,7 +443,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isFrench ? 'Commentaire (optionnel)' : 'Comment (optional)',
+                  AppLocalizations.of(context).translate('rs_fb_comment_optional'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -462,9 +459,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
                     color: isDark ? AppColors.darkText : AppColors.lightText,
                   ),
                   decoration: InputDecoration(
-                    hintText: isFrench
-                        ? 'Partagez votre experience...'
-                        : 'Share your experience...',
+                    hintText: AppLocalizations.of(context).translate('rs_fb_share_hint'),
                     hintStyle: TextStyle(
                       color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                     ),
@@ -518,7 +513,7 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
                       ),
                     )
                   : Text(
-                      isFrench ? 'Soumettre' : 'Submit Feedback',
+                      AppLocalizations.of(context).translate('rs_fb_submit'),
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
             ),

@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:cached_network_image/cached_network_image.dart';
+import 'app_network_image.dart';
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 /// Firebase-style slide-down in-app notification banner.
 ///
@@ -231,7 +232,7 @@ class _BannerWidgetState extends State<_BannerWidget>
                               padding: const EdgeInsets.only(right: 12),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: CachedNetworkImage(
+                                child: AppNetworkImage(
                                   imageUrl: widget.request.imageUrl!,
                                   width: 44,
                                   height: 44,
@@ -291,6 +292,7 @@ class _BannerWidgetState extends State<_BannerWidget>
                             ),
                           ),
                           IconButton(
+                            tooltip: AppLocalizations.of(context).translate('close'),
                             icon: Icon(
                               Icons.close,
                               size: 18,

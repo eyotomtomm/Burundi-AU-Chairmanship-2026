@@ -18,6 +18,7 @@ import '../../services/like_service.dart';
 import '../../widgets/verified_badge.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../utils/input_sanitizer.dart';
+import '../../l10n/app_localizations.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String pdfUrl;
@@ -42,12 +43,19 @@ class PdfViewerScreen extends StatefulWidget {
 }
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
   final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
   late PdfViewerController _pdfViewerController;
-  int _currentPage = 0;
-  int _totalPages = 0;
+  /// Page / zoom label state — only the label rebuilds on page & zoom changes.
+  final ValueNotifier<(int page, int total, double zoom)> _pageState = ValueNotifier((0, 0, 1.0));
+  int get _currentPage => _pageState.value.$1;
+  int get _totalPages => _pageState.value.$2;
+  double get _currentZoom => _pageState.value.$3;
+  set _currentZoom(double z) => _pageState.value = (_currentPage, _totalPages, z);
   bool _isLoading = true;
-  double _currentZoom = 1.0;
+  final CancelToken _cancelToken = CancelToken();
+  /// Rebuilds the open comments sheet when comments change.
+  StateSetter? _sheetSetState;
 
   // Download management (permanent offline save)
   bool _isDownloaded = false;
@@ -85,7 +93,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
     _enableScreenProtection();
     _loadPdf();
-    _recordView();
     if (widget.scrollToComments) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Future.delayed(const Duration(milliseconds: 400), () {
@@ -104,6 +111,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         final filePath = '${directory.path}/magazines/${widget.magazineId}.pdf';
         final file = File(filePath);
         if (await file.exists()) {
+          if (!mounted) return;
           setState(() {
             _isDownloaded = true;
             _localFilePath = filePath;
@@ -123,6 +131,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       final cachePath = '${tempDir.path}/pdf_cache/$cacheKey.pdf';
       final cacheFile = File(cachePath);
       if (await cacheFile.exists()) {
+        if (!mounted) return;
         setState(() {
           _cachedFilePath = cachePath;
         });
@@ -133,6 +142,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
 
     // 3. Download to temp cache with progress
+    if (!mounted) return;
     setState(() {
       _isCaching = true;
       _cacheProgress = 0.0;
@@ -158,6 +168,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       await dio.download(
         url,
         cachePath,
+        cancelToken: _cancelToken,
         onReceiveProgress: (received, total) {
           if (total != -1 && mounted) {
             setState(() {
@@ -228,6 +239,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         final cachedFile = File(_cachedFilePath!);
         if (await cachedFile.exists()) {
           await cachedFile.copy(filePath);
+          if (!mounted) return;
           setState(() {
             _isDownloaded = true;
             _isDownloading = false;
@@ -235,12 +247,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           });
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text('Magazine downloaded! Available offline.'),
+                    const Icon(Icons.check_circle, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(_l10n.translate('rs_pdf_downloaded')),
                   ],
                 ),
                 backgroundColor: AppColors.success,
@@ -262,8 +274,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       await dio.download(
         url,
         filePath,
+        cancelToken: _cancelToken,
         onReceiveProgress: (received, total) {
-          if (total != -1) {
+          if (total != -1 && mounted) {
             setState(() {
               _downloadProgress = received / total;
             });
@@ -271,6 +284,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         },
       );
 
+      if (!mounted) return;
       setState(() {
         _isDownloaded = true;
         _isDownloading = false;
@@ -279,12 +293,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Magazine downloaded! Available offline.'),
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(_l10n.translate('rs_pdf_downloaded')),
               ],
             ),
             backgroundColor: AppColors.success,
@@ -293,14 +307,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isDownloading = false;
       });
 
-      if (mounted) {
+      {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Download failed: $e'),
+            content: Text(AppLocalizations.of(context).translate('generic_error')),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -319,6 +334,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         await file.delete();
       }
 
+      if (!mounted) return;
       setState(() {
         _isDownloaded = false;
         _localFilePath = null;
@@ -326,8 +342,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Downloaded magazine deleted'),
+          SnackBar(
+            content: Text(_l10n.translate('rs_pdf_download_deleted')),
             backgroundColor: AppColors.info,
             behavior: SnackBarBehavior.floating,
           ),
@@ -337,7 +353,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to delete: $e'),
+            content: Text(AppLocalizations.of(context).translate('generic_error')),
             backgroundColor: AppColors.error,
           ),
         );
@@ -345,37 +361,25 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  Future<void> _recordView() async {
-    if (widget.magazineId != null) {
-      try {
-        await ApiService().recordMagazineView(widget.magazineId!);
-      } catch (_) {}
-    }
-  }
-
   void _zoomIn() {
-    setState(() {
-      _currentZoom = (_currentZoom + 0.25).clamp(0.5, 4.0);
-      _pdfViewerController.zoomLevel = _currentZoom;
-    });
+    _currentZoom = (_currentZoom + 0.25).clamp(0.5, 4.0);
+    _pdfViewerController.zoomLevel = _currentZoom;
   }
 
   void _zoomOut() {
-    setState(() {
-      _currentZoom = (_currentZoom - 0.25).clamp(0.5, 4.0);
-      _pdfViewerController.zoomLevel = _currentZoom;
-    });
+    _currentZoom = (_currentZoom - 0.25).clamp(0.5, 4.0);
+    _pdfViewerController.zoomLevel = _currentZoom;
   }
 
   void _resetZoom() {
-    setState(() {
-      _currentZoom = 1.0;
-      _pdfViewerController.zoomLevel = 1.0;
-    });
+    _currentZoom = 1.0;
+    _pdfViewerController.zoomLevel = 1.0;
   }
 
   @override
   void dispose() {
+    _cancelToken.cancel('disposed');
+    _pageState.dispose();
     _removeLikeListener?.call();
     _pdfViewerController.dispose();
     _overlayTimer?.cancel();
@@ -404,7 +408,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign in to like this magazine')),
+        SnackBar(content: Text(_l10n.translate('login_to_like'))),
       );
       return;
     }
@@ -421,6 +425,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } catch (_) {
       if (mounted) setState(() => _commentsLoading = false);
     }
+    _sheetSetState?.call(() {});
   }
 
   Future<void> _postComment(String content, {int? parentId}) async {
@@ -435,7 +440,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to post comment: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).translate('generic_error')), backgroundColor: AppColors.error),
         );
       }
     }
@@ -459,6 +464,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         builder: (_, scrollController) {
           return StatefulBuilder(
             builder: (ctx, setSheetState) {
+              _sheetSetState = setSheetState;
               return Column(
                 children: [
                   // Handle bar
@@ -495,9 +501,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                                   children: [
                                     Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[300]),
                                     const SizedBox(height: 12),
-                                    Text('No comments yet', style: TextStyle(color: Colors.grey[500], fontSize: 15)),
-                                    const SizedBox(height: 4),
-                                    Text('Be the first to share your thoughts!', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                                    Text(_l10n.translate('no_comments_yet'), style: TextStyle(color: Ds.muted(context), fontSize: 15)),
                                   ],
                                 ),
                               )
@@ -525,7 +529,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                             child: TextField(
                               controller: commentController,
                               decoration: InputDecoration(
-                                hintText: 'Add a comment...',
+                                hintText: _l10n.translate('add_comment'),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
                                   borderSide: BorderSide.none,
@@ -542,6 +546,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                           const SizedBox(width: 4),
                           IconButton(
                             icon: const Icon(Icons.send_rounded, color: AppColors.burundiGreen),
+                            tooltip: _l10n.translate('send'),
                             onPressed: () async {
                               final text = commentController.text.trim();
                               if (text.isEmpty) return;
@@ -559,7 +564,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           );
         },
       ),
-    ).then((_) => _startAutoHideTimer());
+    ).then((_) {
+      _sheetSetState = null;
+      _startAutoHideTimer();
+    });
   }
 
   Widget _buildCommentTile(ArticleComment comment) {
@@ -663,15 +671,17 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
             ),
-            if (_totalPages > 0)
-              Text(
-                'Page ${_currentPage + 1} of $_totalPages · ${(_currentZoom * 100).toInt()}%',
+            ValueListenableBuilder<(int, int, double)>(
+              valueListenable: _pageState,
+              builder: (_, s, _) => s.$2 <= 0 ? const SizedBox.shrink() : Text(
+                'Page ${s.$1 + 1} of ${s.$2} · ${(s.$3 * 100).toInt()}%',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w400,
                   color: Colors.white.withValues(alpha: 0.6),
                 ),
               ),
+            ),
           ],
         ),
         actions: [
@@ -679,25 +689,25 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           if (!_isDownloaded && !_isDownloading && widget.magazineId != null)
             IconButton(
               icon: const Icon(Icons.download_outlined),
-              tooltip: 'Download for offline',
+              tooltip: _l10n.translate('rs_pdf_download_offline'),
               onPressed: _downloadMagazine,
             ),
           // Downloaded indicator / delete button
           if (_isDownloaded && widget.magazineId != null)
             PopupMenuButton<String>(
               icon: const Icon(Icons.download_done, color: Ds.gold),
-              tooltip: 'Downloaded',
+              tooltip: _l10n.translate('rs_pdf_downloaded_short'),
               onSelected: (value) {
                 if (value == 'delete') {
                   _deleteDownload();
                 }
               },
               itemBuilder: (context) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'delete',
                   child: ListTile(
-                    leading: Icon(Icons.delete_outline, color: AppColors.error),
-                    title: Text('Delete download'),
+                    leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                    title: Text(_l10n.translate('rs_pdf_delete_download')),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -707,7 +717,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           // Zoom out
           IconButton(
             icon: const Icon(Icons.zoom_out, size: 22),
-            tooltip: 'Zoom Out',
+            tooltip: _l10n.translate('rs_zoom_out'),
             onPressed: _currentZoom > 0.5 ? _zoomOut : null,
           ),
           // Zoom percentage / reset
@@ -728,12 +738,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           // Zoom in
           IconButton(
             icon: const Icon(Icons.zoom_in, size: 22),
-            tooltip: 'Zoom In',
+            tooltip: _l10n.translate('rs_zoom_in'),
             onPressed: _currentZoom < 4.0 ? _zoomIn : null,
           ),
           // Bookmark
           IconButton(
             icon: const Icon(Icons.bookmark_border),
+            tooltip: _l10n.translate('bookmarks'),
             onPressed: () {
               _pdfViewerKey.currentState?.openBookmarkView();
             },
@@ -755,34 +766,27 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               canShowScrollHead: true,
               canShowPaginationDialog: true,
               onDocumentLoaded: (details) {
-                setState(() {
-                  _totalPages = details.document.pages.count;
-                  _isLoading = false;
-                });
+                _pageState.value = (_currentPage, details.document.pages.count, _currentZoom);
+                setState(() => _isLoading = false);
               },
               onDocumentLoadFailed: (details) {
                 setState(() => _isLoading = false);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Failed to load PDF: ${details.description}'),
+                      content: Text('${_l10n.translate('rs_pdf_load_failed')}: ${details.description}'),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
                 }
               },
               onPageChanged: (details) {
-                final newPage = details.newPageNumber - 1;
-                setState(() {
-                  _currentPage = newPage;
-                  _showOverlay = false;
-                });
+                _pageState.value = (details.newPageNumber - 1, _totalPages, _currentZoom);
+                if (_showOverlay) setState(() => _showOverlay = false);
                 _overlayTimer?.cancel();
               },
               onZoomLevelChanged: (details) {
-                setState(() {
-                  _currentZoom = details.newZoomLevel;
-                });
+                _currentZoom = details.newZoomLevel;
               },
             ),
 
@@ -793,7 +797,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 padding: const EdgeInsets.all(32),
                 margin: const EdgeInsets.symmetric(horizontal: 48),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Ds.surface(context),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
@@ -837,7 +841,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 padding: const EdgeInsets.all(32),
                 margin: const EdgeInsets.symmetric(horizontal: 48),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Ds.surface(context),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
@@ -865,7 +869,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         _loadPdf();
                       },
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
+                      label: Text(_l10n.translate('retry')),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.burundiGreen,
                         foregroundColor: Colors.white,
@@ -878,13 +882,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
           // Loading indicator for SfPdfViewer document parsing
           if (_isLoading && _cachedFilePath != null && !_isCaching)
-            const Center(
+            Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: AppColors.burundiGreen),
-                  SizedBox(height: 16),
-                  Text('Rendering PDF...', style: TextStyle(color: Colors.grey)),
+                  const CircularProgressIndicator(color: AppColors.burundiGreen),
+                  const SizedBox(height: 16),
+                  Text(_l10n.translate('rs_pdf_rendering'), style: TextStyle(color: Ds.muted(context))),
                 ],
               ),
             ),
@@ -897,7 +901,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Ds.surface(context),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(

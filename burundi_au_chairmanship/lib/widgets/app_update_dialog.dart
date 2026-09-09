@@ -7,6 +7,7 @@ import 'package:play_in_app_update/play_in_app_update.dart';
 import '../config/app_colors.dart';
 import '../config/app_constants.dart';
 import '../services/remote_config_service.dart';
+import '../l10n/app_localizations.dart';
 
 /// Shows an app update dialog based on Firebase Remote Config values.
 ///
@@ -211,7 +212,6 @@ class AppUpdateDialog {
     required String latestVersion,
     required String langCode,
   }) async {
-    final bool isFr = langCode == 'fr';
     final storeUrl = Platform.isIOS ? _appStoreUrl : _androidStoreUrl;
 
     await showDialog(
@@ -259,9 +259,7 @@ class AppUpdateDialog {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    forceUpdate
-                        ? (isFr ? 'Mise a jour requise' : 'Update Required')
-                        : (isFr ? 'Mise a jour disponible' : 'Update Available'),
+                    AppLocalizations.of(dialogContext).translate(forceUpdate ? 'update_required' : 'update_available'),
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -282,9 +280,7 @@ class AppUpdateDialog {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  isFr
-                      ? 'La version $latestVersion est disponible.'
-                      : 'Version $latestVersion is now available.',
+                  '${AppLocalizations.of(dialogContext).translate('w_version_available_prefix')} $latestVersion ${AppLocalizations.of(dialogContext).translate('w_version_available_suffix')}',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 15,
@@ -312,9 +308,7 @@ class AppUpdateDialog {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            isFr
-                                ? 'Cette mise a jour est obligatoire pour continuer a utiliser l\'application.'
-                                : 'This update is required to continue using the app.',
+                            AppLocalizations.of(dialogContext).translate('w_update_mandatory'),
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -328,9 +322,7 @@ class AppUpdateDialog {
                 ] else ...[
                   const SizedBox(height: 12),
                   Text(
-                    isFr
-                        ? 'De nouvelles fonctionnalites et ameliorations vous attendent!'
-                        : 'New features and improvements await you!',
+                    AppLocalizations.of(dialogContext).translate('w_update_new_features'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
@@ -359,7 +351,7 @@ class AppUpdateDialog {
                       },
                       icon: const Icon(Icons.download_rounded, size: 20),
                       label: Text(
-                        isFr ? 'Mettre a jour maintenant' : 'Update Now',
+                        AppLocalizations.of(dialogContext).translate('update_now'),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -381,7 +373,7 @@ class AppUpdateDialog {
                     TextButton(
                       onPressed: () => Navigator.pop(dialogContext),
                       child: Text(
-                        isFr ? 'Plus tard' : 'Maybe Later',
+                        AppLocalizations.of(dialogContext).translate('maybe_later'),
                         style: TextStyle(
                           color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                           fontSize: 14,

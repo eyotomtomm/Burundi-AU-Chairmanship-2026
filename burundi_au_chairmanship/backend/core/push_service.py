@@ -39,7 +39,7 @@ def get_target_profiles(notification):
     profiles = UserProfile.objects.filter(
         Q(fcm_token__isnull=False) & ~Q(fcm_token='')
         | Q(user__device_tokens__is_active=True)
-    ).select_related('user').distinct()
+    ).filter(user__is_active=True).select_related('user').distinct()
 
     if notification.is_global:
         # Apply language filter even for global notifications

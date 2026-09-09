@@ -1,10 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../config/app_ds.dart';
 import '../../config/environment.dart';
 import '../../services/api_service.dart';
 import '../../widgets/verified_badge.dart';
+import '../../widgets/app_network_image.dart';
 import '../discussions/discussion_detail_screen.dart';
 import 'user_profile_screen.dart';
 
@@ -96,13 +96,17 @@ class _ExploreNotificationsScreenState extends State<ExploreNotificationsScreen>
             ),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: Icon(Icons.arrow_back_rounded,
-                        color: Colors.white, size: 22),
+                Semantics(
+                  button: true,
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Icon(Icons.arrow_back_rounded,
+                          color: Colors.white, size: 22),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -222,7 +226,7 @@ class _ExploreNotificationsScreenState extends State<ExploreNotificationsScreen>
                                       color: Ds.greenDeep),
                                 ),
                               )
-                            : CachedNetworkImage(
+                            : AppNetworkImage(
                                 imageUrl: Environment.fixMediaUrl(avatarUrl),
                                 fit: BoxFit.cover,
                                 placeholder: (_, _) =>

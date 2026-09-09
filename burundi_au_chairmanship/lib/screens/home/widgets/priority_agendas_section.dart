@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../widgets/app_network_image.dart';
 import '../../../config/app_ds.dart';
 import '../../../config/environment.dart';
 import '../../../widgets/ds/ds_widgets.dart';
@@ -120,7 +120,7 @@ class PriorityAgendasSection extends StatelessWidget {
             if (image.isEmpty)
               backdrop
             else
-              CachedNetworkImage(
+              AppNetworkImage(
                 imageUrl: image,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => backdrop,

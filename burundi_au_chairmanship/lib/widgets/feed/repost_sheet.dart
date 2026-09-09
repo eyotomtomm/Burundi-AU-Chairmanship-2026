@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import 'post_body_text.dart';
 import 'verified_badge_row.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Sharing a post: straight repost, or quote it with your own line.
 class RepostSheet {
@@ -44,27 +45,25 @@ class RepostSheet {
             const SizedBox(height: 14),
             ListTile(
               leading: Icon(Icons.repeat_rounded, color: Ds.ink(ctx)),
-              title: Text(fr ? 'Republier' : 'Repost',
+              title: Text(AppLocalizations.of(ctx).translate('w_repost'),
                   style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: Ds.ink(ctx))),
               subtitle: Text(
-                  fr
-                      ? 'Partager tel quel avec vos abonnés'
-                      : 'Share it as is with your followers',
+                  AppLocalizations.of(ctx).translate('w_repost_sub'),
                   style: TextStyle(fontSize: 12, color: Ds.body(ctx))),
               onTap: () => Navigator.pop(ctx, 'repost'),
             ),
             ListTile(
               leading: Icon(Icons.format_quote_rounded, color: Ds.ink(ctx)),
-              title: Text(fr ? 'Citer' : 'Quote',
+              title: Text(AppLocalizations.of(ctx).translate('w_quote'),
                   style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: Ds.ink(ctx))),
               subtitle: Text(
-                  fr ? 'Ajouter votre propre commentaire' : 'Add your own take',
+                  AppLocalizations.of(ctx).translate('w_quote_sub'),
                   style: TextStyle(fontSize: 12, color: Ds.body(ctx))),
               onTap: () => Navigator.pop(ctx, 'quote'),
             ),
@@ -118,14 +117,14 @@ class RepostSheet {
                   children: [
                     GestureDetector(
                       onTap: () => Navigator.pop(ctx),
-                      child: Text(fr ? 'Annuler' : 'Cancel',
+                      child: Text(AppLocalizations.of(ctx).translate('cancel'),
                           style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               color: Ds.body(ctx))),
                     ),
                     Expanded(
-                      child: Text(fr ? 'Citer' : 'Quote',
+                      child: Text(AppLocalizations.of(ctx).translate('w_quote'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               fontSize: 16,
@@ -147,7 +146,7 @@ class RepostSheet {
                           color: Ds.green,
                           borderRadius: BorderRadius.circular(Ds.rPill),
                         ),
-                        child: Text(fr ? 'Publier' : 'Post',
+                        child: Text(AppLocalizations.of(ctx).translate('w_post'),
                             style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -164,7 +163,7 @@ class RepostSheet {
                   maxLines: 6,
                   style: TextStyle(fontSize: 16, height: 1.5, color: Ds.ink(ctx)),
                   decoration: InputDecoration(
-                    hintText: fr ? 'Ajouter votre commentaire…' : 'Add your take…',
+                    hintText: AppLocalizations.of(ctx).translate('w_add_take_hint'),
                     hintStyle: TextStyle(fontSize: 16, color: Ds.muted(ctx)),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
@@ -202,6 +201,7 @@ class RepostSheet {
         ),
       ),
     );
+    ctrl.dispose();
 
     return sent;
   }
@@ -213,7 +213,7 @@ class RepostSheet {
       HapticFeedback.lightImpact();
       if (context.mounted && res['reposted'] == false) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Repost removed')));
+            SnackBar(content: Text(AppLocalizations.of(context).translate('w_repost_removed'))));
       }
       return true;
     } on ApiException catch (e) {

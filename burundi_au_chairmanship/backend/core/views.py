@@ -3,15 +3,20 @@ import logging
 import threading
 import urllib.request
 import json as json_module
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.contrib.auth.signals import user_logged_in
 from django.core.mail import send_mail
 from datetime import timedelta
 from django.conf import settings as django_settings
+from django.utils.html import escape
 import hashlib
+import hmac
 from django.core.cache import cache
 from django.db import models, transaction
-from django.db.models import Count, Exists, OuterRef, F, Q, Subquery, Value, BooleanField
+from django.db import connection
+from django.db.models import Count, Exists, OuterRef, F, Q, Subquery, Value, BooleanField, IntegerField, Prefetch, Window
+from django.db.models.functions import Coalesce, RowNumber
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -25,7 +30,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from config.firebase import verify_firebase_token
-from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle, OTPRateThrottle, OTPVerifyThrottle, SupportTicketThrottle, SearchRateThrottle, ProxyRegistrationThrottle, WeatherProxyThrottle
+from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle, OTPRateThrottle, OTPVerifyThrottle, SupportTicketThrottle, SearchRateThrottle, ProxyRegistrationThrottle, WeatherProxyThrottle, ShareCardThrottle
 
 logger = logging.getLogger(__name__)
 from .models import (
@@ -41,6 +46,7 @@ from .models import (
     ReadingProgress, ArticleDraft, ArticleSeries, TrendingContent,
     EventReminder, EventWaitlist, EventSpeaker, EventFeedback, EventCheckIn, EventPhoto,
     Conversation, DirectMessage, Discussion, DiscussionLike, DiscussionReply, DiscussionMedia, Follow, ContentReport, DiscussionTopic,
+    Block, DiscussionTag,
     ExploreNotification,
     Poll, PollOption, PollVote, NotificationPreference, AnnouncementBanner,
     ContactDirectory, LiveQASession, LiveQAQuestion, UserPreference, OnboardingStep,
@@ -207,14 +213,7 @@ def _generate_unique_username(email, firebase_uid, display_name=None):
     return firebase_uid[:150]
 
 
-def get_client_ip(request):
-    """Extract real client IP from request.
-
-    CloudflareProxyMiddleware (first in the stack) already copies
-    CF-Connecting-IP into REMOTE_ADDR, so we just read that.
-    Reading X-Forwarded-For directly would be client-spoofable.
-    """
-    return request.META.get('REMOTE_ADDR', '')
+from .middleware.cloudflare import get_client_ip  # noqa: E402 — single IP helper
 
 
 def _atomic_toggle_like(model_class, like_model, like_kwargs, obj):
@@ -233,6 +232,40 @@ def _atomic_toggle_like(model_class, like_model, like_kwargs, obj):
         else:
             model_class.objects.filter(pk=obj.pk).update(like_count=F('like_count') + 1)
             return obj.like_count + 1, True
+
+
+def _recent_likes_prefetch(like_model, content_fk):
+    """Prefetch the 3 newest likes per row into ``recent_likes_prefetched``.
+
+    One window-function query for the whole page instead of one query per
+    row in ``get_recent_likers``.
+    """
+    qs = like_model.objects.annotate(
+        rn=Window(RowNumber(), partition_by=F(content_fk), order_by=F('created_at').desc()),
+    ).filter(rn__lte=3).select_related('user', 'user__profile')
+    return Prefetch('likes', queryset=qs, to_attr='recent_likes_prefetched')
+
+
+def _article_comment_count():
+    """Correlated COUNT subquery — avoids GROUP BY over every Article column."""
+    return Coalesce(Subquery(
+        ArticleComment.objects.filter(article=OuterRef('pk')).order_by().values('article')
+        .annotate(c=Count('pk')).values('c')[:1],
+        output_field=IntegerField(),
+    ), 0)
+
+
+def _paginated(request, queryset, serializer_class, page_size=50, **serializer_kwargs):
+    paginator = PageNumberPagination()
+    paginator.page_size = page_size
+    page = paginator.paginate_queryset(queryset, request)
+    serializer = serializer_class(page, many=True, context={'request': request}, **serializer_kwargs)
+    return paginator.get_paginated_response(serializer.data)
+
+
+def _set_device_tokens_active(user, active):
+    """Paused / deleted accounts must not keep receiving pushes."""
+    DeviceToken.objects.filter(user=user).update(is_active=active)
 
 
 def _dedup_record_view(model_class, pk, request, content_label):
@@ -273,7 +306,8 @@ def lookup_ip_geolocation(login_history_id):
             entry.city = data.get('city', '')
             entry.save(update_fields=['country', 'city'])
     except Exception:
-        logger.debug('GeoIP lookup failed for %s', entry.ip_address, exc_info=True)
+        # Best-effort enrichment on a daemon thread: never raise, never block login.
+        logger.debug('GeoIP lookup failed for login %s', login_history_id, exc_info=True)
 
 
 def _parse_device_from_ua(ua_string):
@@ -308,13 +342,15 @@ def _parse_device_from_ua(ua_string):
     return device_name, device_type
 
 
-def _create_active_session(user, request, session_key=None):
+def _create_active_session(user, request, session_key=None, refresh_jti=None):
     """Create or update an ActiveSession record for a successful login.
 
     Args:
         user: The authenticated Django user
         request: The DRF request object (for IP, User-Agent, optional body fields)
         session_key: Optional unique key (e.g. JWT jti). Falls back to uuid4.
+        refresh_jti: jti of the refresh token issued for this session, so
+            revoking the session can blacklist it.
     """
     import uuid
 
@@ -347,6 +383,7 @@ def _create_active_session(user, request, session_key=None):
             'ip_address': ip if ip else None,
             'app_version': app_version,
             'is_current': True,
+            'refresh_jti': refresh_jti or None,
         },
     )
     return session
@@ -379,8 +416,10 @@ def verify_recaptcha(token):
             result = json_module.loads(resp.read().decode())
         return result.get('success', False)
     except Exception as e:
+        # Key is configured (checked above), so a verification outage must not
+        # become a CAPTCHA bypass.
         logger.warning(f'reCAPTCHA verification failed: {e}')
-        return True
+        return False
 
 
 # ── Auth Views ────────────────────────────────────────────
@@ -430,6 +469,29 @@ def register(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _authenticate_email(request, email, password):
+    """Resolve email -> user and run it through authenticate() so django-axes
+    counts failures / enforces lockouts (raises PermissionDenied when locked).
+
+    Returns (user_or_None, outcome) where outcome is:
+      'ok'       - active account, correct password
+      'inactive' - correct password but user.is_active is False (caller decides
+                   whether it is a self-deactivation that may be reactivated)
+      'invalid'  - unknown email or wrong password
+    """
+    # Duplicate emails would make .get() raise; take the oldest deterministically.
+    user = User.objects.filter(email=email).order_by('id').first()
+    # For unknown emails ModelBackend still runs a dummy hash (constant timing)
+    # and axes still records the failure against (username, ip).
+    # Pass the raw HttpRequest: axes reads the attributes its middleware set on it.
+    auth_user = authenticate(request._request, username=user.username if user else email, password=password)
+    if auth_user is not None:
+        return auth_user, 'ok'
+    if user is not None and not user.is_active and user.check_password(password):
+        return user, 'inactive'
+    return user, 'invalid'
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([AuthRateThrottle])
@@ -439,31 +501,17 @@ def login(request):
     ip = get_client_ip(request)
     ua = request.META.get('HTTP_USER_AGENT', '')
 
-    try:
-        user = User.objects.get(email=email)
-    except User.DoesNotExist:
-        # Dummy password hash to equalize timing with the real check_password
-        # branch, preventing account-enumeration via response-time analysis.
-        make_password(password)
+    user, outcome = _authenticate_email(request, email, password)
+    profile = user.profile if user else None
+    self_deactivated = bool(profile and (profile.is_deactivated or profile.is_scheduled_for_deletion))
 
-        # Record failed login - user not found
-        lh = LoginHistory.objects.create(
-            user=None,
-            email=email,
-            method='email',
-            ip_address=ip,
-            user_agent=ua,
-            success=False,
-            failure_reason='User not found',
-        )
-        threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
-        return Response(
-            {'detail': 'Invalid email or password.'},
-            status=status.HTTP_401_UNAUTHORIZED,
-        )
-
-    if not user.check_password(password):
-        # Record failed login - wrong password
+    if outcome == 'invalid' or (outcome == 'inactive' and not self_deactivated):
+        if user is None:
+            reason = 'User not found'
+        elif outcome == 'inactive':
+            reason = 'Account disabled'
+        else:
+            reason = 'Invalid password'
         lh = LoginHistory.objects.create(
             user=user,
             email=email,
@@ -471,17 +519,22 @@ def login(request):
             ip_address=ip,
             user_agent=ua,
             success=False,
-            failure_reason='Invalid password',
+            failure_reason=reason,
         )
         threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
+        if reason == 'Account disabled':
+            return Response({'detail': 'This account has been disabled.'},
+                            status=status.HTTP_403_FORBIDDEN)
         return Response(
             {'detail': 'Invalid email or password.'},
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
+    # Lets django-axes reset its failure counter (AXES_RESET_ON_SUCCESS).
+    user_logged_in.send(sender=User, request=request._request, user=user)
+
     # Handle deactivated / deletion-scheduled accounts
-    profile = user.profile
-    if not user.is_active and (profile.is_deactivated or profile.is_scheduled_for_deletion):
+    if not user.is_active and self_deactivated:
         # Check if past 30-day window
         if (profile.is_scheduled_for_deletion and
                 profile.deletion_scheduled_for and
@@ -502,6 +555,7 @@ def login(request):
 
         user.is_active = True
         user.save()
+        _set_device_tokens_active(user, True)
 
         refresh = RefreshToken.for_user(user)
         message = 'Welcome back! Your account has been reactivated.'
@@ -520,7 +574,8 @@ def login(request):
         threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
 
         # Create active session
-        _create_active_session(user, request, session_key=str(refresh.access_token.payload.get('jti', '')))
+        _create_active_session(user, request, session_key=str(refresh.access_token.payload.get('jti', '')),
+                               refresh_jti=str(refresh.payload.get('jti', '')))
 
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
@@ -546,7 +601,8 @@ def login(request):
     threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
 
     # Create active session
-    _create_active_session(user, request, session_key=str(refresh.access_token.payload.get('jti', '')))
+    _create_active_session(user, request, session_key=str(refresh.access_token.payload.get('jti', '')),
+                           refresh_jti=str(refresh.payload.get('jti', '')))
 
     return Response({
         'user': UserSerializer(user, context={'request': request}).data,
@@ -590,25 +646,23 @@ def deactivate_account(request):
     # Mark Django user as inactive so they can't access protected endpoints
     user.is_active = False
     user.save()
+    _set_device_tokens_active(user, False)
 
     # Send confirmation email
-    try:
-        send_mail(
-            subject='B4Africa - Account Deactivated',
-            message=(
-                f'Hello {user.first_name or user.username},\n\n'
-                'Your Be 4 Africa account has been deactivated.\n\n'
-                'Your data is safe and your account is just paused. '
-                'You can reactivate it anytime by simply logging back in.\n\n'
-                'If you did not request this, please contact us immediately.\n\n'
-                'Best regards,\nB4Africa Team'
-            ),
-            from_email=django_settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=True,
-        )
-    except Exception:
-        logger.warning('Failed to send deactivation email to %s', user.email)
+    from .tasks import send_email_async
+    transaction.on_commit(lambda: send_email_async.delay(
+        'B4Africa - Account Deactivated',
+        (
+            f'Hello {user.first_name or user.username},\n\n'
+            'Your Be 4 Africa account has been deactivated.\n\n'
+            'Your data is safe and your account is just paused. '
+            'You can reactivate it anytime by simply logging back in.\n\n'
+            'If you did not request this, please contact us immediately.\n\n'
+            'Best regards,\nB4Africa Team'
+        ),
+        django_settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+    ))
 
     return Response({
         'message': 'Your account has been deactivated.',
@@ -638,27 +692,25 @@ def delete_account(request):
     # Mark user as inactive
     user.is_active = False
     user.save()
+    _set_device_tokens_active(user, False)
 
     # Send confirmation email
     deletion_date = profile.deletion_scheduled_for.strftime('%B %d, %Y')
-    try:
-        send_mail(
-            subject='B4Africa - Account Deletion Scheduled',
-            message=(
-                f'Hello {user.first_name or user.username},\n\n'
-                'Your Be 4 Africa account has been scheduled for permanent deletion.\n\n'
-                f'Your data will be permanently removed on {deletion_date}.\n\n'
-                'Changed your mind? Simply log back in before that date to cancel '
-                'the deletion and reactivate your account.\n\n'
-                'If you did not request this, please contact us immediately.\n\n'
-                'Best regards,\nB4Africa Team'
-            ),
-            from_email=django_settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=True,
-        )
-    except Exception:
-        logger.warning('Failed to send deletion email to %s', user.email)
+    from .tasks import send_email_async
+    transaction.on_commit(lambda: send_email_async.delay(
+        'B4Africa - Account Deletion Scheduled',
+        (
+            f'Hello {user.first_name or user.username},\n\n'
+            'Your Be 4 Africa account has been scheduled for permanent deletion.\n\n'
+            f'Your data will be permanently removed on {deletion_date}.\n\n'
+            'Changed your mind? Simply log back in before that date to cancel '
+            'the deletion and reactivate your account.\n\n'
+            'If you did not request this, please contact us immediately.\n\n'
+            'Best regards,\nB4Africa Team'
+        ),
+        django_settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+    ))
 
     return Response({
         'message': 'Your account has been scheduled for deletion.',
@@ -679,21 +731,19 @@ def reactivate_account(request):
     email = request.data.get('email', '')
     password = request.data.get('password', '')
 
-    try:
-        user = User.objects.get(email=email)
-    except User.DoesNotExist:
-        return Response(
-            {'detail': 'Invalid email or password.'},
-            status=status.HTTP_401_UNAUTHORIZED,
-        )
-
-    if not user.check_password(password):
+    user, outcome = _authenticate_email(request, email, password)
+    if outcome == 'invalid':
         return Response(
             {'detail': 'Invalid email or password.'},
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
     profile = user.profile
+    # Only self-deactivated / deletion-scheduled accounts may be reactivated;
+    # an admin-disabled account must not be able to re-enable itself.
+    if not user.is_active and not (profile.is_deactivated or profile.is_scheduled_for_deletion):
+        return Response({'detail': 'This account has been disabled.'},
+                        status=status.HTTP_403_FORBIDDEN)
 
     # Check if account is past the 30-day deletion window
     if (profile.is_scheduled_for_deletion and
@@ -715,6 +765,7 @@ def reactivate_account(request):
 
     user.is_active = True
     user.save()
+    _set_device_tokens_active(user, True)
 
     refresh = RefreshToken.for_user(user)
 
@@ -1107,13 +1158,18 @@ def firebase_login(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AnonRateThrottle])
 def register_fcm_token(request):
     """
     Register an FCM token for push notifications (no auth required).
     If user is authenticated, links the token to the user.
-    If user is not authenticated, stores the token with user=None (anonymous).
+    If user is not authenticated, stores the token with user=None (anonymous);
+    a token already bound to a user is never re-bound by an anonymous call.
     This ensures anonymous users can still receive global push notifications.
     """
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from .validators import validate_fcm_token
+
     fcm_token = request.data.get('fcm_token')
 
     if not fcm_token:
@@ -1121,6 +1177,10 @@ def register_fcm_token(request):
             {'detail': 'FCM token is required'},
             status=status.HTTP_400_BAD_REQUEST
         )
+    try:
+        validate_fcm_token(fcm_token)
+    except DjangoValidationError as e:
+        return Response({'detail': ' '.join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         user = request.user if request.user.is_authenticated else None
@@ -1140,6 +1200,8 @@ def register_fcm_token(request):
 
         if user:
             defaults['user'] = user
+        # Anonymous: 'user' is absent from defaults, so an existing token keeps
+        # its owner; only a brand-new row is created unbound.
 
         DeviceToken.objects.update_or_create(
             token=fcm_token,
@@ -1268,6 +1330,9 @@ def logout_view(request):
         )
     try:
         token = RefreshToken(refresh_token)
+        # Only the token's owner may blacklist it.
+        if str(token.payload.get('user_id')) != str(request.user.pk):
+            return Response({'detail': 'Invalid refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
         token.blacklist()
     except Exception:
         logger.debug('Token blacklist skipped (already invalid)')
@@ -1309,8 +1374,10 @@ class ActiveUserTokenRefreshView(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        old_jti = None
         try:
             untyped = UntypedToken(refresh_token)
+            old_jti = untyped.payload.get('jti')
             user_id = untyped.payload.get('user_id')
             if user_id:
                 user = User.objects.filter(pk=user_id).first()
@@ -1324,7 +1391,18 @@ class ActiveUserTokenRefreshView(viewsets.ViewSet):
 
         # Delegate to the standard refresh view
         view = _BaseRefresh.as_view()
-        return view(request._request)
+        response = view(request._request)
+
+        # Rotation issued a new refresh token: keep the session pointing at it
+        # so "revoke session" still blacklists the live token.
+        new_refresh = getattr(response, 'data', None) and response.data.get('refresh')
+        if old_jti and new_refresh:
+            try:
+                new_jti = UntypedToken(new_refresh).payload.get('jti')
+                ActiveSession.objects.filter(refresh_jti=old_jti).update(refresh_jti=new_jti)
+            except TokenError:
+                pass
+        return response
 
 
 @api_view(['POST'])
@@ -1425,9 +1503,7 @@ def record_app_open(request):
     return Response({'ok': True}, status=status.HTTP_201_CREATED)
 
 
-def _get_client_ip(request):
-    """Extract the client IP (REMOTE_ADDR, already set by CloudflareProxyMiddleware)."""
-    return request.META.get('REMOTE_ADDR', '')
+_get_client_ip = get_client_ip
 
 
 @api_view(['GET'])
@@ -1454,13 +1530,53 @@ def export_user_data(request):
             'is_active': user.is_active,
             'is_staff': user.is_staff,
         },
+        'comments': [
+            {'type': label, 'id': c.id, 'text': c.content, 'created_at': c.created_at.isoformat()}
+            for label, manager in (
+                ('article', user.article_comments), ('magazine', user.magazine_comments),
+                ('live_feed', user.livefeed_comments), ('event', user.event_comments_authored),
+                ('video', user.video_comments), ('gallery', user.gallery_comments),
+            )
+            for c in manager.all()
+        ],
+        'discussions': [
+            {'id': d.id, 'title': d.title, 'content': d.content, 'category': d.category,
+             'created_at': d.created_at.isoformat()}
+            for d in user.discussions.all()
+        ],
+        'discussion_replies': [
+            {'id': r.id, 'discussion_id': r.discussion_id, 'content': r.content,
+             'created_at': r.created_at.isoformat()}
+            for r in user.discussion_replies.all()
+        ],
+        'support_tickets': [
+            {'id': t.id, 'subject': t.subject, 'status': t.status, 'priority': t.priority,
+             'created_at': t.created_at.isoformat(),
+             'messages': [
+                 {'id': m.id, 'text': m.message, 'from_support': m.is_admin_reply,
+                  'created_at': m.created_at.isoformat()}
+                 for m in t.messages.all()
+             ]}
+            for t in user.support_tickets.all()
+        ],
+        'event_submissions': [
+            {'id': sub.id, 'event_registration_id': sub.event_registration_id,
+             'status': sub.status, 'is_proxy': sub.is_proxy, 'form_data': sub.form_data,
+             'submitted_at': sub.submitted_at.isoformat() if sub.submitted_at else None}
+            for sub in user.event_submissions.all()
+        ],
+        'continental_dialogue_applications': [
+            {'id': a.id, 'reference_id': a.reference_id, 'status': a.status,
+             'created_at': a.created_at.isoformat()}
+            for a in user.youth_dialogue_applications.all()
+        ],
         'data_export_info': {
             'export_date': timezone.now().isoformat(),
             'format': 'JSON',
-            'version': '1.0',
+            'version': '1.1',
         },
         'notes': {
-            'content_data': 'This export includes your account information. Content you viewed (articles, magazines, etc.) is not tracked or stored.',
+            'content_data': 'This export includes your account information and the content you submitted (comments, posts, support tickets, event registrations, applications). Content you viewed is not tracked or stored.',
             'deletion': 'To delete your account and all data, use the Delete Account feature in the app.',
             'questions': 'Contact support@burundi.gov.bi for questions about your data.',
         }
@@ -1486,7 +1602,9 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MagazineEditionSerializer
 
     def get_queryset(self):
-        qs = MagazineEdition.objects.prefetch_related('images').filter(
+        qs = MagazineEdition.objects.prefetch_related(
+            'images', _recent_likes_prefetch(MagazineLike, 'edition'),
+        ).filter(
             status='published',  # Only show published magazines in public API
         )
         user = self.request.user
@@ -1519,14 +1637,13 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[SearchRateThrottle])
     def comments(self, request, pk=None):
         """Get or post comments on a magazine edition."""
-        from django.utils.html import escape
         from django.db.models import Prefetch
         edition = self.get_object()
         if request.method == 'GET':
-            reply_qs = MagazineComment.objects.select_related('user', 'user__profile').order_by('created_at')
+            reply_qs = MagazineComment.objects.filter(user__is_active=True).select_related('user', 'user__profile').order_by('created_at')
             comments = (
                 edition.comments
-                .filter(parent__isnull=True)
+                .filter(parent__isnull=True, user__is_active=True)
                 .select_related('user', 'user__profile')
                 .prefetch_related(Prefetch('replies', queryset=reply_qs))
                 .order_by('-created_at')
@@ -1536,7 +1653,7 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
                 reply_qs = reply_qs.annotate(_is_liked=like_exists)
                 comments = (
                     edition.comments
-                    .filter(parent__isnull=True)
+                    .filter(parent__isnull=True, user__is_active=True)
                     .select_related('user', 'user__profile')
                     .prefetch_related(Prefetch('replies', queryset=reply_qs))
                     .annotate(_is_liked=like_exists)
@@ -1575,7 +1692,6 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        content = escape(content)
         parent_id = request.data.get('parent')
         parent = None
         if parent_id:
@@ -1610,7 +1726,6 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
             permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
-        from django.utils.html import escape
         try:
             comment = MagazineComment.objects.get(pk=comment_id, edition_id=pk)
         except MagazineComment.DoesNotExist:
@@ -1640,7 +1755,7 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        comment.content = escape(content)
+        comment.content = content
         comment.updated_at = timezone.now()
         comment.save(update_fields=['content', 'updated_at'])
         return Response(MagazineCommentSerializer(comment, context={'request': request}).data)
@@ -1652,16 +1767,11 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
             comment = MagazineComment.objects.get(pk=comment_id, edition_id=pk)
         except MagazineComment.DoesNotExist:
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
-        like, created = MagazineCommentLike.objects.get_or_create(user=request.user, comment=comment)
-        if not created:
-            like.delete()
-            MagazineComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            MagazineComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        comment.refresh_from_db()
-        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
+        new_count, is_liked = _atomic_toggle_like(
+            MagazineComment, MagazineCommentLike,
+            {'user': request.user, 'comment': comment}, comment,
+        )
+        return Response({'is_liked': is_liked, 'like_count': new_count})
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1684,7 +1794,9 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can read articles, but authentication required to like/comment"""
     permission_classes = [AllowAny]
     serializer_class = ArticleSerializer
-    filterset_fields = ['category', 'is_featured', 'content_type']
+    # 'content_type' is deliberately absent: news and articles are one
+    # feed now, and old app builds still send ?content_type=news.
+    filterset_fields = ['category', 'is_featured']
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -1694,16 +1806,11 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         now = timezone.now()
-        qs = Article.objects.select_related('category').prefetch_related('media').annotate(
-            comment_count=Count('comments', distinct=True),
-        ).filter(
-            is_draft=False,  # Exclude legacy drafts from public API
-            status='published',  # Only show published articles
-        ).exclude(
-            scheduled_publish_at__gt=now,  # Exclude scheduled (future) articles
-        ).exclude(
-            expires_at__lt=now,  # Exclude expired articles
-        ).order_by('-publish_date')  # Explicitly order by newest first
+        qs = Article.objects.select_related('category').prefetch_related(
+            'media', _recent_likes_prefetch(ArticleLike, 'article'),
+        ).annotate(
+            comment_count=_article_comment_count(),
+        ).public(now).order_by('-publish_date', '-id')  # Newest first
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -1726,25 +1833,19 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='related', permission_classes=[AllowAny])
     def related(self, request, pk=None):
-        """Get related articles in the same category and content_type, excluding the current article."""
+        """Get related articles in the same category, excluding the current one."""
         article = self.get_object()
         now = timezone.now()
-        related_qs = Article.objects.select_related('category').prefetch_related('media').filter(
-            is_draft=False,
-            status='published',
-            content_type=article.content_type,
-        ).exclude(
-            scheduled_publish_at__gt=now,
-        ).exclude(
-            expires_at__lt=now,
-        ).exclude(pk=article.pk)
+        related_qs = Article.objects.select_related('category').prefetch_related(
+            'media',
+        ).public(now).exclude(pk=article.pk)
 
         if article.category_id:
             related_qs = related_qs.filter(category=article.category)
 
         related_qs = related_qs.annotate(
-            comment_count=Count('comments', distinct=True),
-        ).order_by('-publish_date')[:5]
+            comment_count=_article_comment_count(),
+        ).order_by('-publish_date', '-id')[:5]
 
         if request.user.is_authenticated:
             related_qs = related_qs.annotate(
@@ -1800,10 +1901,10 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         article = self.get_object()
         if request.method == 'GET':
             # Return only top-level comments; replies are nested via the serializer.
-            reply_qs = ArticleComment.objects.select_related('user', 'user__profile').order_by('created_at')
+            reply_qs = ArticleComment.objects.filter(user__is_active=True).select_related('user', 'user__profile').order_by('created_at')
             comments = (
                 article.comments
-                .filter(parent__isnull=True)
+                .filter(parent__isnull=True, user__is_active=True)
                 .select_related('user', 'user__profile')
                 .prefetch_related(Prefetch('replies', queryset=reply_qs))
                 .order_by('-created_at')
@@ -1813,7 +1914,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
                 reply_qs = reply_qs.annotate(_is_liked=like_exists)
                 comments = (
                     article.comments
-                    .filter(parent__isnull=True)
+                    .filter(parent__isnull=True, user__is_active=True)
                     .select_related('user', 'user__profile')
                     .prefetch_related(Prefetch('replies', queryset=reply_qs))
                     .annotate(_is_liked=like_exists)
@@ -1863,8 +1964,6 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
 
         # HTML sanitization: escape all HTML entities (treat as plain text)
-        from django.utils.html import escape
-        content = escape(content)
 
         # Optional threading — flatten any deeper nesting to 1 level.
         parent_id = request.data.get('parent')
@@ -1932,7 +2031,6 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
             permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
-        from django.utils.html import escape
         try:
             comment = ArticleComment.objects.get(pk=comment_id, article_id=pk)
         except ArticleComment.DoesNotExist:
@@ -1962,7 +2060,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        comment.content = escape(content)
+        comment.content = content
         comment.updated_at = timezone.now()
         comment.save(update_fields=['content', 'updated_at'])
         return Response(ArticleCommentSerializer(comment, context={'request': request}).data)
@@ -1974,16 +2072,11 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             comment = ArticleComment.objects.get(pk=comment_id, article_id=pk)
         except ArticleComment.DoesNotExist:
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
-        like, created = ArticleCommentLike.objects.get_or_create(user=request.user, comment=comment)
-        if not created:
-            like.delete()
-            ArticleComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            ArticleComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        comment.refresh_from_db()
-        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
+        new_count, is_liked = _atomic_toggle_like(
+            ArticleComment, ArticleCommentLike,
+            {'user': request.user, 'comment': comment}, comment,
+        )
+        return Response({'is_liked': is_liked, 'like_count': new_count})
 
     @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
@@ -2129,20 +2222,15 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['status']
 
     def get_queryset(self):
-        qs = LiveFeed.objects.select_related('event').filter(content_status='published').order_by('-created_at')
+        # Status transitions run in core.tasks.transition_live_feed_statuses (beat).
+        qs = LiveFeed.objects.select_related('event').prefetch_related(
+            'event__event_speakers', _recent_likes_prefetch(LiveFeedLike, 'feed'),
+        ).filter(content_status='published').order_by('-created_at', '-id')
         if self.request.user.is_authenticated:
             qs = qs.annotate(
                 is_liked=Exists(LiveFeedLike.objects.filter(user=self.request.user, feed=OuterRef('pk')))
             )
         return qs
-
-    def list(self, request, *args, **kwargs):
-        # Auto-transition stale upcoming feeds to recorded before listing
-        LiveFeed.objects.filter(
-            status='upcoming',
-            scheduled_time__lte=timezone.now(),
-        ).update(status='recorded')
-        return super().list(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
@@ -2170,10 +2258,10 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
         from django.db.models import Prefetch
         feed = self.get_object()
         if request.method == 'GET':
-            reply_qs = LiveFeedComment.objects.select_related('user', 'user__profile').order_by('created_at')
+            reply_qs = LiveFeedComment.objects.filter(user__is_active=True).select_related('user', 'user__profile').order_by('created_at')
             comments = (
                 feed.comments
-                .filter(parent__isnull=True)
+                .filter(parent__isnull=True, user__is_active=True)
                 .select_related('user', 'user__profile')
                 .prefetch_related(Prefetch('replies', queryset=reply_qs))
                 .order_by('-created_at')
@@ -2183,7 +2271,7 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
                 reply_qs = reply_qs.annotate(_is_liked=like_exists)
                 comments = (
                     feed.comments
-                    .filter(parent__isnull=True)
+                    .filter(parent__isnull=True, user__is_active=True)
                     .select_related('user', 'user__profile')
                     .prefetch_related(Prefetch('replies', queryset=reply_qs))
                     .annotate(_is_liked=like_exists)
@@ -2223,8 +2311,6 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        from django.utils.html import escape
-        content = escape(content)
         parent_id = request.data.get('parent')
         parent = None
         if parent_id:
@@ -2259,7 +2345,6 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
             permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
-        from django.utils.html import escape
         try:
             comment = LiveFeedComment.objects.get(pk=comment_id, feed_id=pk)
         except LiveFeedComment.DoesNotExist:
@@ -2289,7 +2374,7 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        comment.content = escape(content)
+        comment.content = content
         comment.updated_at = timezone.now()
         comment.save(update_fields=['content', 'updated_at'])
         return Response(LiveFeedCommentSerializer(comment, context={'request': request}).data)
@@ -2301,16 +2386,11 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
             comment = LiveFeedComment.objects.get(pk=comment_id, feed_id=pk)
         except LiveFeedComment.DoesNotExist:
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
-        like, created = LiveFeedCommentLike.objects.get_or_create(user=request.user, comment=comment)
-        if not created:
-            like.delete()
-            LiveFeedComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            LiveFeedComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        comment.refresh_from_db()
-        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
+        new_count, is_liked = _atomic_toggle_like(
+            LiveFeedComment, LiveFeedCommentLike,
+            {'user': request.user, 'comment': comment}, comment,
+        )
+        return Response({'is_liked': is_liked, 'like_count': new_count})
 
 
 class ResourceViewSet(viewsets.ReadOnlyModelViewSet):
@@ -2364,7 +2444,9 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = GalleryAlbumSerializer
 
     def get_queryset(self):
-        qs = GalleryAlbum.objects.prefetch_related('photos').filter(status='published')
+        qs = GalleryAlbum.objects.prefetch_related(
+            'photos', _recent_likes_prefetch(GalleryAlbumLike, 'album'),
+        ).filter(status='published')
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -2398,14 +2480,13 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[SearchRateThrottle])
     def comments(self, request, pk=None):
         """Get or post comments on a gallery album."""
-        from django.utils.html import escape
         from django.db.models import Prefetch
         album = self.get_object()
         if request.method == 'GET':
-            reply_qs = GalleryComment.objects.select_related('user', 'user__profile').order_by('created_at')
+            reply_qs = GalleryComment.objects.filter(user__is_active=True).select_related('user', 'user__profile').order_by('created_at')
             comments = (
                 album.comments
-                .filter(parent__isnull=True)
+                .filter(parent__isnull=True, user__is_active=True)
                 .select_related('user', 'user__profile')
                 .prefetch_related(Prefetch('replies', queryset=reply_qs))
                 .order_by('-created_at')
@@ -2415,7 +2496,7 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
                 reply_qs = reply_qs.annotate(_is_liked=like_exists)
                 comments = (
                     album.comments
-                    .filter(parent__isnull=True)
+                    .filter(parent__isnull=True, user__is_active=True)
                     .select_related('user', 'user__profile')
                     .prefetch_related(Prefetch('replies', queryset=reply_qs))
                     .annotate(_is_liked=like_exists)
@@ -2454,7 +2535,6 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        content = escape(content)
         parent_id = request.data.get('parent')
         parent = None
         if parent_id:
@@ -2489,7 +2569,6 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
             permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
-        from django.utils.html import escape
         try:
             comment = GalleryComment.objects.get(pk=comment_id, album_id=pk)
         except GalleryComment.DoesNotExist:
@@ -2519,7 +2598,7 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        comment.content = escape(content)
+        comment.content = content
         comment.updated_at = timezone.now()
         comment.save(update_fields=['content', 'updated_at'])
         return Response(GalleryCommentSerializer(comment, context={'request': request}).data)
@@ -2531,16 +2610,11 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
             comment = GalleryComment.objects.get(pk=comment_id, album_id=pk)
         except GalleryComment.DoesNotExist:
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
-        like, created = GalleryCommentLike.objects.get_or_create(user=request.user, comment=comment)
-        if not created:
-            like.delete()
-            GalleryComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            GalleryComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        comment.refresh_from_db()
-        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
+        new_count, is_liked = _atomic_toggle_like(
+            GalleryComment, GalleryCommentLike,
+            {'user': request.user, 'comment': comment}, comment,
+        )
+        return Response({'is_liked': is_liked, 'like_count': new_count})
 
 
 class VideoViewSet(viewsets.ReadOnlyModelViewSet):
@@ -2551,8 +2625,8 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         qs = Video.objects.prefetch_related(
-            'chapters', 'subtitles'
-        ).filter(status='published').order_by('-is_featured', '-publish_date')
+            'chapters', 'subtitles', _recent_likes_prefetch(VideoLike, 'video'),
+        ).filter(status='published').order_by('-is_featured', '-publish_date', '-id')
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -2594,14 +2668,13 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[SearchRateThrottle])
     def comments(self, request, pk=None):
         """Get or post comments on a video."""
-        from django.utils.html import escape
         from django.db.models import Prefetch
         video = self.get_object()
         if request.method == 'GET':
-            reply_qs = VideoComment.objects.select_related('user', 'user__profile').order_by('created_at')
+            reply_qs = VideoComment.objects.filter(user__is_active=True).select_related('user', 'user__profile').order_by('created_at')
             comments = (
                 video.comments
-                .filter(parent__isnull=True)
+                .filter(parent__isnull=True, user__is_active=True)
                 .select_related('user', 'user__profile')
                 .prefetch_related(Prefetch('replies', queryset=reply_qs))
                 .order_by('-created_at')
@@ -2611,7 +2684,7 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
                 reply_qs = reply_qs.annotate(_is_liked=like_exists)
                 comments = (
                     video.comments
-                    .filter(parent__isnull=True)
+                    .filter(parent__isnull=True, user__is_active=True)
                     .select_related('user', 'user__profile')
                     .prefetch_related(Prefetch('replies', queryset=reply_qs))
                     .annotate(_is_liked=like_exists)
@@ -2650,7 +2723,6 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        content = escape(content)
         parent_id = request.data.get('parent')
         parent = None
         if parent_id:
@@ -2685,7 +2757,6 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
             permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
-        from django.utils.html import escape
         try:
             comment = VideoComment.objects.get(pk=comment_id, video_id=pk)
         except VideoComment.DoesNotExist:
@@ -2715,7 +2786,7 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        comment.content = escape(content)
+        comment.content = content
         comment.updated_at = timezone.now()
         comment.save(update_fields=['content', 'updated_at'])
         return Response(VideoCommentSerializer(comment, context={'request': request}).data)
@@ -2727,16 +2798,11 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
             comment = VideoComment.objects.get(pk=comment_id, video_id=pk)
         except VideoComment.DoesNotExist:
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
-        like, created = VideoCommentLike.objects.get_or_create(user=request.user, comment=comment)
-        if not created:
-            like.delete()
-            VideoComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            VideoComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        comment.refresh_from_db()
-        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
+        new_count, is_liked = _atomic_toggle_like(
+            VideoComment, VideoCommentLike,
+            {'user': request.user, 'comment': comment}, comment,
+        )
+        return Response({'is_liked': is_liked, 'like_count': new_count})
 
 
 class SocialMediaLinkViewSet(viewsets.ReadOnlyModelViewSet):
@@ -3040,6 +3106,12 @@ def health_check(request):
     # Anonymous / non-staff get a fixed minimal response (for load balancers).
     # No version, no infrastructure detail, no healthy/degraded distinction.
     if not (request.user.is_authenticated and request.user.is_staff):
+        from django.db import connection
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT 1')
+        except Exception:
+            return Response({'status': 'degraded'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         return Response({'status': 'ok'})
 
     # ── Staff-only: detailed component checks ─────────────────
@@ -3140,7 +3212,7 @@ def _annotated_event_registrations(request):
         )
         qs = qs.annotate(
             _submission_count=Count('submissions'),
-            _non_waitlisted_count=Count('submissions', filter=Q(submissions__is_waitlisted=False)),
+            _non_waitlisted_count=Count('submissions', filter=Q(submissions__is_waitlisted=False) & ~Q(submissions__status='rejected')),
             _has_registered=Exists(user_sub),
             _user_submission_status=Subquery(user_sub.values('status')[:1]),
             _user_submission_id=Subquery(user_sub.values('id')[:1]),
@@ -3148,7 +3220,7 @@ def _annotated_event_registrations(request):
     else:
         qs = qs.annotate(
             _submission_count=Count('submissions'),
-            _non_waitlisted_count=Count('submissions', filter=Q(submissions__is_waitlisted=False)),
+            _non_waitlisted_count=Count('submissions', filter=Q(submissions__is_waitlisted=False) & ~Q(submissions__status='rejected')),
             _has_registered=Value(False, output_field=BooleanField()),
         )
     return qs
@@ -3210,7 +3282,10 @@ class FactViewSet(viewsets.ReadOnlyModelViewSet):
 @permission_classes([AllowAny])
 def home_feed(request):
     """Combined endpoint for home screen — hero slides, featured articles, feature cards, categories, event cards, and settings."""
-    cache_key = f'home_feed:auth:{request.user.id}' if request.user.is_authenticated else 'home_feed:anon'
+    # home_feed:ver is bumped by core.signals when any feed source changes,
+    # which invalidates every per-user variant at once.
+    ver = cache.get('home_feed:ver', 0)
+    cache_key = f'home_feed:v{ver}:auth:{request.user.id}' if request.user.is_authenticated else f'home_feed:v{ver}:anon'
     cached = cache.get(cache_key)
     if cached is not None:
         return Response(cached)
@@ -3218,15 +3293,11 @@ def home_feed(request):
     hero_slides = HeroSlide.objects.filter(is_active=True)
 
     now = timezone.now()
-    base_articles = Article.objects.select_related('category').prefetch_related('media').filter(
-        is_draft=False,
-    ).exclude(
-        scheduled_publish_at__gt=now,
-    ).exclude(
-        expires_at__lt=now,
-    ).annotate(
-        comment_count=Count('comments', distinct=True),
-    ).order_by('-publish_date')  # Explicitly order by newest first
+    base_articles = Article.objects.select_related('category').prefetch_related(
+        'media', _recent_likes_prefetch(ArticleLike, 'article'),
+    ).public(now).annotate(
+        comment_count=_article_comment_count(),
+    ).order_by('-publish_date', '-id')  # Explicitly order by newest first
     if request.user.is_authenticated:
         base_articles = base_articles.annotate(
             is_liked=Exists(ArticleLike.objects.filter(article=OuterRef('pk'), user=request.user)),
@@ -3235,10 +3306,15 @@ def home_feed(request):
         from django.db.models import Value, BooleanField
         base_articles = base_articles.annotate(is_liked=Value(False, output_field=BooleanField()))
 
-    featured_articles = base_articles.filter(is_featured=True, content_type='article')[:5]
-    featured_news = base_articles.filter(is_featured=True, content_type='news')[:5]
-    articles = base_articles.filter(content_type='article')[:10]
-    news_items = base_articles.filter(content_type='news')[:10]
+    # One feed. The article/news split was never an editorial choice — the
+    # admin form preselected 'article', so everything not consciously switched
+    # landed there. `articles` and `featured_articles` stay empty rather than
+    # being dropped: an installed build reads both keys and concatenates them,
+    # so duplicating the list into both would show every post twice.
+    featured_news = base_articles.filter(is_featured=True)[:5]
+    news_items = base_articles[:10]
+    featured_articles = Article.objects.none()
+    articles = Article.objects.none()
     feature_cards = FeatureCard.objects.filter(is_active=True).prefetch_related(
         'key_point_items', 'impact_area_items', 'media',
     )
@@ -3407,21 +3483,28 @@ def search_articles(request):
     """
     query = request.GET.get('q', '').strip()
     lang = request.GET.get('lang', 'en')
-    content_type_filter = request.GET.get('content_type', '').strip()
-
     if not query or len(query) < 2:
         return Response({'results': [], 'count': 0})
 
-    # Bilingual search in title and content
-    articles = Article.objects.filter(
-        Q(title__icontains=query) | Q(content__icontains=query) |
-        Q(title_fr__icontains=query) | Q(content_fr__icontains=query)
-    ).select_related('category').prefetch_related('media').annotate(
-        comment_count=Count('comments', distinct=True),
+    # Bilingual search in title and content — Postgres full-text (GIN index
+    # article_search_gin), icontains elsewhere (SQLite dev/test).
+    articles = Article.objects.public()
+    if connection.vendor == 'postgresql':
+        from django.contrib.postgres.search import SearchQuery, SearchVector
+        articles = articles.alias(
+            _sv=SearchVector(*Article.SEARCH_FIELDS, config='simple'),
+        ).filter(_sv=SearchQuery(query, config='simple', search_type='websearch'))
+    else:
+        articles = articles.filter(
+            Q(title__icontains=query) | Q(content__icontains=query) |
+            Q(title_fr__icontains=query) | Q(content_fr__icontains=query)
+        )
+    articles = articles.select_related('category').prefetch_related(
+        'media', _recent_likes_prefetch(ArticleLike, 'article'),
+    ).annotate(
+        comment_count=_article_comment_count(),
     )
 
-    if content_type_filter in ('article', 'news'):
-        articles = articles.filter(content_type=content_type_filter)
 
     # Add is_liked annotation if authenticated
     if request.user.is_authenticated:
@@ -3458,10 +3541,10 @@ def search_magazines(request):
         return Response({'results': [], 'count': 0})
 
     # Bilingual search in title and description
-    magazines = MagazineEdition.objects.filter(
+    magazines = MagazineEdition.objects.filter(status='published').filter(
         Q(title__icontains=query) | Q(description__icontains=query) |
         Q(title_fr__icontains=query) | Q(description_fr__icontains=query)
-    ).prefetch_related('images')[:20]  # Limit to 20 results
+    ).prefetch_related('images', _recent_likes_prefetch(MagazineLike, 'edition'))[:20]  # Limit to 20 results
 
     serializer = MagazineEditionSerializer(magazines, many=True, context={'request': request})
     return Response({
@@ -3805,42 +3888,48 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        event_reg = serializer.validated_data['event_registration']
+        from rest_framework.exceptions import ValidationError
+        from .utils import active_registration_count
         user = self.request.user
-        # Enforce one self-registration per user per event
-        if not serializer.validated_data.get('is_proxy', False):
-            if EventSubmission.objects.filter(event_registration=event_reg, user=user, is_proxy=False).exists():
-                from rest_framework.exceptions import ValidationError
-                raise ValidationError({'detail': 'You have already registered for this event.'})
+        with transaction.atomic():
+            # Lock the registration row so capacity check + insert serialise
+            # across concurrent requests; the partial unique constraint
+            # uniq_self_registration_per_event backstops the duplicate check.
+            event_reg = EventRegistration.objects.select_for_update().get(
+                pk=serializer.validated_data['event_registration'].pk)
+            deadline_passed = event_reg.registration_deadline and timezone.now() > event_reg.registration_deadline
+            if not event_reg.is_active or not event_reg.is_registration_enabled or deadline_passed:
+                raise ValidationError({'detail': 'Registration for this event is closed.'})
+            # Enforce one self-registration per user per event
+            if not serializer.validated_data.get('is_proxy', False):
+                if EventSubmission.objects.filter(event_registration=event_reg, user=user, is_proxy=False).exists():
+                    raise ValidationError({'detail': 'You have already registered for this event.'})
 
-        # Check capacity and auto-waitlist if full
-        is_waitlisted = False
-        if event_reg.max_registrations > 0:
-            current_count = event_reg.submissions.filter(is_waitlisted=False).count()
-            if current_count >= event_reg.max_registrations:
-                is_waitlisted = True
+            # Check capacity (rejected submissions free their seat) and auto-waitlist if full
+            is_waitlisted = (
+                event_reg.max_registrations > 0
+                and active_registration_count(event_reg) >= event_reg.max_registrations
+            )
 
-        submission = serializer.save(
-            user=user,
-            is_waitlisted=is_waitlisted,
-            status='waitlist' if is_waitlisted else 'pending',
-        )
-
-        # Also create EventWaitlist entry for waitlisted submissions
-        if is_waitlisted:
-            position = EventWaitlist.objects.filter(event_registration=event_reg).count() + 1
-            EventWaitlist.objects.get_or_create(
+            submission = serializer.save(
                 user=user,
                 event_registration=event_reg,
-                defaults={'position': position},
+                is_waitlisted=is_waitlisted,
+                status='waitlist' if is_waitlisted else 'pending',
             )
+
+            # Also create EventWaitlist entry for waitlisted submissions
+            if is_waitlisted:
+                position = EventWaitlist.objects.filter(event_registration=event_reg).count() + 1
+                EventWaitlist.objects.get_or_create(
+                    user=user,
+                    event_registration=event_reg,
+                    defaults={'position': position},
+                )
 
         # Send confirmation email
         if event_reg.send_confirmation_email and user.email:
             try:
-                from django.core.mail import send_mail
-                from django.conf import settings as django_settings
-
                 subject = f'Registration Confirmation: {event_reg.event_title}'
 
                 # Build HTML email
@@ -3855,11 +3944,11 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Confirmed</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
-        Dear <strong>{user.get_full_name() or user.username}</strong>,
+        Dear <strong>{escape(user.get_full_name() or user.username)}</strong>,
       </p>
       <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
         Thank you for registering for <strong>{event_reg.event_title}</strong>. Your registration has been received and is being processed.
@@ -3894,11 +3983,11 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
                 html_message += f'''
       <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
-        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
+        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundichairship.africa"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundichairship.africa"}</a>
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa</p>
     </div>
   </div>
 </div>
@@ -3910,16 +3999,13 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                     plain_message += f"{event_reg.confirmation_message}\n\n"
                 plain_message += "Best regards,\nBe 4 Africa Team"
 
-                send_mail(
-                    subject=subject,
-                    message=plain_message,
-                    from_email=django_settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
+                from .tasks import send_email_async
+                transaction.on_commit(lambda: send_email_async.delay(
+                    subject, plain_message, django_settings.DEFAULT_FROM_EMAIL, [user.email],
                     html_message=html_message,
-                    fail_silently=True,
-                )
+                ))
             except Exception:
-                pass  # Don't fail registration if email fails
+                logger.exception('Registration confirmation email failed for submission %s', submission.pk)
 
     @staticmethod
     def _build_qr_data(prefix, ref_id, qr_hash, request):
@@ -3972,8 +4058,14 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
     @action(detail=True, methods=['post'], url_path='check-in')
     def check_in(self, request, pk=None):
-        """Check in a submission using QR code data (admin/staff use)."""
-        submission = self.get_object()
+        """Check in a submission using QR code data (staff / usher only)."""
+        is_usher = getattr(getattr(request.user, 'profile', None), 'is_usher', False)
+        if not (request.user.is_staff or is_usher):
+            return Response({'detail': 'Staff or usher access required.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        # get_queryset() is scoped to the caller's own submissions; ushers
+        # check in other people's tickets.
+        submission = get_object_or_404(EventSubmission, pk=pk)
         qr_data = request.data.get('qr_data', '')
 
         if not qr_data:
@@ -4070,9 +4162,9 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         # dispute it.  This prevents abuse as a government-branded spam relay.
         if event_reg.send_confirmation_email and data['proxy_email']:
             try:
-                registrant_name = request.user.get_full_name() or request.user.username
-                proxy_name = data['proxy_name']
-                contact_email = event_reg.contact_email or 'info@burundi4africa.com'
+                registrant_name = escape(request.user.get_full_name() or request.user.username)
+                proxy_name = escape(data['proxy_name'])
+                contact_email = event_reg.contact_email or 'info@burundichairship.africa'
                 subject = f'Someone registered you for: {event_reg.event_title}'
 
                 html_message = f'''<!DOCTYPE html>
@@ -4086,7 +4178,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Notice</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 12px;">
@@ -4125,7 +4217,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa</p>
     </div>
   </div>
 </div>
@@ -4142,16 +4234,13 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                     f"Best regards,\nBe 4 Africa Team"
                 )
 
-                send_mail(
-                    subject=subject,
-                    message=plain_message,
-                    from_email=django_settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[data['proxy_email']],
+                from .tasks import send_email_async
+                transaction.on_commit(lambda: send_email_async.delay(
+                    subject, plain_message, django_settings.DEFAULT_FROM_EMAIL, [data['proxy_email']],
                     html_message=html_message,
-                    fail_silently=True,
-                )
+                ))
             except Exception:
-                pass  # Don't fail registration if email fails
+                logger.exception('Proxy registration email failed for submission %s', submission.pk)
 
         return Response(EventSubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
 
@@ -4159,7 +4248,9 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
     def upload_file(self, request):
         """Upload a file for event registration form fields."""
         import uuid
-        from django.core.files.storage import default_storage
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from .models import _private_storage
+        from .validators import validate_image_file, validate_document_file
 
         file_obj = request.FILES.get('file')
         if not file_obj:
@@ -4174,20 +4265,18 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Validate size
+        # Size + magic bytes + structure, via the shared model validators.
         is_image = ext in django_settings.ALLOWED_IMAGE_EXTENSIONS
-        max_size = django_settings.MAX_IMAGE_SIZE if is_image else django_settings.MAX_DOCUMENT_SIZE
-        if file_obj.size > max_size:
-            max_mb = max_size / (1024 * 1024)
-            return Response(
-                {'detail': f'File too large. Maximum size is {max_mb:.0f}MB.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        try:
+            (validate_image_file if is_image else validate_document_file)(file_obj)
+        except DjangoValidationError as e:
+            return Response({'detail': ' '.join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Save file
-        filename = f"registration_files/{uuid.uuid4().hex}_{file_obj.name}"
-        saved_path = default_storage.save(filename, file_obj)
-        file_url = default_storage.url(saved_path)
+        # Private storage: signed, expiring URL rather than a public guessable path.
+        storage = _private_storage()
+        filename = f"registration_files/{uuid.uuid4().hex}.{ext}"
+        saved_path = storage.save(filename, file_obj)
+        file_url = storage.url(saved_path)
 
         return Response({
             'url': file_url,
@@ -4340,11 +4429,12 @@ def verify_pending_otp(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-    # Verify OTP hash
+    # Verify OTP hash — count the attempt before comparing so a request that
+    # dies mid-way cannot be replayed for free.
     otp_code = str(otp_code).strip()
-    if pending['otp_hash'] != _hash_otp(otp_code):
-        pending['otp_attempts'] = attempts + 1
-        cache.set(cache_key, pending, timeout=1800)
+    pending['otp_attempts'] = attempts + 1
+    cache.set(cache_key, pending, timeout=1800)
+    if not hmac.compare_digest(str(pending['otp_hash']), _hash_otp(otp_code)):
         return Response(
             {'detail': 'Invalid OTP code'},
             status=status.HTTP_400_BAD_REQUEST
@@ -4356,22 +4446,30 @@ def verify_pending_otp(request):
     phone_number = pending.get('phone_number', '')
     gender = pending.get('gender', '')
 
+    if User.objects.filter(email__iexact=email).exists() or UserProfile.objects.filter(firebase_uid=firebase_uid).exists():
+        cache.delete(cache_key)
+        return Response(
+            {'detail': 'An account with this email already exists. Please sign in instead.'},
+            status=status.HTTP_409_CONFLICT,
+        )
+
     first_name, last_name = _split_display_name(name)
     username = _generate_unique_username(email, firebase_uid, display_name=name)
-    user = User.objects.create(
-        username=username,
-        email=email,
-        first_name=first_name,
-        last_name=last_name,
-    )
+    with transaction.atomic():
+        user = User.objects.create(
+            username=username,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+        )
 
-    profile = user.profile
-    profile.firebase_uid = firebase_uid
-    profile.phone_number = phone_number
-    profile.gender = gender
-    profile.is_email_verified = True
-    profile.email_verified_at = timezone.now()
-    profile.save()
+        profile = user.profile
+        profile.firebase_uid = firebase_uid
+        profile.phone_number = phone_number
+        profile.gender = gender
+        profile.is_email_verified = True
+        profile.email_verified_at = timezone.now()
+        profile.save()
 
     # Clean up cache
     cache.delete(cache_key)
@@ -4540,8 +4638,13 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
     - POST /api/support/tickets/{id}/mark_read/ — mark all admin replies as read
     """
     permission_classes = [IsAuthenticated]
-    throttle_classes = [SupportTicketThrottle]
     http_method_names = ['get', 'post']
+
+    def get_throttles(self):
+        # 5/hour applies to opening/replying to tickets, not to reading them.
+        if self.action in ('create', 'reply'):
+            return [SupportTicketThrottle()]
+        return super().get_throttles()
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -4724,9 +4827,8 @@ class PopupViewSet(viewsets.ReadOnlyModelViewSet):
 @permission_classes([IsAuthenticated])
 def login_history(request):
     """Return login history for the current user."""
-    entries = LoginHistory.objects.filter(user=request.user)[:50]
-    serializer = LoginHistorySerializer(entries, many=True)
-    return Response(serializer.data)
+    entries = LoginHistory.objects.filter(user=request.user)
+    return _paginated(request, entries, LoginHistorySerializer, page_size=50)
 
 
 @api_view(['GET'])
@@ -4734,8 +4836,7 @@ def login_history(request):
 def active_sessions(request):
     """Return active sessions for the current user."""
     sessions = ActiveSession.objects.filter(user=request.user)
-    serializer = ActiveSessionSerializer(sessions, many=True)
-    return Response(serializer.data)
+    return _paginated(request, sessions, ActiveSessionSerializer, page_size=50)
 
 
 @api_view(['DELETE'])
@@ -4744,10 +4845,15 @@ def revoke_session(request, session_id):
     """Revoke (terminate) a specific active session."""
     try:
         session = ActiveSession.objects.get(pk=session_id, user=request.user)
-        session.delete()
-        return Response({'message': 'Session revoked successfully'})
     except ActiveSession.DoesNotExist:
         return Response({'detail': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+    if session.refresh_jti:
+        # Kill the device's refresh token too, otherwise it just mints a new access token.
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+        for token in OutstandingToken.objects.filter(jti=session.refresh_jti, user=request.user):
+            BlacklistedToken.objects.get_or_create(token=token)
+    session.delete()
+    return Response({'message': 'Session revoked successfully'})
 
 
 @api_view(['POST'])
@@ -4773,7 +4879,8 @@ def change_password(request):
         ActiveSession.objects.filter(user=user).delete()
         # Generate new tokens for the current device
         refresh = RefreshToken.for_user(user)
-        _create_active_session(user, request, session_key=str(refresh.access_token.payload.get('jti', '')))
+        _create_active_session(user, request, session_key=str(refresh.access_token.payload.get('jti', '')),
+                               refresh_jti=str(refresh.payload.get('jti', '')))
         return Response({
             'message': 'Password changed successfully',
             'access': str(refresh.access_token),
@@ -4870,6 +4977,26 @@ def get_reactions(request):
     return Response({'reactions': result, 'user_reaction': user_reaction})
 
 
+# An article counts as read once the reader has been most of the way down it.
+READ_THRESHOLD_PERCENT = 60
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def read_articles(request):
+    """Ids of the articles this reader has already got through.
+
+    The list screens use it to mark items read, so it returns ids only rather
+    than the full progress rows.
+    """
+    ids = ReadingProgress.objects.filter(
+        user=request.user
+    ).filter(
+        Q(completed=True) | Q(progress_percent__gte=READ_THRESHOLD_PERCENT)
+    ).values_list('article_id', flat=True)
+    return Response({'article_ids': list(ids)})
+
+
 @api_view(['POST'])
 @permission_classes([IsVerifiedUser])
 def update_reading_progress(request):
@@ -4895,15 +5022,17 @@ def update_reading_progress(request):
 class ArticleSeriesViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: View article series."""
     permission_classes = [AllowAny]
-    queryset = ArticleSeries.objects.filter(is_active=True).prefetch_related('articles')
+    queryset = ArticleSeries.objects.filter(is_active=True).annotate(_article_count=Count('articles'))
     serializer_class = ArticleSeriesSerializer
 
     @action(detail=True, methods=['get'])
     def articles(self, request, pk=None):
         """Get articles in this series."""
         series = self.get_object()
-        articles = series.articles.select_related('category').prefetch_related('media').annotate(
-            comment_count=Count('comments', distinct=True),
+        articles = series.articles.select_related('category').prefetch_related(
+            'media', _recent_likes_prefetch(ArticleLike, 'article'),
+        ).annotate(
+            comment_count=_article_comment_count(),
         )
         if request.user.is_authenticated:
             articles = articles.annotate(
@@ -5100,13 +5229,79 @@ class ConversationViewSet(viewsets.ModelViewSet):
         if not content:
             return Response({'detail': 'Message content required'}, status=400)
 
-        from django.utils.html import escape
         msg = DirectMessage.objects.create(
-            conversation=convo, sender=request.user, content=escape(content)
+            conversation=convo, sender=request.user, content=content
         )
         convo.last_message_at = msg.created_at
         convo.save(update_fields=['last_message_at'])
         return Response(DirectMessageSerializer(msg, context={'request': request}).data, status=201)
+
+
+def _require_explore_terms(request):
+    """Return a 403 Response if the caller has not accepted the Explore terms.
+
+    The app gates its composer on this too, but the acceptance record is what
+    a moderation decision rests on, so the server has to be the one enforcing
+    it — a direct API call must not be able to skip it.
+    """
+    profile = getattr(request.user, 'profile', None)
+    if not profile or not profile.explore_terms_accepted_at:
+        return Response(
+            {'detail': 'Accept the Explore community terms before posting.',
+             'terms_required': True},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
+
+
+def _vet_post_text(request, content):
+    """Run the same checks a reply gets: ban, profanity, length.
+
+    Posts used to skip all three, so an account banned for repeated profanity
+    could still publish to the feed it was banned from commenting on.
+    Returns a 4xx Response, or None when the text is fine.
+    """
+    from .validators import check_profanity, check_comment_ban, record_profanity_strike
+
+    content = (content or '').strip()
+    if len(content) > Discussion.MAX_CONTENT_LENGTH:
+        return Response(
+            {'detail': f'Post too long (max {Discussion.MAX_CONTENT_LENGTH} characters).'},
+            status=status.HTTP_400_BAD_REQUEST)
+
+    reference_id = getattr(getattr(request.user, 'profile', None), 'reference_id',
+                           f'B{request.user.pk:06d}')
+    device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+
+    is_banned, ban_reason = check_comment_ban(request.user, device_id)
+    if is_banned:
+        return Response({'detail': ban_reason, 'reference_id': reference_id},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    if not content:
+        return None
+    is_clean, bad_word = check_profanity(content)
+    if is_clean:
+        return None
+
+    strike_count, is_now_banned = record_profanity_strike(
+        request.user, device_id,
+        flagged_content=content, matched_word=bad_word, content_type='discussion_post',
+        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+    )
+    if is_now_banned:
+        return Response(
+            {'detail': 'You have been permanently banned from posting due to '
+                       'repeated profanity violations.',
+             'reference_id': reference_id},
+            status=status.HTTP_403_FORBIDDEN)
+    remaining = 5 - strike_count
+    return Response(
+        {'detail': 'Your post contains inappropriate language. Please keep the '
+                   f'conversation respectful. Warning: {remaining} strike(s) '
+                   'remaining before permanent ban.',
+         'reference_id': reference_id},
+        status=status.HTTP_400_BAD_REQUEST)
 
 
 class DiscussionViewSet(viewsets.ModelViewSet):
@@ -5123,11 +5318,33 @@ class DiscussionViewSet(viewsets.ModelViewSet):
 
         # Counting reposts and checking "did I like this" per row turned the
         # feed into one query per post; both are annotations now.
-        qs = qs.annotate(repost_total=Count('reposts', distinct=True))
+        qs = qs.annotate(repost_total=Coalesce(Subquery(
+            Discussion.objects.filter(repost_of=OuterRef('pk')).order_by().values('repost_of')
+            .annotate(c=Count('pk')).values('c')[:1], output_field=IntegerField()), 0))
         if self.request.user.is_authenticated:
             qs = qs.annotate(liked_by_me=Exists(
                 DiscussionLike.objects.filter(
                     discussion=OuterRef('pk'), user=self.request.user)))
+            # "Which option did I pick" was a query per poll on the page.
+            qs = qs.prefetch_related(Prefetch(
+                'poll__votes',
+                queryset=PollVote.objects.filter(user=self.request.user),
+                to_attr='viewer_votes'))
+
+        # Posts pulled from the feed pending review stay visible to their
+        # author and to staff, so neither is left wondering where they went.
+        user = self.request.user
+        if not (user.is_authenticated and user.is_staff):
+            visible = Q(is_hidden=False)
+            if user.is_authenticated:
+                visible |= Q(author=user)
+            qs = qs.filter(visible)
+
+        # A block hides both directions: their posts, and reposts of them.
+        hidden_authors = Block.hidden_user_ids(user)
+        if hidden_authors:
+            qs = qs.exclude(author_id__in=hidden_authors).exclude(
+                repost_of__author_id__in=hidden_authors)
 
         # ?feed=following narrows the Explore feed to people the caller follows.
         if self.request.query_params.get('feed') == 'following':
@@ -5145,13 +5362,12 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         if topic:
             qs = qs.filter(topic_id=topic)
 
-        # ?tag=water matches "#water" but not "#watershed" — a bare icontains
-        # would collide with every longer tag that starts the same way.
-        tag = (self.request.query_params.get('tag') or '').lstrip('#').strip()
+        # Tags are extracted into their own indexed table on save, so this
+        # is an index lookup rather than a regex scan over every post body.
+        tag = (self.request.query_params.get('tag') or '').lstrip('#').strip().lower()
         if tag:
-            escaped = re.escape(tag)
-            qs = qs.filter(content__iregex=r'#' + escaped + r'\b')
-        return qs.order_by('-is_pinned', '-created_at')
+            qs = qs.filter(tags__tag=tag[:64])
+        return qs.order_by('-is_pinned', '-created_at', '-id')
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
@@ -5159,7 +5375,10 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         return [AllowAny()]
 
     def create(self, request, *args, **kwargs):
-        resp = _require_verified_email(request) or _require_complete_profile(request)
+        resp = (_require_verified_email(request)
+                or _require_complete_profile(request)
+                or _require_explore_terms(request)
+                or _vet_post_text(request, request.data.get('content')))
         if resp:
             return resp
         return super().create(request, *args, **kwargs)
@@ -5282,7 +5501,28 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         if instance.author != request.user:
             return Response({'detail': 'You can only edit your own discussions.'}, status=status.HTTP_403_FORBIDDEN)
-        return super().update(request, *args, **kwargs)
+
+        # An unbounded edit lets a post gather reach on one text and then carry
+        # another, so the window is short and the change is marked.
+        age = (timezone.now() - instance.created_at).total_seconds()
+        if age > Discussion.EDIT_WINDOW_SECONDS:
+            minutes = Discussion.EDIT_WINDOW_SECONDS // 60
+            return Response(
+                {'detail': f'Edit window has expired ({minutes} minutes).'},
+                status=status.HTTP_403_FORBIDDEN)
+
+        content = request.data.get('content')
+        if content is not None and content != instance.content:
+            resp = _vet_post_text(request, content)
+            if resp:
+                return resp
+
+        response = super().update(request, *args, **kwargs)
+        if response.status_code < 300:
+            stamp = timezone.now()
+            Discussion.objects.filter(pk=instance.pk).update(edited_at=stamp)
+            response.data['edited_at'] = stamp
+        return response
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -5295,9 +5535,14 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         """Get or post replies to a discussion."""
         discussion = self.get_object()
         if request.method == 'GET':
-            replies = discussion.replies.select_related('author').all()
-            serializer = DiscussionReplySerializer(replies, many=True, context={'request': request})
-            return Response(serializer.data)
+            replies = discussion.replies.filter(author__is_active=True).select_related('author', 'author__profile')
+            hidden_authors = Block.hidden_user_ids(request.user)
+            if hidden_authors:
+                replies = replies.exclude(author_id__in=hidden_authors)
+            if request.user.is_authenticated:
+                replies = replies.annotate(_is_liked=Exists(
+                    DiscussionReplyLike.objects.filter(user=request.user, comment=OuterRef('pk'))))
+            return _paginated(request, replies, DiscussionReplySerializer, page_size=50)
 
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required'}, status=401)
@@ -5307,7 +5552,6 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         if discussion.is_locked:
             return Response({'detail': 'Discussion is locked'}, status=400)
 
-        from django.utils.html import escape
         content = request.data.get('content', '').strip()
         if not content:
             return Response({'detail': 'Content required'}, status=400)
@@ -5331,7 +5575,6 @@ class DiscussionViewSet(viewsets.ModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=403)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=400)
-        content = escape(content)
 
         parent_id = request.data.get('parent')
         reply = DiscussionReply.objects.create(
@@ -5376,13 +5619,16 @@ class DiscussionViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Reply not found.'}, status=status.HTTP_404_NOT_FOUND)
         if reply.author != request.user and not request.user.is_staff:
             return Response({'detail': 'You can only delete your own replies.'}, status=status.HTTP_403_FORBIDDEN)
-        reply.delete()
+        with transaction.atomic():
+            removed = 1 + reply.children.count()  # children cascade with the parent
+            reply.delete()
+            if not Discussion.objects.filter(pk=pk, reply_count__gte=removed).update(reply_count=F('reply_count') - removed):
+                Discussion.objects.filter(pk=pk).update(reply_count=0)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['patch'], url_path='replies/(?P<reply_id>[0-9]+)/edit',
             permission_classes=[IsVerifiedUser])
     def edit_reply(self, request, pk=None, reply_id=None):
-        from django.utils.html import escape
         try:
             reply = DiscussionReply.objects.get(pk=reply_id, discussion_id=pk)
         except DiscussionReply.DoesNotExist:
@@ -5412,7 +5658,7 @@ class DiscussionViewSet(viewsets.ModelViewSet):
                 return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
             remaining = 5 - strike_count
             return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
-        reply.content = escape(content)
+        reply.content = content
         reply.updated_at = timezone.now()
         reply.save(update_fields=['content', 'updated_at'])
         return Response(DiscussionReplySerializer(reply, context={'request': request}).data)
@@ -5424,16 +5670,11 @@ class DiscussionViewSet(viewsets.ModelViewSet):
             reply = DiscussionReply.objects.get(pk=reply_id, discussion_id=pk)
         except DiscussionReply.DoesNotExist:
             return Response({'detail': 'Reply not found.'}, status=status.HTTP_404_NOT_FOUND)
-        like, created = DiscussionReplyLike.objects.get_or_create(user=request.user, comment=reply)
-        if not created:
-            like.delete()
-            DiscussionReply.objects.filter(pk=reply.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            DiscussionReply.objects.filter(pk=reply.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        reply.refresh_from_db()
-        return Response({'is_liked': is_liked, 'like_count': reply.like_count})
+        new_count, is_liked = _atomic_toggle_like(
+            DiscussionReply, DiscussionReplyLike,
+            {'user': request.user, 'comment': reply}, reply,
+        )
+        return Response({'is_liked': is_liked, 'like_count': new_count})
 
 
 class PollViewSet(viewsets.ReadOnlyModelViewSet):
@@ -5466,21 +5707,24 @@ class PollViewSet(viewsets.ReadOnlyModelViewSet):
         except PollOption.DoesNotExist:
             return Response({'detail': 'Invalid option'}, status=404)
 
-        if not poll.multiple_choice:
-            # Single choice - remove existing votes
-            existing = PollVote.objects.filter(user=request.user, poll=poll)
-            if existing.exists():
+        with transaction.atomic():
+            # Lock the poll row so two concurrent votes from one user serialise;
+            # the (user, option) unique constraint is the last line of defence.
+            Poll.objects.select_for_update().filter(pk=poll.pk).exists()
+            if not poll.multiple_choice:
+                # Single choice - remove existing votes
+                existing = PollVote.objects.filter(user=request.user, poll=poll)
                 for v in existing:
                     PollOption.objects.filter(pk=v.option_id).update(vote_count=F('vote_count') - 1)
                     Poll.objects.filter(pk=poll.pk).update(total_votes=F('total_votes') - 1)
                 existing.delete()
 
-        if PollVote.objects.filter(user=request.user, option=option).exists():
-            return Response({'detail': 'Already voted for this option'}, status=400)
+            if PollVote.objects.filter(user=request.user, option=option).exists():
+                return Response({'detail': 'Already voted for this option'}, status=400)
 
-        PollVote.objects.create(user=request.user, poll=poll, option=option)
-        PollOption.objects.filter(pk=option.pk).update(vote_count=F('vote_count') + 1)
-        Poll.objects.filter(pk=poll.pk).update(total_votes=F('total_votes') + 1)
+            PollVote.objects.create(user=request.user, poll=poll, option=option)
+            PollOption.objects.filter(pk=option.pk).update(vote_count=F('vote_count') + 1)
+            Poll.objects.filter(pk=poll.pk).update(total_votes=F('total_votes') + 1)
 
         poll.refresh_from_db()
         return Response(PollSerializer(poll, context={'request': request}).data)
@@ -5533,7 +5777,7 @@ class LiveQAViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = LiveQASessionSerializer
 
     def get_queryset(self):
-        return LiveQASession.objects.filter(is_active=True).select_related(
+        return LiveQASession.objects.filter(is_active=True).annotate(_question_count=Count('questions', filter=Q(questions__is_approved=True))).select_related(
             'event', 'event_registration', 'moderator'
         ).prefetch_related('questions')
 
@@ -5757,8 +6001,11 @@ def auto_translate(request):
         source_name = lang_names[source_lang]
         target_name = lang_names[target_lang]
 
+        model = getattr(django_settings, 'GEMINI_MODEL', 'gemini-2.5-flash')
         resp = ext_requests.post(
-            f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}',
+            f'https://generativelanguage.googleapis.com/v1beta/models/'
+            f'{model}:generateContent',
+            headers={'x-goog-api-key': api_key},
             json={
                 # System instruction is separate from user content to prevent
                 # prompt injection — the user text is never in the instruction.
@@ -6140,6 +6387,7 @@ def content_versions(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AnonRateThrottle])
 def validate_password_strength(request):
     """Validate password strength and return score."""
     password = request.data.get('password', '')
@@ -6184,8 +6432,17 @@ def notify_explore(recipient, actor, verb, discussion=None):
     if not recipient or not actor or recipient.id == actor.id:
         return None
 
-    note = ExploreNotification.objects.create(
+    # Blocking silences notifications in both directions.
+    if Block.objects.filter(
+            Q(blocker=recipient, blocked=actor) | Q(blocker=actor, blocked=recipient)).exists():
+        return None
+
+    # Unliking and re-liking used to fire a fresh push each time, which turned
+    # the like button into a ten-a-minute channel aimed at one person.
+    note, created = ExploreNotification.objects.get_or_create(
         recipient=recipient, actor=actor, verb=verb, discussion=discussion)
+    if not created:
+        return note
 
     name = f'{actor.first_name} {actor.last_name}'.strip() or actor.username
     body = {
@@ -6257,24 +6514,59 @@ def mark_explore_notifications_read(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+def widget_feature(request):
+    """Small payload for the phone home-screen widget.
+
+    Deliberately flat and tiny: a widget refreshes on the system's schedule and
+    renders in a few hundred milliseconds, so it gets one item, not a feed.
+    Featured articles win; otherwise the newest published one.
+    """
+    now = timezone.now()
+    published = Article.objects.select_related('category').public(now)
+
+    article = (published.filter(is_featured=True).order_by('-publish_date', '-id').first()
+               or published.order_by('-publish_date', '-id').first())
+
+    if article is None:
+        return Response({'title': None})
+
+    image = None
+    if article.image:
+        image = request.build_absolute_uri(article.image.url)
+
+    return Response({
+        'title': article.title,
+        'category': article.category.name if article.category else '',
+        'published_at': article.publish_date,
+        'image': image,
+        'is_featured': article.is_featured,
+        'deep_link': f'/article/{article.id}',
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def trending_tags(request):
     """The hashtags people are actually using, so tags are discoverable
-    instead of only reachable by already knowing one exists."""
-    from collections import Counter
+    instead of only reachable by already knowing one exists.
 
-    recent = Discussion.objects.order_by('-created_at').values_list(
-        'content', flat=True)[:500]
-    counter = Counter()
-    for content in recent:
-        # Count each tag once per post, so repeating it in one post can't
-        # push it up the list.
-        found = {m.lower() for m in re.findall(r'#([\w\u00C0-\u024F]+)', content or '')}
-        for tag in found:
-            counter[tag] += 1
+    Reads the DiscussionTag index rather than regexing 500 post bodies, and
+    caches the result: the list is the same for every viewer and moves slowly.
+    """
+    from django.core.cache import cache
 
-    return Response([
-        {'tag': tag, 'count': count} for tag, count in counter.most_common(12)
-    ])
+    cached = cache.get('explore:trending_tags')
+    if cached is not None:
+        return Response(cached)
+
+    rows = (DiscussionTag.objects
+            .filter(discussion__is_hidden=False)
+            .values('tag')
+            .annotate(count=Count('discussion', distinct=True))
+            .order_by('-count', 'tag')[:12])
+    payload = [{'tag': r['tag'], 'count': r['count']} for r in rows]
+    cache.set('explore:trending_tags', payload, 300)
+    return Response(payload)
 
 
 @api_view(['GET'])
@@ -6342,34 +6634,105 @@ def report_content(request):
             return Response({'detail': 'You cannot report yourself.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
+    detail = (request.data.get('detail') or '')[:2000]
     report, created = ContentReport.objects.get_or_create(
         reporter=request.user,
         discussion=discussion,
         reported_user=reported_user,
-        defaults={'reason': reason, 'detail': (request.data.get('detail') or '')[:2000]},
+        defaults={'reason': reason, 'detail': detail},
     )
-    # Re-reporting the same thing is a no-op rather than an error — the user
-    # only needs to know it has been passed on.
+    if not created and report.status == 'open':
+        # Someone re-reporting has usually changed their mind about severity,
+        # so the newer reason is the one a moderator should see.
+        report.reason = reason
+        report.detail = detail or report.detail
+        report.save(update_fields=['reason', 'detail'])
+
+    # Enough independent reports and the post leaves the feed until a
+    # moderator rules on it. The author still sees their own post.
+    if discussion is not None and not discussion.is_hidden:
+        open_reports = ContentReport.objects.filter(
+            discussion=discussion, status='open').count()
+        if open_reports >= Discussion.AUTO_HIDE_REPORTS:
+            Discussion.objects.filter(pk=discussion.pk).update(is_hidden=True)
+
     return Response(
         {'detail': 'Thanks — our moderators will take a look.', 'created': created},
         status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_block(request, user_id):
+    """Block or unblock another account.
+
+    App Store guideline 1.2 and Play's UGC policy both require this alongside
+    reporting: blocking hides the account's posts and replies from the blocker
+    and silences notifications between them, in both directions.
+    """
+    target = get_object_or_404(User, pk=user_id, is_active=True)
+    if target.id == request.user.id:
+        return Response({'detail': 'You cannot block yourself.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    existing = Block.objects.filter(blocker=request.user, blocked=target).first()
+    if existing:
+        existing.delete()
+        return Response({'is_blocked': False})
+
+    Block.objects.create(blocker=request.user, blocked=target)
+    # A block undoes any following in either direction — staying subscribed to
+    # someone you just blocked makes no sense.
+    Follow.objects.filter(
+        Q(follower=request.user, following=target)
+        | Q(follower=target, following=request.user)).delete()
+    return Response({'is_blocked': True})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def blocked_users(request):
+    """Accounts the caller has blocked, so they can undo it."""
+    users = _profile_payload_queryset(
+        request, User.objects.filter(blocks_against__blocker=request.user)).order_by('id')
+    return Response([_public_profile_payload(u, request) for u in users[:200]])
 
 
 # ══════════════════════════════════════════════════════════════
 # Social graph — follow / public profiles
 # ══════════════════════════════════════════════════════════════
 
+def _profile_payload_queryset(request, qs):
+    """Attach everything `_public_profile_payload` would otherwise count one
+    user at a time — four COUNTs per row adds up fast over a followers list."""
+    qs = qs.select_related('profile').annotate(
+        post_total=Count('discussions', distinct=True),
+        follower_total=Count('follower_set', distinct=True),
+        following_total=Count('following_set', distinct=True),
+    )
+    if request.user.is_authenticated:
+        qs = qs.annotate(followed_by_me=Exists(
+            Follow.objects.filter(follower=request.user, following=OuterRef('pk'))))
+    return qs
+
+
 def _public_profile_payload(user, request):
-    """Everything the profile header and a feed avatar need."""
+    """Everything the profile header and a feed avatar need.
+
+    Counts come from `_profile_payload_queryset` where the caller annotated
+    them; the fallbacks below are for one-off lookups.
+    """
     from .utils import user_handle
     profile = getattr(user, 'profile', None)
     avatar = None
     if profile and profile.profile_picture:
         avatar = request.build_absolute_uri(profile.profile_picture.url)
-    is_following = False
-    if request.user.is_authenticated and request.user.id != user.id:
-        is_following = Follow.objects.filter(
-            follower=request.user, following=user).exists()
+    is_following = getattr(user, 'followed_by_me', None)
+    if is_following is None:
+        is_following = False
+        if request.user.is_authenticated and request.user.id != user.id:
+            is_following = Follow.objects.filter(
+                follower=request.user, following=user).exists()
     # A verified user's approved request carries their honorific and official
     # role — surface those automatically rather than making them retype it.
     honorific = ''
@@ -6393,19 +6756,35 @@ def _public_profile_payload(user, request):
         'bio': profile.bio if profile else '',
         'organization': profile.organization if profile else '',
         'role': (profile.role if profile else '') or official_role,
-        'post_count': Discussion.objects.filter(author=user).count(),
-        'follower_count': Follow.objects.filter(following=user).count(),
-        'following_count': Follow.objects.filter(follower=user).count(),
+        'post_count': _count_or(user, 'post_total',
+                                 lambda: Discussion.objects.filter(author=user).count()),
+        'follower_count': _count_or(user, 'follower_total',
+                                    lambda: Follow.objects.filter(following=user).count()),
+        'following_count': _count_or(user, 'following_total',
+                                     lambda: Follow.objects.filter(follower=user).count()),
         'is_following': is_following,
+        'is_blocked': _is_blocked(request, user),
         'is_self': request.user.is_authenticated and request.user.id == user.id,
     }
+
+
+def _count_or(obj, attr, fallback):
+    value = getattr(obj, attr, None)
+    return value if value is not None else fallback()
+
+
+def _is_blocked(request, user):
+    if not request.user.is_authenticated or request.user.id == user.id:
+        return False
+    return Block.objects.filter(blocker=request.user, blocked=user).exists()
 
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def public_user_profile(request, user_id):
     """Public profile header for the feed's author pages."""
-    user = get_object_or_404(User, pk=user_id, is_active=True)
+    user = get_object_or_404(
+        _profile_payload_queryset(request, User.objects.filter(is_active=True)), pk=user_id)
     return Response(_public_profile_payload(user, request))
 
 
@@ -6438,11 +6817,19 @@ def user_followers(request, user_id):
     """Who follows this user, or who they follow with ?direction=following."""
     user = get_object_or_404(User, pk=user_id, is_active=True)
     if request.GET.get('direction') == 'following':
-        users = User.objects.filter(follower_set__follower=user)
+        users = User.objects.filter(follower_set__follower=user, is_active=True)
     else:
-        users = User.objects.filter(following_set__following=user)
-    users = users.select_related('profile')[:200]
-    return Response([_public_profile_payload(u, request) for u in users])
+        users = User.objects.filter(following_set__following=user, is_active=True)
+    hidden = Block.hidden_user_ids(request.user)
+    if hidden:
+        users = users.exclude(pk__in=hidden)
+    users = _profile_payload_queryset(request, users).order_by('id')
+
+    paginator = PageNumberPagination()
+    paginator.page_size = 50
+    page = paginator.paginate_queryset(users, request)
+    return paginator.get_paginated_response(
+        [_public_profile_payload(u, request) for u in page])
 
 
 # ══════════════════════════════════════════════════════════════
@@ -6511,15 +6898,11 @@ def event_comments(request, event_id):
 
     if request.method == 'GET':
         comments = EventComment.objects.filter(
-            event=event, parent__isnull=True, is_approved=True
+            event=event, parent__isnull=True, is_approved=True, user__is_active=True,
         ).select_related('user', 'user__profile').prefetch_related(
             'replies', 'replies__user', 'replies__user__profile'
         ).order_by('-created_at')
-        serializer = EventCommentSerializer(comments, many=True, context={'request': request})
-        return Response({
-            'count': comments.count(),
-            'results': serializer.data
-        })
+        return _paginated(request, comments, EventCommentSerializer, page_size=50)
 
     # POST - create a comment
     if not request.user.is_authenticated:
@@ -6559,9 +6942,8 @@ def event_comments(request, event_id):
         if parent.parent is not None:
             parent = parent.parent
 
-    from django.utils.html import escape
     comment = EventComment.objects.create(
-        event=event, user=request.user, parent=parent, content=escape(content),
+        event=event, user=request.user, parent=parent, content=content,
     )
 
     # Parse @mentions (privacy-safe — username is stored as email in DB)
@@ -6614,7 +6996,6 @@ def event_comment_delete(request, event_id, comment_id):
 @permission_classes([IsVerifiedUser])
 def event_comment_edit(request, event_id, comment_id):
     """Edit own comment on an event within 2-minute window."""
-    from django.utils.html import escape
     comment = get_object_or_404(EventComment, pk=comment_id, event_id=event_id)
     if comment.user != request.user:
         return Response({'detail': 'You can only edit your own comments.'}, status=403)
@@ -6641,7 +7022,7 @@ def event_comment_edit(request, event_id, comment_id):
             return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=403)
         remaining = 5 - strike_count
         return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=400)
-    comment.content = escape(content)
+    comment.content = content
     comment.updated_at = timezone.now()
     comment.save(update_fields=['content', 'updated_at'])
     return Response(EventCommentSerializer(comment, context={'request': request}).data)
@@ -6653,32 +7034,28 @@ def event_comment_edit(request, event_id, comment_id):
 def event_comment_toggle_like(request, event_id, comment_id):
     """Toggle like on an event comment."""
     comment = get_object_or_404(EventComment, pk=comment_id, event_id=event_id)
-    like, created = EventCommentLike.objects.get_or_create(user=request.user, comment=comment)
-    if not created:
-        like.delete()
-        EventComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
-        is_liked = False
-    else:
-        EventComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
-        is_liked = True
-    comment.refresh_from_db()
-    return Response({'is_liked': is_liked, 'like_count': comment.like_count})
+    new_count, is_liked = _atomic_toggle_like(
+        EventComment, EventCommentLike,
+        {'user': request.user, 'comment': comment}, comment,
+    )
+    return Response({'is_liked': is_liked, 'like_count': new_count})
 
 
 @api_view(['GET'])
 @permission_classes([IsVerifiedUser])
 def event_attendees(request, event_id):
     """List attendees for event networking (name, badge, nationality only - no email/phone)."""
-    event = get_object_or_404(Event, pk=event_id)
+    # The app passes the EventRegistration id (EventRegistration has no link
+    # to Event; the old event_registration__event lookup raised FieldError).
+    event_reg = get_object_or_404(EventRegistration, pk=event_id)
     submissions = EventSubmission.objects.filter(
-        event_registration__event=event,
+        event_registration=event_reg,
         status__in=['pending', 'approved'],
     )
     attendee_users = User.objects.filter(
-        id__in=submissions.values_list('user_id', flat=True)
-    ).select_related('profile').distinct()
-    serializer = EventAttendeeSerializer(attendee_users, many=True, context={'request': request})
-    return Response({'count': attendee_users.count(), 'results': serializer.data})
+        id__in=submissions.values_list('user_id', flat=True), is_active=True,
+    ).select_related('profile').order_by('first_name', 'id')
+    return _paginated(request, attendee_users, EventAttendeeSerializer, page_size=50)
 
 
 @api_view(['POST'])
@@ -6715,13 +7092,19 @@ def subscribe_newsletter(request):
     # Check if already subscribed
     existing = NewsletterSubscriber.objects.filter(email__iexact=email).first()
     if existing:
-        # Re-activate if previously unsubscribed, update details
-        existing.name = name
-        existing.phone_number = phone_number
-        existing.is_active = True
-        if user and not existing.user:
+        # Only the verified owner of the address may change an existing
+        # subscription; anonymous callers must not overwrite someone else's
+        # name/phone (or learn that the address exists — same 200 either way).
+        owns = user is not None and (
+            existing.user_id == user.id
+            or (existing.user_id is None and (user.email or '').lower() == email.lower())
+        )
+        if owns:
+            existing.name = name
+            existing.phone_number = phone_number
+            existing.is_active = True
             existing.user = user
-        existing.save()
+            existing.save()
         return Response({'detail': 'Subscription updated successfully.', 'subscribed': True})
 
     NewsletterSubscriber.objects.create(
@@ -6913,6 +7296,8 @@ def _resolve_share(kind, pk, lang):
         raise Http404('Not available')
     if getattr(obj, 'status', 'published') not in ('published', None):
         raise Http404('Not available')
+    if getattr(obj, 'is_hidden', False):
+        raise Http404('Not available')
 
     body = re.sub(r'<[^>]+>', ' ', _share_localised(obj, body_field, lang))
     body = re.sub(r'\s+', ' ', body).strip()
@@ -6925,9 +7310,9 @@ def _resolve_share(kind, pk, lang):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-# Link previews are fetched by crawlers and by every recipient at once;
-# the shared anon rate limit would turn a popular post into a broken card.
-@throttle_classes([])
+# Link previews are fetched by crawlers and by every recipient at once, so the
+# shared anon rate limit is too tight — but rendering is CPU-bound, so cap per IP.
+@throttle_classes([ShareCardThrottle])
 def share_card_image(request, kind, pk):
     """The 1200x630 JPEG a chat app shows for a shared link.
 
@@ -7218,16 +7603,16 @@ def _send_yd_admin_notification(application):
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;">New Continental Dialogue Application</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa</p>
     </div>
     <div style="padding:32px;">
       <div style="background:#f7fafc;border-radius:12px;padding:20px;margin:0 0 24px;">
         <table style="width:100%;border-collapse:collapse;">
-          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Name</td><td style="padding:6px 0;color:#2d3748;font-size:14px;font-weight:600;">{application.first_name} {application.last_name}</td></tr>
-          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Email</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{application.email}</td></tr>
-          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Nationality</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{application.get_nationality_display()}</td></tr>
-          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Organization</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{application.organization}</td></tr>
-          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Position</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{application.position}</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Name</td><td style="padding:6px 0;color:#2d3748;font-size:14px;font-weight:600;">{escape(application.first_name)} {escape(application.last_name)}</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Email</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{escape(application.email)}</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Nationality</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{escape(application.get_nationality_display())}</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Organization</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{escape(application.organization)}</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Position</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{escape(application.position)}</td></tr>
         </table>
       </div>
       <p style="color:#4a5568;font-size:14px;">Review this application in the admin panel.</p>
@@ -7236,12 +7621,10 @@ def _send_yd_admin_notification(application):
 </div>
 </body></html>'''
 
-        def _send():
-            send_mail(
-                subject, '', django_settings.DEFAULT_FROM_EMAIL,
-                admin_emails, html_message=html_message, fail_silently=True,
-            )
-        threading.Thread(target=_send, daemon=True).start()
+        from .tasks import send_email_async
+        transaction.on_commit(lambda: send_email_async.delay(
+            subject, '', django_settings.DEFAULT_FROM_EMAIL, admin_emails, html_message=html_message,
+        ))
     except Exception:
         logger.exception('Continental Dialogue admin notification email failed')
 
@@ -7332,7 +7715,7 @@ def _notify_yd(application, event_key):
     lang = _get_yd_user_lang(application)
     is_fr = lang == 'fr'
     event = application.event
-    _support_email = (event.support_email if event and event.support_email else 'info@burundi4africa.com')
+    _support_email = (event.support_email if event and event.support_email else 'info@burundichairship.africa')
 
     EVENT_CONFIG = {
         'submitted': {
@@ -7620,16 +8003,12 @@ def _notify_yd(application, event_key):
 
     results = {'email': False, 'push': False, 'in_app': False, 'push_detail': '', 'in_app_detail': ''}
 
-    # 1. Send email (best-effort, threaded)
+    # 1. Send email (best-effort, via Celery after the surrounding transaction commits)
     try:
-        _send_yd_applicant_email(
-            application,
-            config['subject'],
-            config['heading'],
-            config['badge_color'],
-            body_html,
-            lang=lang,
-        )
+        from .tasks import send_yd_applicant_email_async
+        transaction.on_commit(lambda: send_yd_applicant_email_async.delay(
+            application.pk, config['subject'], config['heading'], config['badge_color'], body_html, lang,
+        ))
         results['email'] = True
     except Exception:
         logger.exception('Continental Dialogue email notification failed for user %s', application.user_id)
@@ -7664,54 +8043,10 @@ def _notify_yd(application, event_key):
             'action_value': config.get('push_route', '/youth-dialogue'),
         }
 
-        def _send_push():
-            try:
-                from core.tasks import send_push_notification_async
-                send_push_notification_async.delay(
-                    [application.user_id],
-                    config['push_title'],
-                    config['push_body'],
-                    push_data,
-                )
-                logger.info('Push dispatched via Celery for Continental Dialogue user %s (%d tokens)', application.user_id, len(all_tokens))
-            except Exception:
-                # Celery/Redis unavailable — send synchronously as fallback
-                try:
-                    from config.firebase import initialize_firebase
-                    initialize_firebase()
-                    import firebase_admin.messaging as messaging
-                    msg = messaging.MulticastMessage(
-                        tokens=all_tokens,
-                        notification=messaging.Notification(
-                            title=config['push_title'],
-                            body=config['push_body'],
-                        ),
-                        data=push_data,
-                        android=messaging.AndroidConfig(
-                            priority='high',
-                            notification=messaging.AndroidNotification(
-                                channel_id='default_channel',
-                                priority='max',
-                                default_sound=True,
-                                default_vibrate_timings=True,
-                            ),
-                        ),
-                        apns=messaging.APNSConfig(
-                            headers={'apns-priority': '10'},
-                            payload=messaging.APNSPayload(
-                                aps=messaging.Aps(
-                                    sound='default',
-                                    badge=1,
-                                    content_available=True,
-                                ),
-                            ),
-                        ),
-                    )
-                    resp = messaging.send_each_for_multicast(msg)
-                    logger.info('Push sent synchronously for user %s: %d success, %d failed', application.user_id, resp.success_count, resp.failure_count)
-                except Exception:
-                    logger.exception('Push notification failed for Continental Dialogue user %s', application.user_id)
-        threading.Thread(target=_send_push, daemon=True).start()
+        from core.tasks import send_push_notification_async
+        transaction.on_commit(lambda: send_push_notification_async.delay(
+            [application.user_id], config['push_title'], config['push_body'], push_data,
+        ))
         results['push'] = True
         results['push_detail'] = f'{len(all_tokens)} device(s)'
 
@@ -7850,7 +8185,8 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
                 f'</div>'
             )
 
-        greeting = f'Cher(e) <strong>{application.first_name}</strong>,' if is_fr else f'Dear <strong>{application.first_name}</strong>,'
+        safe_first = escape(application.first_name)
+        greeting = f'Cher(e) <strong>{safe_first}</strong>,' if is_fr else f'Dear <strong>{safe_first}</strong>,'
         programme_label = 'Programme Dialogue Continental' if is_fr else 'Continental Dialogue Programme'
         footer_year = '2026'
 
@@ -7870,7 +8206,7 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
         app_btn_label = "Ouvrir l'application B4Africa" if is_fr else 'Open B4Africa App'
 
         # Support email
-        support_email = (event.support_email if event and event.support_email else 'info@burundi4africa.com')
+        support_email = (event.support_email if event and event.support_email else 'info@burundichairship.africa')
 
         html_message = f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -7946,11 +8282,12 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
                 except Exception:
                     logger.warning('Failed to embed image %s for email', cid_name)
 
-            email.send(fail_silently=True)
+            email.send(fail_silently=False)
 
-        threading.Thread(target=_send, daemon=True).start()
+        _send()
     except Exception:
         logger.exception('Continental Dialogue applicant email failed')
+        raise
 
 
 class YouthDialogueViewSet(viewsets.GenericViewSet):
@@ -8191,8 +8528,8 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @action(detail=False, methods=['post'], url_path='send-email-otp')
-    @throttle_classes([OTPRateThrottle])
+    @action(detail=False, methods=['post'], url_path='send-email-otp',
+            throttle_classes=[OTPRateThrottle])
     def send_yd_email_otp(self, request):
         """Send OTP to the email provided in the application form for verification."""
         from .otp_utils import send_email_otp
@@ -8206,8 +8543,8 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             return Response({'message': message, 'otp_id': otp_id, 'email': email})
         return Response({'detail': message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @action(detail=False, methods=['post'], url_path='verify-email-otp')
-    @throttle_classes([OTPVerifyThrottle])
+    @action(detail=False, methods=['post'], url_path='verify-email-otp',
+            throttle_classes=[OTPVerifyThrottle])
     def verify_yd_email_otp(self, request):
         """Verify OTP code sent to the applicant's email."""
         from .otp_utils import verify_email_otp
@@ -8266,7 +8603,9 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
         if app is None:
             return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        allowed_statuses = ('accepted', 'documents_pending', 'documents_rejected')
+        # 'submitted' / 'under_review': the apply form attaches supporting
+        # files right after applying (apply/ itself is JSON-only).
+        allowed_statuses = ('submitted', 'under_review', 'accepted', 'documents_pending', 'documents_rejected')
         if app.status not in allowed_statuses:
             return Response(
                 {'detail': 'Document upload not allowed at this stage.'},
@@ -8911,9 +9250,7 @@ def verify_qr(request):
         return Response({'valid': False, 'detail': 'Invalid QR code format.'}, status=400)
 
     qr_type, ref_id, qr_hash = parsed
-    ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', ''))
-    if ip_address and ',' in ip_address:
-        ip_address = ip_address.split(',')[0].strip()
+    ip_address = get_client_ip(request)
     scanned_by = request.user if request.user.is_authenticated else None
     is_staff = scanned_by and scanned_by.is_staff
 
@@ -8979,7 +9316,12 @@ def verify_qr(request):
             'checked_in_at': submission.checked_in_at.isoformat() if submission.checked_in_at else None,
             'is_duplicate': is_duplicate,
             'scan_count': scan_count,
-            'details': {
+        }
+        # A ticket QR is printed, photographed and forwarded, so the endpoint
+        # stays open — but the attendee's contact details are for the door
+        # staff only. Same rule the youth_dialogue branch below applies.
+        if is_staff:
+            result['details'] = {
                 'email': submission.proxy_email if submission.is_proxy else submission.user.email,
                 'organization': fd_organization,
                 'nationality': fd_nationality,
@@ -8991,8 +9333,7 @@ def verify_qr(request):
                 'event_date': reg.event_date.isoformat() if reg.event_date else None,
                 'event_end_date': reg.event_end_date.isoformat() if reg.event_end_date else None,
                 'submission_id': submission.id,
-            },
-        }
+            }
         return Response(result)
 
     elif qr_type == 'youth_dialogue':
@@ -9106,9 +9447,7 @@ def verify_manual(request):
     if lookup_type not in ('code', 'name_email', 'name_search'):
         return Response({'detail': 'lookup_type must be "code", "name_email", or "name_search".'}, status=400)
 
-    ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', ''))
-    if ip_address and ',' in ip_address:
-        ip_address = ip_address.split(',')[0].strip()
+    ip_address = get_client_ip(request)
 
     if lookup_type == 'code':
         code = request.data.get('code', '').strip()
@@ -9453,9 +9792,7 @@ def verify_qr_web(request):
             context['qr_type'] = qr_type
 
             # Log the web scan
-            ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', ''))
-            if ip_address and ',' in ip_address:
-                ip_address = ip_address.split(',')[0].strip()
+            ip_address = get_client_ip(request)
             scan_count = QRScanLog.objects.filter(qr_type=qr_type, reference_id=ref_id).count()
             is_duplicate = scan_count > 0
             QRScanLog.objects.create(

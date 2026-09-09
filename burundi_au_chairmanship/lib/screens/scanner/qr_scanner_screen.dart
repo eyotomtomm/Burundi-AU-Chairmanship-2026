@@ -7,6 +7,7 @@ import '../../services/api_service.dart';
 import 'manual_lookup_screen.dart';
 import 'qr_scan_result_screen.dart';
 import 'yd_scan_history_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 class QrScannerScreen extends StatefulWidget {
   final String? mode;
@@ -18,15 +19,40 @@ class QrScannerScreen extends StatefulWidget {
   State<QrScannerScreen> createState() => _QrScannerScreenState();
 }
 
-class _QrScannerScreenState extends State<QrScannerScreen> {
+class _QrScannerScreenState extends State<QrScannerScreen>
+    with WidgetsBindingObserver {
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
   );
   bool _isProcessing = false;
+  String? _lastCode;
+  DateTime? _lastScanAt;
+  static const _rescanCooldown = Duration(milliseconds: 1500);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Release the camera when backgrounded; resume when the app comes back.
+    switch (state) {
+      case AppLifecycleState.resumed:
+        if (!_isProcessing) _controller.start();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        _controller.stop();
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
   }
@@ -38,6 +64,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
     final rawValue = barcodes.first.rawValue;
     if (rawValue == null || rawValue.isEmpty) return;
+
+    // Ignore the same code re-read right after returning from the result screen.
+    final now = DateTime.now();
+    if (rawValue == _lastCode &&
+        _lastScanAt != null &&
+        now.difference(_lastScanAt!) < _rescanCooldown) {
+      return;
+    }
+    _lastCode = rawValue;
+    _lastScanAt = now;
 
     setState(() => _isProcessing = true);
 
@@ -75,6 +111,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     } finally {
       if (mounted) {
         // Restart camera when returning from result screen
+        _lastScanAt = DateTime.now();
         _controller.start();
         setState(() => _isProcessing = false);
       }
@@ -87,6 +124,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final isStaff = context.watch<AuthProvider>().isStaff;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFF101810),
@@ -94,7 +132,15 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          MobileScanner(controller: _controller, onDetect: _onDetect),
+          MobileScanner(
+            controller: _controller,
+            onDetect: _onDetect,
+            errorBuilder: (context, error, _) => _CameraError(
+              permissionDenied:
+                  error.errorCode == MobileScannerErrorCode.permissionDenied,
+              onRetry: () => _controller.start(),
+            ),
+          ),
 
           // Header row
           Positioned(
@@ -103,21 +149,25 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             right: 16,
             child: Row(
               children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => Navigator.maybePop(context),
-                  child: const SizedBox(
-                    width: 34,
-                    height: 40,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Icon(Icons.arrow_back_rounded, size: 22, color: Colors.white),
+                Semantics(
+                  button: true,
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.maybePop(context),
+                    child: const SizedBox(
+                      width: 34,
+                      height: 40,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Icon(Icons.arrow_back_rounded, size: 22, color: Colors.white),
+                      ),
                     ),
                   ),
                 ),
                 Expanded(
                   child: Text(
-                    _isYdMode ? '$_programmeName Scanner' : 'Scan credential',
+                    _isYdMode ? '$_programmeName ${l10n.translate('scan_scanner')}' : l10n.translate('scan_credential_title'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -135,13 +185,13 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                       size: 20,
                     ),
                     onPressed: () => _controller.toggleTorch(),
-                    tooltip: 'Toggle Flash',
+                    tooltip: l10n.translate('scan_toggle_flash'),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.cameraswitch_rounded, color: Colors.white, size: 20),
                   onPressed: () => _controller.switchCamera(),
-                  tooltip: 'Switch Camera',
+                  tooltip: l10n.translate('scan_switch_camera'),
                 ),
               ],
             ),
@@ -177,20 +227,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                       children: [
                         Text(
                           _isYdMode
-                              ? 'Scan a $_programmeName QR code'
-                              : 'Align the delegate QR inside the frame',
+                              ? '${l10n.translate('scan_qr_for')} $_programmeName'
+                              : l10n.translate('scan_align_frame'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               fontSize: 13,
                               color: Colors.white.withValues(alpha: 0.85)),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Alignez le code QR dans le cadre',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.6)),
                         ),
                       ],
                     ),
@@ -208,7 +250,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 if (_isYdMode)
                   _GlassBar(
                     icon: Icons.history_rounded,
-                    label: 'Scan history',
+                    label: l10n.translate('scan_history_title'),
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const YdScanHistoryScreen())),
                   ),
@@ -216,7 +258,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 if (isStaff)
                   _GlassBar(
                     icon: Icons.keyboard_rounded,
-                    label: "Can't scan? Look up manually",
+                    label: l10n.translate('scan_lookup_manually'),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -316,6 +358,49 @@ class _GlassBar extends StatelessWidget {
             ),
             Icon(Icons.chevron_right_rounded,
                 size: 18, color: Colors.white.withValues(alpha: 0.6)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown in place of the camera preview when it cannot start.
+/// permission_handler is not a dependency, so we give instructions rather than
+/// a deep link into Settings.
+class _CameraError extends StatelessWidget {
+  final bool permissionDenied;
+  final VoidCallback onRetry;
+  const _CameraError({required this.permissionDenied, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.no_photography_rounded, size: 56, color: Colors.white54),
+            const SizedBox(height: 16),
+            Text(
+              permissionDenied
+                  ? l10n.translate('camera_permission_denied')
+                  : l10n.translate('generic_error'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white54),
+              ),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text(l10n.retry),
+            ),
           ],
         ),
       ),

@@ -202,3 +202,50 @@ def register_admin_notification_signals():
         sender=User,
         dispatch_uid='admin_notif_user_created',
     )
+
+
+# ── Cache invalidation ───────────────────────────────────────────
+# Views cache whole responses under fixed keys; drop them when the source
+# rows change. home_feed has one key per user, so it is versioned instead:
+# bumping home_feed:ver retires every variant at once (views.home_feed).
+
+def _bump_home_feed_version(**kwargs):
+    from django.core.cache import cache
+    try:
+        cache.incr('home_feed:ver')
+    except ValueError:
+        cache.set('home_feed:ver', 1, None)
+
+
+def _invalidate_cache_keys(*keys):
+    def handler(**kwargs):
+        from django.core.cache import cache
+        cache.delete_many(keys)
+    return handler
+
+
+def register_cache_invalidation_signals():
+    from django.db.models.signals import post_delete
+    from . import models as m
+
+    key_map = {
+        m.Category: ('categories:v1',),
+        m.AppSettings: ('app_settings:v1',),
+        m.QuickAccessMenuItem: ('quick_access_menu:v2',),
+        m.EmergencyContact: ('emergency_contacts:v1',),
+        m.YouthDialogueEvent: ('yd_settings:v1',),
+    }
+    for model, keys in key_map.items():
+        handler = _invalidate_cache_keys(*keys)
+        for signal in (post_save, post_delete):
+            signal.connect(handler, sender=model, weak=False,
+                           dispatch_uid=f'cache_inv_{model.__name__}_{signal.__class__.__name__}_{id(signal)}')
+
+    home_feed_sources = (
+        m.HeroSlide, m.Article, m.FeatureCard, m.Category, m.AppSettings,
+        m.EventRegistration, m.Event,
+    )
+    for model in home_feed_sources:
+        for signal in (post_save, post_delete):
+            signal.connect(_bump_home_feed_version, sender=model, weak=False,
+                           dispatch_uid=f'home_feed_ver_{model.__name__}_{id(signal)}')

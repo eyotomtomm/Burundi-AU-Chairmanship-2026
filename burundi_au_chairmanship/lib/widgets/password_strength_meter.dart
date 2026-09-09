@@ -21,12 +21,12 @@ class PasswordStrengthMeter extends StatelessWidget {
     return score;
   }
 
-  /// Returns (label, color) for a given score.
+  /// Returns (l10n label key, color) for a given score.
   static ({String label, Color color}) _strengthInfo(int score) {
-    if (score <= 1) return (label: 'Weak', color: AppColors.burundiRed);
-    if (score == 2) return (label: 'Fair', color: Colors.orange);
-    if (score == 3) return (label: 'Good', color: Colors.amber);
-    return (label: 'Strong', color: AppColors.burundiGreen);
+    if (score <= 1) return (label: 'w_pw_weak', color: AppColors.burundiRed);
+    if (score == 2) return (label: 'w_pw_fair', color: Colors.orange);
+    if (score == 3) return (label: 'w_pw_good', color: Colors.amber);
+    return (label: 'w_pw_strong', color: AppColors.burundiGreen);
   }
 
   @override

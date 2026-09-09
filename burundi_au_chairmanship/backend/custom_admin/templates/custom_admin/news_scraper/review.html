@@ -53,6 +53,8 @@
     </div>
     <p class="text-[11px] text-on-surface-variant mt-3">
       Fetching only fills the review queue below. Nothing appears in the app until you approve it.
+      Sources with a daily schedule also fill this queue on their own —
+      <a href="{% url 'custom_admin:news_sources_list' %}" class="text-amber-700 font-semibold">set that per source</a>.
     </p>
   </form>
 
@@ -106,8 +108,16 @@
         </div>
 
         <div class="p-4 flex flex-col flex-1">
+          {% if current_status == 'pending' %}
+          <!-- Editable before approval: whatever is here is what gets published. -->
+          <input type="text" name="title_{{ item.pk }}" value="{{ item.title }}" maxlength="300"
+                 class="w-full text-[13px] font-bold text-on-surface leading-snug py-1.5 px-2">
+          <textarea name="content_{{ item.pk }}" rows="5"
+                    class="w-full text-[11px] text-on-surface-variant mt-1.5 flex-1 py-1.5 px-2">{{ item.content }}</textarea>
+          {% else %}
           <p class="text-[13px] font-bold text-on-surface leading-snug">{{ item.title|truncatechars:110 }}</p>
           <p class="text-[11px] text-on-surface-variant mt-1.5 flex-1">{{ item.content|truncatechars:170 }}</p>
+          {% endif %}
           <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
             <span class="font-label text-[10px] text-on-surface-variant">{{ item.published_at|date:"d M Y" }}</span>
             <div class="flex items-center gap-2">

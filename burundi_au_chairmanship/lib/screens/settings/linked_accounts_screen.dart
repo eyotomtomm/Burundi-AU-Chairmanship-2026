@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../services/firebase_auth_service.dart';
@@ -55,7 +56,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load linked accounts';
+          _errorMessage = AppLocalizations.of(context).translate('la_failed_load');
           _isLoading = false;
         });
       }
@@ -91,8 +92,8 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
       if (mounted) {
         HapticFeedback.mediumImpact();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google account linked successfully'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).translate('la_google_linked')),
             backgroundColor: AppColors.success,
           ),
         );
@@ -115,7 +116,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to link Google account: $e'),
+            content: Text(AppLocalizations.of(context).translate('la_failed_link_google')),
             backgroundColor: AppColors.error,
           ),
         );
@@ -147,8 +148,8 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
       if (mounted) {
         HapticFeedback.mediumImpact();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Apple account linked successfully'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).translate('la_apple_linked')),
             backgroundColor: AppColors.success,
           ),
         );
@@ -171,7 +172,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to link Apple account: $e'),
+            content: Text(AppLocalizations.of(context).translate('la_failed_link_apple')),
             backgroundColor: AppColors.error,
           ),
         );
@@ -185,27 +186,28 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final l10n = AppLocalizations.of(context);
 
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Link Email/Password'),
+        title: Text(l10n.translate('la_link_email_password')),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Set an email and password to use as an additional sign-in method.',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
+              Text(
+                l10n.translate('la_email_password_desc'),
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: 'Email',
+                  labelText: l10n.translate('email'),
                   prefixIcon: const Icon(Icons.email_outlined),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -213,10 +215,10 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Email is required';
+                    return l10n.translate('la_email_required');
                   }
                   if (!value.contains('@')) {
-                    return 'Enter a valid email';
+                    return l10n.translate('la_enter_valid_email');
                   }
                   return null;
                 },
@@ -226,7 +228,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                 controller: passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: 'Password',
+                  labelText: l10n.translate('password'),
                   prefixIcon: const Icon(Icons.lock_outlined),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -234,7 +236,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                 ),
                 validator: (value) {
                   if (value == null || value.trim().length < 6) {
-                    return 'Password must be at least 6 characters';
+                    return l10n.translate('la_password_min6');
                   }
                   return null;
                 },
@@ -245,7 +247,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.translate('cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -259,20 +261,22 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                 Navigator.pop(dialogContext, true);
               }
             },
-            child: const Text('Link'),
+            child: Text(l10n.translate('la_link')),
           ),
         ],
       ),
     );
 
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    emailController.dispose();
+    passwordController.dispose();
     if (result != true) return;
 
     setState(() => _isLinking = true);
 
     try {
       // Create email/password credential in Firebase
-      final email = emailController.text.trim();
-      final password = passwordController.text.trim();
 
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
@@ -293,8 +297,8 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
       if (mounted) {
         HapticFeedback.mediumImpact();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email/password linked successfully'),
+          SnackBar(
+            content: Text(l10n.translate('la_email_linked')),
             backgroundColor: AppColors.success,
           ),
         );
@@ -317,7 +321,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to link email: $e'),
+            content: Text(l10n.translate('la_failed_link_email')),
             backgroundColor: AppColors.error,
           ),
         );
@@ -330,11 +334,12 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
   Future<void> _unlinkAccount(Map<String, dynamic> account) async {
     final provider = account['provider'] as String;
     final providerDisplay = account['provider_display'] as String? ?? provider;
+    final l10n = AppLocalizations.of(context);
 
     if (_totalLinked <= 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot unlink your only sign-in method. Link another provider first.'),
+        SnackBar(
+          content: Text(l10n.translate('la_cannot_unlink_only')),
           backgroundColor: AppColors.warning,
         ),
       );
@@ -349,22 +354,21 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
           children: [
             const Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 28),
             const SizedBox(width: 8),
-            Text('Unlink $providerDisplay?'),
+            Text('${l10n.translate('la_unlink')} $providerDisplay?'),
           ],
         ),
         content: Text(
-          'You will no longer be able to sign in with your $providerDisplay account.\n\n'
-          'Make sure you have another sign-in method available.',
+          '${l10n.translate('la_unlink_warning_prefix')} $providerDisplay${l10n.translate('la_unlink_warning_suffix')}',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.translate('cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Unlink'),
+            child: Text(l10n.translate('la_unlink')),
           ),
         ],
       ),
@@ -383,7 +387,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
         HapticFeedback.mediumImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$providerDisplay account unlinked'),
+            content: Text('${l10n.translate('la_account_unlinked')}: $providerDisplay'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -399,7 +403,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to unlink: $e'),
+            content: Text(l10n.translate('la_failed_unlink')),
             backgroundColor: AppColors.error,
           ),
         );
@@ -429,7 +433,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
       case 'google':
         return const Color(0xFF4285F4);
       case 'apple':
-        return Colors.black87;
+        return Ds.ink(context);
       case 'email':
         return AppColors.burundiGreen;
       case 'firebase':
@@ -442,8 +446,8 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
   String _formatDate(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return '';
     try {
-      final date = DateTime.parse(dateStr);
-      return '${date.day}/${date.month}/${date.year}';
+      final date = DateTime.parse(dateStr).toLocal();
+      return DateFormat.yMMMd(Localizations.localeOf(context).toString()).format(date);
     } catch (_) {
       return dateStr;
     }
@@ -458,7 +462,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(
-        title: const Text('Linked Accounts'),
+        title: Text(l10n.translate('la_title')),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))
@@ -515,17 +519,16 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Manage Sign-In Methods',
-                                    style: TextStyle(
+                                  Text(
+                                    l10n.translate('la_manage_title'),
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 15,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Link multiple providers to sign in with any of them. '
-                                    'You must keep at least one.',
+                                    l10n.translate('la_manage_desc'),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: isDark
@@ -545,7 +548,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                       // Currently linked accounts
                       if (_linkedAccounts.isNotEmpty) ...[
                         Text(
-                          'LINKED ACCOUNTS',
+                          l10n.translate('la_title').toUpperCase(),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -583,7 +586,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
 
                       // Available providers to link
                       Text(
-                        'LINK NEW PROVIDER',
+                        l10n.translate('la_link_new_provider').toUpperCase(),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -611,7 +614,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                             // Google
                             _buildLinkProviderTile(
                               provider: 'google',
-                              label: 'Link Google Account',
+                              label: l10n.translate('la_link_google'),
                               icon: Icons.g_mobiledata_rounded,
                               color: const Color(0xFF4285F4),
                               isLinked: _isProviderLinked('google'),
@@ -623,9 +626,9 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                               ...[
                                 _buildLinkProviderTile(
                                   provider: 'apple',
-                                  label: 'Link Apple Account',
+                                  label: l10n.translate('la_link_apple'),
                                   icon: Icons.apple_rounded,
-                                  color: isDark ? Colors.white : Colors.black87,
+                                  color: Ds.ink(context),
                                   isLinked: _isProviderLinked('apple'),
                                   onTap: _linkAppleAccount,
                                 ),
@@ -634,7 +637,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                             // Email/Password
                             _buildLinkProviderTile(
                               provider: 'email',
-                              label: 'Link Email/Password',
+                              label: l10n.translate('la_link_email_password'),
                               icon: Icons.email_rounded,
                               color: AppColors.burundiGreen,
                               isLinked: _isProviderLinked('email'),
@@ -659,6 +662,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
     final linkedAt = account['linked_at'] as String? ?? '';
     final isPrimary = account['is_primary'] as bool? ?? false;
     final canUnlink = _totalLinked > 1;
+    final l10n = AppLocalizations.of(context);
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -689,9 +693,9 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
                 color: AppColors.burundiGreen,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                'PRIMARY',
-                style: TextStyle(
+              child: Text(
+                l10n.translate('la_primary'),
+                style: const TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -711,7 +715,7 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
             Text(displayName, style: const TextStyle(fontSize: 12, color: Colors.grey)),
           if (linkedAt.isNotEmpty)
             Text(
-              'Linked ${_formatDate(linkedAt)}',
+              '${l10n.translate('la_linked_on')} ${_formatDate(linkedAt)}',
               style: const TextStyle(fontSize: 11, color: Colors.grey),
             ),
         ],
@@ -719,11 +723,11 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
       trailing: canUnlink
           ? IconButton(
               icon: const Icon(Icons.link_off_rounded, color: AppColors.error, size: 20),
-              tooltip: 'Unlink',
+              tooltip: l10n.translate('la_unlink'),
               onPressed: _isLinking ? null : () => _unlinkAccount(account),
             )
           : Tooltip(
-              message: 'Cannot unlink your only sign-in method',
+              message: l10n.translate('la_cannot_unlink_only_short'),
               child: Icon(
                 Icons.lock_outline,
                 color: Colors.grey.withValues(alpha: 0.5),
@@ -761,7 +765,8 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
         ),
       ),
       subtitle: isLinked
-          ? const Text('Already linked', style: TextStyle(fontSize: 12, color: Colors.grey))
+          ? Text(AppLocalizations.of(context).translate('la_already_linked'),
+              style: const TextStyle(fontSize: 12, color: Colors.grey))
           : null,
       trailing: isLinked
           ? const Icon(Icons.check_circle, color: AppColors.success, size: 22)

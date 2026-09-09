@@ -17,6 +17,7 @@
 
   {% if items %}
   <div class="bg-surface-container-lowest border border-slate-200 rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
     <table class="w-full">
       <thead>
         <tr>
@@ -53,16 +54,20 @@
               <a href="{% url 'custom_admin:discussion_topic_edit' item.pk %}" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
                 <span class="material-symbols-outlined text-xl">edit</span>
               </a>
-              <a href="{% url 'custom_admin:discussion_topic_delete' item.pk %}" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"
-                 onclick="return confirm('Delete this topic? Posts already made under it are kept.')">
-                <span class="material-symbols-outlined text-xl">delete</span>
-              </a>
+              <form method="post" action="{% url 'custom_admin:discussion_topic_delete' item.pk %}" class="inline"
+                    onsubmit="return confirm('Delete this topic? Posts already made under it are kept.')">
+                {% csrf_token %}
+                <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                  <span class="material-symbols-outlined text-xl">delete</span>
+                </button>
+              </form>
             </div>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   {% else %}
   <div class="bg-surface-container-lowest border border-slate-200 rounded-xl p-10 text-center">

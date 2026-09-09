@@ -1,5 +1,6 @@
 """OTP utility functions for email verification"""
 import hashlib
+import hmac
 import logging
 import secrets
 import string
@@ -20,6 +21,10 @@ def _send_mail_with_fallback(subject, message, from_email, recipient_list):
     """
     Try sending via the primary SMTP backend. On authentication or
     connection failure, automatically retry via the fallback SMTP server.
+
+    Deliberately synchronous: the OTP endpoints must tell the user when the
+    code could not be sent, so this is not routed through Celery. The
+    worker is protected by settings.EMAIL_TIMEOUT (10s) instead.
     """
     try:
         send_mail(subject, message, from_email, recipient_list, fail_silently=False)
@@ -215,10 +220,11 @@ def verify_email_otp(user, email, otp_code):
         if otp.is_expired():
             return False, 'OTP has expired. Please request a new one.'
 
-        if otp.otp_code != _hash_otp(otp_code):
-            OTPVerification.objects.filter(pk=otp.pk).update(
-                attempts=models_F('attempts') + 1
-            )
+        # Count the attempt before comparing so an aborted request is not free.
+        OTPVerification.objects.filter(pk=otp.pk).update(
+            attempts=models_F('attempts') + 1
+        )
+        if not hmac.compare_digest(str(otp.otp_code), _hash_otp(otp_code)):
             logger.warning(
                 'OTP verify: hash mismatch for user=%s email=%s '
                 'stored_len=%d input_len=%d attempts=%d',

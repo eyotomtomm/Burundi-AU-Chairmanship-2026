@@ -26,7 +26,6 @@ class ContentCacheService {
 
   // Cache keys
   static const String keyHomeFeed = 'home_feed';
-  static const String keyArticles = 'articles';
   static const String keyNews = 'news';
   static const String keyMagazines = 'magazines';
   static const String keyEvents = 'events';

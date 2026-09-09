@@ -527,7 +527,8 @@ ADAPTERS = {'x': _fetch_x, 'rss': _fetch_rss}
 #  Entry point
 # ─────────────────────────────────────────────────────────────
 
-def fetch_source(source, date_from, date_to, download_images=True, time_budget=None):
+def fetch_source(source, date_from, date_to, download_images=True, time_budget=None,
+                 progress=None):
     """Pull `source` between two dates into pending ScrapedItems.
 
     Returns ``(created, skipped, truncated)``. Already-seen posts are skipped,
@@ -538,6 +539,10 @@ def fetch_source(source, date_from, date_to, download_images=True, time_budget=N
     is waiting (Cloudflare gives up at 100s); leave it None in the scheduled
     worker, which has no such limit. When the budget runs out the run stops
     where it is and reports ``truncated``; the next run continues from there.
+
+    ``progress`` is called as ``progress(done, total, created, skipped)`` after
+    each post, so a caller running this in the background can report a
+    percentage.
     """
     adapter = ADAPTERS.get(source.kind)
     if adapter is None:
@@ -549,9 +554,18 @@ def fetch_source(source, date_from, date_to, download_images=True, time_budget=N
     deadline = time.monotonic() + time_budget if time_budget else None
     ai_deadline = time.monotonic() + AI_TIME_BUDGET
 
-    for post in adapter(source.target, date_from, date_to, deadline):
+    # Materialised so the caller can be told how far along it is. The adapters
+    # already hold the whole response in memory, and MAX_MEDIA_ITEMS caps it.
+    posts = list(adapter(source.target, date_from, date_to, deadline))
+    total = len(posts)
+    if progress:
+        progress(0, total, 0, 0)
+
+    for done, post in enumerate(posts, 1):
         if ScrapedItem.objects.filter(source=source, external_id=post['external_id']).exists():
             skipped += 1
+            if progress:
+                progress(done, total, created, skipped)
             continue
 
         # Out of time: stop before starting work we cannot finish. Everything
@@ -591,6 +605,8 @@ def fetch_source(source, date_from, date_to, download_images=True, time_budget=N
         except IntegrityError:
             # Raced with a concurrent fetch of the same source.
             skipped += 1
+        if progress:
+            progress(done, total, created, skipped)
 
     source.last_fetched_at = timezone.now()
     source.save(update_fields=['last_fetched_at'])

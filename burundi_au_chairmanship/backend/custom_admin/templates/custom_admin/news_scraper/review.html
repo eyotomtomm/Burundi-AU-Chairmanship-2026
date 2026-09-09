@@ -58,6 +58,20 @@
     </p>
   </form>
 
+  <!-- Fetch progress (only while a job is running) -->
+  <div id="fetchProgress" data-job="{{ job_id }}" class="bg-surface-container-lowest border border-slate-200 rounded-xl p-5" hidden>
+    <div class="flex items-center justify-between gap-4 mb-2.5">
+      <p class="text-[13px] font-bold text-on-surface" id="fpTitle">Fetching…</p>
+      <p class="font-label text-[11px] text-on-surface-variant" id="fpCount"></p>
+    </div>
+    <div class="w-full h-2 rounded-full bg-surface-container overflow-hidden">
+      <div id="fpBar" class="h-full bg-primary-container transition-all duration-500" style="width:0%"></div>
+    </div>
+    <p class="text-[11px] text-on-surface-variant mt-2.5" id="fpNote">
+      This runs in the background — you can leave this page and come back.
+    </p>
+  </div>
+
   <!-- Status chips -->
   <div class="flex flex-wrap gap-2.5 items-center">
     <a href="?status=pending&from={{ date_from }}&to={{ date_to }}" class="fchip {% if current_status == 'pending' %}on{% endif %}">Pending {{ counts.pending }}</a>
@@ -159,10 +173,65 @@
 <script>
 (function () {
   var all = document.getElementById('selectAllItems');
-  if (!all) return;
-  all.addEventListener('change', function () {
-    document.querySelectorAll('.item-check').forEach(function (cb) { cb.checked = all.checked; });
-  });
+  if (all) {
+    all.addEventListener('change', function () {
+      document.querySelectorAll('.item-check').forEach(function (cb) { cb.checked = all.checked; });
+    });
+  }
+
+  // Fetching can run for minutes; Cloudflare cuts a request off at 100s. The
+  // work happens on the server in the background and we poll it here.
+  var box = document.getElementById('fetchProgress');
+  var job = box && box.dataset.job;
+  if (!job) return;
+
+  var bar = document.getElementById('fpBar');
+  var title = document.getElementById('fpTitle');
+  var count = document.getElementById('fpCount');
+  var note = document.getElementById('fpNote');
+  box.hidden = false;
+
+  function done(msg, cls) {
+    title.textContent = msg;
+    if (cls) title.className = 'text-[13px] font-bold ' + cls;
+    bar.style.width = '100%';
+  }
+
+  var poll = setInterval(function () {
+    fetch('{% url "custom_admin:news_scraper_progress" %}?job=' + encodeURIComponent(job),
+          { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.state === 'unknown') {
+          clearInterval(poll);
+          done('Progress unavailable — reload to see what was fetched.');
+          return;
+        }
+        bar.style.width = (d.percent || 0) + '%';
+        count.textContent = (d.created || 0) + ' new · ' + (d.skipped || 0) + ' already queued';
+
+        if (d.state === 'running') {
+          title.textContent = 'Fetching' + (d.source ? ' ' + d.source : '') + '…';
+          if (d.total) note.textContent = 'Post ' + d.done + ' of ' + d.total +
+            ' — this runs in the background, you can leave this page.';
+        } else if (d.state === 'done') {
+          clearInterval(poll);
+          var msg = 'Fetched ' + (d.created || 0) + ' new item' +
+                    ((d.created === 1) ? '' : 's') + '.';
+          done(msg, 'text-emerald-700');
+          note.textContent = (d.errors && d.errors.length)
+            ? d.errors.join(' · ')
+            : 'Reloading to show the queue…';
+          setTimeout(function () { window.location.search =
+            window.location.search.replace(/[?&]job=[^&]*/, ''); }, 1200);
+        } else if (d.state === 'failed') {
+          clearInterval(poll);
+          done('Fetch failed.', 'text-red-700');
+          note.textContent = (d.errors || []).join(' · ') || 'See the server logs.';
+        }
+      })
+      .catch(function () { /* transient — the next tick retries */ });
+  }, 1500);
 })();
 </script>
 {% endblock %}

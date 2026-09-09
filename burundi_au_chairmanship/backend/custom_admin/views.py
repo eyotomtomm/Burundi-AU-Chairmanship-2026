@@ -12166,7 +12166,8 @@ def news_scraper(request):
     """Review queue: pick sources + a date range, fetch, then approve/reject."""
     from datetime import datetime, time as _time, timedelta
     from core.models import NewsSource, ScrapedItem
-    from core.news_scraper import fetch_source, ScrapeError, WEB_TIME_BUDGET
+    from core.news_scraper import ScrapeError
+    from core import scrape_jobs
 
     sources = NewsSource.objects.all()
     status = request.GET.get('status') or 'pending'
@@ -12195,25 +12196,17 @@ def news_scraper(request):
         chosen = sources.filter(is_active=True)
         if selected:
             chosen = chosen.filter(pk__in=selected)
+        job_id = ''
         if not chosen:
             messages.error(request, 'Select at least one active source to fetch from.')
         else:
             try:
                 start, end = _bounds()
-                total_new = total_seen = 0
-                ran_out_of_time = False
-                # Split the budget across the chosen sources so one slow feed
-                # cannot spend the whole window and starve the rest.
-                per_source = max(20, WEB_TIME_BUDGET // max(1, len(chosen)))
-                for src in chosen:
-                    try:
-                        created, skipped, truncated = fetch_source(
-                            src, start, end, time_budget=per_source)
-                        total_new += created
-                        total_seen += skipped
-                        ran_out_of_time = ran_out_of_time or truncated
-                    except ScrapeError as exc:
-                        messages.error(request, f'{src.name}: {exc}')
+                # Cloudflare abandons any request at 100s, and a wide range takes
+                # far longer than that. Start the work on a thread and let the
+                # page poll for progress instead of holding the connection open.
+                job_id = scrape_jobs.new_job()
+                scrape_jobs.spawn(job_id, list(chosen), start, end)
                 # Guest access to X only returns a shallow, mostly-old slice.
                 # Say so, rather than let an empty queue look like "no news".
                 from core.news_scraper import x_cookies_path
@@ -12226,27 +12219,11 @@ def news_scraper(request):
                         'account, not necessarily the one being read — to fetch the full '
                         'date range.'
                     )
-                if ran_out_of_time:
-                    # Every post is deduplicated, so a second press continues
-                    # rather than starting over.
-                    messages.warning(
-                        request,
-                        'Stopped early to stay inside the page timeout. Press Fetch '
-                        'again to continue from where this run left off — already '
-                        'queued posts are skipped.'
-                    )
-                if total_new or total_seen:
-                    messages.success(
-                        request,
-                        f'Fetched {total_new} new item{"" if total_new == 1 else "s"} '
-                        f'({total_seen} already in the queue).'
-                    )
-                elif not any(m.level_tag == 'error' for m in messages.get_messages(request)):
-                    messages.info(request, 'No posts found in that date range.')
             except ScrapeError as exc:
                 messages.error(request, str(exc))
         return redirect(
-            f"{reverse('custom_admin:news_scraper')}?from={date_from}&to={date_to}&status={status}"
+            f"{reverse('custom_admin:news_scraper')}?from={date_from}&to={date_to}"
+            f"&status={status}&job={job_id}"
         )
 
     items = (ScrapedItem.objects.select_related('source', 'article')
@@ -12270,6 +12247,7 @@ def news_scraper(request):
         'current_source': source_filter or '',
         'date_from': date_from,
         'date_to': date_to,
+        'job_id': request.GET.get('job', ''),
     })
 
 
@@ -12310,6 +12288,18 @@ def _attach_scraped_media(item, article):
         row = ArticleMedia(article=article, media_type='image', order=order)
         row.image.save(name, ContentFile(data), save=True)
         order += 1
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def news_scraper_progress(request):
+    """Poll target for a running fetch. Returns the job's state as JSON."""
+    from core import scrape_jobs
+    state = scrape_jobs.read(request.GET.get('job', ''))
+    if state is None:
+        # Expired, unknown, or the process that held it was replaced.
+        return JsonResponse({'state': 'unknown'})
+    return JsonResponse(state)
 
 
 @login_required(login_url='custom_admin:login')

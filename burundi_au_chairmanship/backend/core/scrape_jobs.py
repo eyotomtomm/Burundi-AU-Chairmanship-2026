@@ -89,9 +89,16 @@ def spawn(job_id, sources, start, end):
     """
     ids = [s.pk for s in sources]
     if not getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
-        from .tasks import run_scrape_job
-        run_scrape_job.delay(job_id, ids, start.isoformat(), end.isoformat())
-        return None
+        try:
+            from .tasks import run_scrape_job
+            run_scrape_job.delay(job_id, ids, start.isoformat(), end.isoformat())
+            return None
+        except Exception as exc:
+            # An unreachable broker must not turn Fetch into a 500. A thread is
+            # the worse home for this work, but it is better than no fetch at
+            # all, and a thread that dies is now reported instead of hanging.
+            logger.warning('scrape job %s: no Celery worker to hand to (%s); '
+                           'running in this process instead', job_id, exc)
 
     thread = threading.Thread(
         target=_run, args=(job_id, ids, start, end),

@@ -63,6 +63,18 @@ class ScrapeJobStateTests(TestCase):
         delay.assert_called_once_with(job, [self.source.pk],
                                       start.isoformat(), end.isoformat())
 
+    def test_an_unreachable_broker_falls_back_to_a_thread(self):
+        """Fetch must still run when the queue is down, not 500."""
+        job = scrape_jobs.new_job()
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=False), \
+                patch('core.tasks.run_scrape_job.delay',
+                      side_effect=OSError('broker is down')), \
+                patch('core.scrape_jobs._run') as run:
+            thread = scrape_jobs.spawn(job, [self.source],
+                                       timezone.now(), timezone.now())
+        thread.join(timeout=5)
+        run.assert_called_once()
+
     def test_the_worker_gets_the_range_back_as_datetimes(self):
         seen = {}
 

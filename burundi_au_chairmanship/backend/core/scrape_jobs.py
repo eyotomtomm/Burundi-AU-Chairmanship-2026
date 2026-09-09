@@ -42,11 +42,12 @@ RUNNER_TTL = 180
 TTL = 60 * 60
 # A stuck job must not spin forever in a thread nobody is watching.
 MAX_RUNTIME = 15 * 60
-# Longest a live run can go without writing an update: gallery-dl's own
-# timeout, plus an image download and a headline for the post after it. Past
-# this the process holding the job is gone, and the bar would otherwise spin
-# for ever.
-STALE = 6 * 60
+# Longest a live run can go without writing an update: news_scraper's
+# FETCH_TIMEOUT (480s), which reports nothing while it runs, plus an image
+# download and a headline for the post after it. Past this the process holding
+# the job is gone, and the bar would otherwise spin for ever. Raise this with
+# FETCH_TIMEOUT or a healthy fetch gets declared dead mid-read.
+STALE = 10 * 60
 
 
 def new_job():

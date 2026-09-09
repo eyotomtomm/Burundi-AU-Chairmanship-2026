@@ -216,15 +216,26 @@
             'this starts within a minute.';
         } else if (d.state === 'running') {
           title.textContent = 'Fetching' + (d.source ? ' ' + d.source : '') + '…';
-          if (d.total) note.textContent = 'Post ' + d.done + ' of ' + d.total +
-            ' — this runs in the background, you can leave this page.';
+          note.textContent = d.total
+            ? 'Post ' + d.done + ' of ' + d.total +
+              ' — this runs in the background, you can leave this page.'
+            : 'Reading the source — this reports nothing for a few minutes.';
         } else if (d.state === 'done') {
           clearInterval(poll);
           var msg = 'Fetched ' + (d.created || 0) + ' new item' +
                     ((d.created === 1) ? '' : 's') + '.';
-          done(msg, 'text-emerald-700');
-          note.textContent = (d.errors && d.errors.length)
-            ? d.errors.join(' · ')
+          var failed = d.errors && d.errors.length;
+          done(msg, failed ? 'text-amber-700' : 'text-emerald-700');
+          // Only a clean run may reload: the reload is what used to wipe the
+          // one line saying why a source returned nothing, 1.2s after writing it.
+          if (failed) {
+            note.textContent = d.errors.join(' · ') + ' — reload to see the queue.';
+            return;
+          }
+          // 0 new and 0 seen is not the same as "no news": the source was read
+          // and had nothing in this range. Say which, or it reads as a failure.
+          note.textContent = (!d.created && !d.skipped)
+            ? 'The source was read and had nothing in this date range.'
             : 'Reloading to show the queue…';
           setTimeout(function () { window.location.search =
             window.location.search.replace(/[?&]job=[^&]*/, ''); }, 1200);

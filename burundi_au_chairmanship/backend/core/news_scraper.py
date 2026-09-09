@@ -54,7 +54,12 @@ AI_TIME_BUDGET = 60
 DIRECTORY_MSG = 2
 IMAGE_EXTENSIONS = ('jpg', 'jpeg', 'png', 'webp')
 VIDEO_EXTENSIONS = ('mp4', 'm3u8', 'mov')
-FETCH_TIMEOUT = 240
+# gallery-dl's own ceiling. It was 240s when a browser held the connection
+# open behind Cloudflare's 100s cut-off, and 240s is what X kept overrunning:
+# a signed-in search of a wide range pages slowly and sleeps on rate limits.
+# Nothing waits on this any more — the run is polled — so give it the room it
+# was always going to need. scrape_jobs.STALE is sized against this.
+FETCH_TIMEOUT = 480
 IMAGE_TIMEOUT = 20
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
@@ -324,8 +329,18 @@ def _fetch_x(handle, date_from, date_to, deadline=None):
             'gallery-dl is not installed on this server. Install it with '
             '`pip install gallery-dl`, or run the fetch locally.'
         )
-    except subprocess.TimeoutExpired:
-        raise ScrapeError(f'X did not respond within {FETCH_TIMEOUT}s — try a narrower date range.')
+    except subprocess.TimeoutExpired as exc:
+        # gallery-dl says why it is slow — a rate-limit wait, a retry loop —
+        # on stderr. Without it "did not respond" is the end of the trail.
+        said = (exc.stderr or '')
+        if isinstance(said, bytes):
+            said = said.decode('utf-8', 'replace')
+        said = said.strip()[-300:]
+        raise ScrapeError(
+            f'X did not respond within {_remaining(deadline, FETCH_TIMEOUT)}s — '
+            'try a narrower date range.'
+            + (f' gallery-dl said: {said}' if said else '')
+        )
 
     if not proc.stdout.strip():
         raise ScrapeError(

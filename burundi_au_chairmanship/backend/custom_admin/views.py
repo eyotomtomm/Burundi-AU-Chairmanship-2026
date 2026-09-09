@@ -12166,7 +12166,7 @@ def news_scraper(request):
     """Review queue: pick sources + a date range, fetch, then approve/reject."""
     from datetime import datetime, time as _time, timedelta
     from core.models import NewsSource, ScrapedItem
-    from core.news_scraper import fetch_source, ScrapeError
+    from core.news_scraper import fetch_source, ScrapeError, WEB_TIME_BUDGET
 
     sources = NewsSource.objects.all()
     status = request.GET.get('status') or 'pending'
@@ -12201,11 +12201,17 @@ def news_scraper(request):
             try:
                 start, end = _bounds()
                 total_new = total_seen = 0
+                ran_out_of_time = False
+                # Split the budget across the chosen sources so one slow feed
+                # cannot spend the whole window and starve the rest.
+                per_source = max(20, WEB_TIME_BUDGET // max(1, len(chosen)))
                 for src in chosen:
                     try:
-                        created, skipped = fetch_source(src, start, end)
+                        created, skipped, truncated = fetch_source(
+                            src, start, end, time_budget=per_source)
                         total_new += created
                         total_seen += skipped
+                        ran_out_of_time = ran_out_of_time or truncated
                     except ScrapeError as exc:
                         messages.error(request, f'{src.name}: {exc}')
                 # Guest access to X only returns a shallow, mostly-old slice.
@@ -12219,6 +12225,15 @@ def news_scraper(request):
                         'or X_COOKIES on the server — a cookies.txt from any signed-in X '
                         'account, not necessarily the one being read — to fetch the full '
                         'date range.'
+                    )
+                if ran_out_of_time:
+                    # Every post is deduplicated, so a second press continues
+                    # rather than starting over.
+                    messages.warning(
+                        request,
+                        'Stopped early to stay inside the page timeout. Press Fetch '
+                        'again to continue from where this run left off — already '
+                        'queued posts are skipped.'
                     )
                 if total_new or total_seen:
                     messages.success(

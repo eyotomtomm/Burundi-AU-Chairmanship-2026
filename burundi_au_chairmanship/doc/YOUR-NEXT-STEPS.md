@@ -131,16 +131,46 @@ Gmail with `smtp.burundichairship.africa` as the *fallback*, which is the
 inverse of what `.do/app.yaml` intends. Flipping them aligns SPF/DKIM with the
 new domain but moves all mail onto an SMTP host that has never carried it.
 Decide that deliberately, after the deploy, not during it.
-## 4. Purge Cloudflare immediately after deploying
+## 4. Cloudflare — you do not need a purge (verified 2026-09-09)
 
-Share cards are served with `s-maxage=604800`. Any hidden-discussion card that
-was already fetched stays in Cloudflare's edge cache for up to **seven days**
-after the fix ships. The code fix does not reach those URLs on its own.
+The earlier advice here assumed the edge honoured the `s-maxage=604800` that
+`share_card_image` sets, which would have kept a hidden discussion's card alive
+for seven days after the fix. Measured against the live zone, it does not:
 
-Cloudflare dashboard → your zone → **Caching → Configuration → Purge Everything**
-(or purge by prefix `/discussions/`).
+| URL | `cf-cache-status` |
+|---|---|
+| `/api/home-feed/`, `/api/articles/` | `DYNAMIC` |
+| `/articles/<id>/share/` | `DYNAMIC` |
+| `/articles/<id>/card.jpg` | `BYPASS` |
+| `/privacy-policy/`, `/.well-known/assetlinks.json` | `DYNAMIC` |
+| `/static/...` | `BYPASS` |
 
----
+Nothing on this zone is served from the Cloudflare cache. `DYNAMIC` means
+Cloudflare never considered it cacheable — Django sends `Cache-Control: private`
+on almost everything — and `BYPASS` means a rule explicitly skips the cache even
+where the origin asked for `public, s-maxage=604800`. So every fix in this
+branch is live the moment the deploy finishes, and there is no stale window to
+purge.
+
+Purge anyway if you want the reassurance — it costs nothing:
+**Cloudflare → your zone → Caching → Configuration → Purge Everything.**
+
+Two things that follow from the same measurement, neither blocking:
+
+**The share cards are not being edge-cached, and they were designed to be.**
+Each one is a JPEG rendered by Pillow in the web process. Django keeps a 12-hour
+copy (`views.py`, `cache.set(cache_key, jpeg, 60 * 60 * 12)`) so it is not
+re-rendered per request, but every crawler and every recipient of a shared link
+still reaches origin. That is what `ShareCardThrottle` is defending against, and
+it is the reason the throttle exists at all. Find the Cache Rule causing
+`BYPASS` and exempt `/*/card.jpg` from it, and those requests stop touching
+Django.
+
+**`Cache-Control: private` is coming from Django on everything**, including
+`/.well-known/assetlinks.json` and the legal pages. That is Django's default
+once a response varies on the session cookie. Harmless, but it means no edge
+caching is possible on this zone until it is addressed — worth knowing before
+paying for more instances to handle traffic the edge should be absorbing.
 
 ## 5. Deploy to staging, not straight to production
 
@@ -230,7 +260,13 @@ print('device cleared - next login re-runs setup')
 "
 ```
 
-**Verify App Links.** Two fingerprints should be published:
+**Verify App Links — currently broken in production, fixed by this deploy.**
+`/.well-known/assetlinks.json` serves exactly one fingerprint today, the upload
+key `2E:76:17:…`. Play-installed builds are signed with the *Play App Signing*
+key, so Android's verification fails against that file and shared links open in
+the browser instead of the app for every Play Store user. Both fingerprints are
+already in `config/urls.py` on this branch; they reach production when it
+deploys. Confirm two are served, then re-verify on a device:
 
 ```bash
 curl -s https://burundi4africa.com/.well-known/assetlinks.json | python3 -m json.tool

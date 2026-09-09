@@ -53,27 +53,48 @@ class ScrapeJobStateTests(TestCase):
         cache.set(scrape_jobs.KEY.format(job), state, scrape_jobs.TTL)
         self.assertEqual(scrape_jobs.read(job)['state'], 'done')
 
-    def test_spawn_hands_the_work_to_the_celery_worker(self):
-        """The web process recycles its workers; the fetch must not live there."""
+    def test_spawn_queues_for_the_scheduler_when_one_is_running(self):
+        """The web process is recycled under long work; it must not run this."""
+        cache.set(scrape_jobs.RUNNER_KEY, True, 60)
         job = scrape_jobs.new_job()
         start, end = timezone.now() - timedelta(days=1), timezone.now()
-        with self.settings(CELERY_TASK_ALWAYS_EAGER=False), \
-                patch('core.tasks.run_scrape_job.delay') as delay:
-            scrape_jobs.spawn(job, [self.source], start, end)
-        delay.assert_called_once_with(job, [self.source.pk],
-                                      start.isoformat(), end.isoformat())
+        with patch('core.scrape_jobs._start') as start_now:
+            self.assertIsNone(scrape_jobs.spawn(job, [self.source], start, end))
+        start_now.assert_not_called()
+        self.assertEqual(scrape_jobs.read(job)['state'], 'queued')
+        self.assertEqual(cache.get(scrape_jobs.QUEUE_KEY), [{
+            'job': job, 'sources': [self.source.pk],
+            'start': start.isoformat(), 'end': end.isoformat(),
+        }])
 
-    def test_an_unreachable_broker_falls_back_to_a_thread(self):
-        """Fetch must still run when the queue is down, not 500."""
+    def test_the_scheduler_starts_what_was_queued_and_claims_it(self):
         job = scrape_jobs.new_job()
-        with self.settings(CELERY_TASK_ALWAYS_EAGER=False), \
-                patch('core.tasks.run_scrape_job.delay',
-                      side_effect=OSError('broker is down')), \
-                patch('core.scrape_jobs._run') as run:
+        cache.set(scrape_jobs.QUEUE_KEY, [{
+            'job': job, 'sources': [self.source.pk],
+            'start': timezone.now().isoformat(), 'end': timezone.now().isoformat(),
+        }], 60)
+        with patch('core.scrape_jobs._start') as start_now:
+            self.assertEqual(scrape_jobs.run_queued(), 1)
+            self.assertEqual(scrape_jobs.run_queued(), 0)  # not a second time
+        self.assertEqual(start_now.call_count, 1)
+        self.assertTrue(cache.get(scrape_jobs.RUNNER_KEY))
+
+    def test_with_no_scheduler_the_fetch_still_runs_here(self):
+        """A local runserver has no worker; Fetch must not silently do nothing."""
+        job = scrape_jobs.new_job()
+        with patch('core.scrape_jobs._run') as run:
             thread = scrape_jobs.spawn(job, [self.source],
                                        timezone.now(), timezone.now())
         thread.join(timeout=5)
         run.assert_called_once()
+
+    def test_a_queued_job_nobody_picks_up_is_reported_failed(self):
+        job = scrape_jobs.new_job()
+        scrape_jobs._update(job, state='queued')
+        state = cache.get(scrape_jobs.KEY.format(job))
+        state['updated'] = state['updated'] - scrape_jobs.STALE - 1
+        cache.set(scrape_jobs.KEY.format(job), state, scrape_jobs.TTL)
+        self.assertEqual(scrape_jobs.read(job)['state'], 'failed')
 
     def test_the_worker_gets_the_range_back_as_datetimes(self):
         seen = {}

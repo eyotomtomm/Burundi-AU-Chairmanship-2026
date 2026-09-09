@@ -10,6 +10,14 @@ percentage.
 State lives in the cache, which in this deployment is the database cache table,
 so it is shared between both web instances: the browser can poll whichever
 instance the load balancer picks, not just the one that started the job.
+
+The fetch itself does not run in the web process. gunicorn recycles a worker
+every few hundred requests and takes any thread still running in it, which left
+the page polling a job nothing would ever write to again. Instead the job is
+queued in that same shared cache and picked up by whatever process runs the
+periodic jobs — ``run_scheduler`` here, ``celery -A config worker -B`` if a
+broker is ever added. That process advertises itself by stamping a key each
+time it drains the queue, so no setting has to say which one is deployed.
 """
 
 import logging
@@ -17,7 +25,6 @@ import threading
 import time
 import uuid
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.utils.dateparse import parse_datetime
@@ -25,6 +32,12 @@ from django.utils.dateparse import parse_datetime
 logger = logging.getLogger(__name__)
 
 KEY = 'scrape_job:{}'
+# The queue the scheduler drains, and the mark it leaves to say it is there.
+QUEUE_KEY = 'scrape_job:queue'
+RUNNER_KEY = 'scrape_job:runner'
+# Comfortably more than the 30s drain interval, so a tick that is merely late
+# does not look like a worker that is gone.
+RUNNER_TTL = 180
 # Long enough to watch a slow fetch, short enough not to litter the table.
 TTL = 60 * 60
 # A stuck job must not spin forever in a thread nobody is watching.
@@ -53,7 +66,7 @@ def read(job_id):
     data = cache.get(KEY.format(job_id)) if job_id else None
     if not data:
         return data
-    if (data.get('state') in ('starting', 'running')
+    if (data.get('state') in ('starting', 'queued', 'running')
             and time.time() - data.get('updated', 0) > STALE):
         data['state'] = 'failed'
         data['errors'] = (data.get('errors') or []) + [
@@ -80,28 +93,47 @@ def _update(job_id, **fields):
 def spawn(job_id, sources, start, end):
     """Run the fetch outside this request. Returns immediately.
 
-    A fetch takes minutes, and the web process is the wrong place for that:
-    gunicorn recycles a worker every few hundred requests, which silently
-    kills any thread still running in it — the job then never reports again.
-    The Celery worker already runs this exact fetch on a schedule and has no
-    such recycle, so hand it over there. A thread is kept for local runs,
-    where tasks execute inline and there is no worker to hand to.
+    Queued for the scheduler when one is running, because the web process is
+    recycled underneath long work. Where no scheduler answers — a local
+    runserver — this process runs it after all, which is what the browser
+    already expected.
     """
     ids = [s.pk for s in sources]
-    if not getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
-        try:
-            from .tasks import run_scrape_job
-            run_scrape_job.delay(job_id, ids, start.isoformat(), end.isoformat())
-            return None
-        except Exception as exc:
-            # An unreachable broker must not turn Fetch into a 500. A thread is
-            # the worse home for this work, but it is better than no fetch at
-            # all, and a thread that dies is now reported instead of hanging.
-            logger.warning('scrape job %s: no Celery worker to hand to (%s); '
-                           'running in this process instead', job_id, exc)
+    if cache.get(RUNNER_KEY):
+        # ponytail: last write wins if two admins press Fetch in the same
+        # instant. Single-admin tool; a real queue table if that ever changes.
+        pending = cache.get(QUEUE_KEY) or []
+        pending.append({'job': job_id, 'sources': ids,
+                        'start': start.isoformat(), 'end': end.isoformat()})
+        cache.set(QUEUE_KEY, pending, TTL)
+        _update(job_id, state='queued')
+        return None
+    logger.warning('scrape job %s: no scheduler is running; fetching in this '
+                   'process instead', job_id)
+    return _start(job_id, ids, start, end)
 
+
+def run_queued():
+    """Start whatever has been queued. The scheduler calls this on a timer.
+
+    Each fetch gets its own thread so a run of several minutes does not hold
+    up the per-minute jobs behind it in the scheduler's single loop. This
+    process is not recycled per request, so the thread lives as long as the
+    work does.
+    """
+    cache.set(RUNNER_KEY, True, RUNNER_TTL)  # "a runner is here"
+    pending = cache.get(QUEUE_KEY) or []
+    if pending:
+        cache.set(QUEUE_KEY, [], TTL)  # claim them before running
+    for entry in pending:
+        _start(entry['job'], entry['sources'], entry['start'], entry['end'])
+    return len(pending)
+
+
+def _start(job_id, source_ids, start, end):
+    """Run one fetch on a daemon thread of this process."""
     thread = threading.Thread(
-        target=_run, args=(job_id, ids, start, end),
+        target=_run, args=(job_id, source_ids, start, end),
         daemon=True, name=f'scrape-{job_id[:8]}',
     )
     thread.start()

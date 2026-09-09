@@ -182,15 +182,29 @@ git checkout production-readiness-fixes
 python manage.py migrate --plan   # review before applying
 ```
 
-Then on a real device, before you tag a release:
+The Android release artifacts were built and inspected on 2026-09-09, so this
+part is done — recorded here rather than left as a thing to check:
+
+| Checked in the built artifact | Result |
+|---|---|
+| `versionCode` | `58` — the bump reached the binary |
+| `targetSdkVersion` | 36 |
+| Permissions | INTERNET, POST_NOTIFICATIONS, CAMERA, VIBRATE, ACCESS_NETWORK_STATE, WAKE_LOCK, READ_MEDIA_AUDIO, FCM receive, install-referrer, `AD_ID`, `ACCESS_ADSERVICES_*`, GSF read |
+| Removed permissions | no storage, no `READ_MEDIA_IMAGES`/`VIDEO`, no location, contacts or calendar — the removals hold in the shipping binary |
+| Launcher icon | `<adaptive-icon>` with background plus a 16%-inset foreground |
+| `app-release.apk` | 110 MB — a fat APK carrying all three ABIs, which is expected and not what ships |
+| `app-release.aab` | 76 MB; Play splits it per ABI, so the real download is roughly a third of that |
+
+`AD_ID` and `ACCESS_ADSERVICES_*` come in with Firebase Analytics and are
+confirmed present in the binary, so the Play Data Safety form has to declare
+advertising ID. That is the one thing in this table that still needs you.
+
+Rebuild both after any further change:
 
 ```bash
 cd burundi_au_chairmanship
-flutter build apk --release   # proves the Android permission removals + adaptive icon
+flutter build appbundle --release   # this is what you upload
 ```
-
-That build has never been run since the permission changes. Do it before the
-store upload, not after.
 
 ---
 

@@ -14,10 +14,13 @@ instance the load balancer picks, not just the one that started the job.
 
 import logging
 import threading
+import time
 import uuid
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
+from django.utils.dateparse import parse_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +29,11 @@ KEY = 'scrape_job:{}'
 TTL = 60 * 60
 # A stuck job must not spin forever in a thread nobody is watching.
 MAX_RUNTIME = 15 * 60
+# Longest a live run can go without writing an update: gallery-dl's own
+# timeout, plus an image download and a headline for the post after it. Past
+# this the process holding the job is gone, and the bar would otherwise spin
+# for ever.
+STALE = 6 * 60
 
 
 def new_job():
@@ -36,11 +44,29 @@ def new_job():
 
 
 def read(job_id):
-    """Current state of a job, or None once it has expired."""
-    return cache.get(KEY.format(job_id)) if job_id else None
+    """Current state of a job, or None once it has expired.
+
+    A job whose process died — a recycled web worker, a worker that never
+    picked the task up — stops being written to and would otherwise leave the
+    page saying "Fetching…" for ever. Report it as failed once it goes quiet.
+    """
+    data = cache.get(KEY.format(job_id)) if job_id else None
+    if not data:
+        return data
+    if (data.get('state') in ('starting', 'running')
+            and time.time() - data.get('updated', 0) > STALE):
+        data['state'] = 'failed'
+        data['errors'] = (data.get('errors') or []) + [
+            'The fetch stopped without finishing — the process running it was '
+            'restarted, or the background worker never picked it up. Press '
+            'Fetch again; anything already saved was kept.'
+        ]
+        _write(job_id, data)
+    return data
 
 
 def _write(job_id, data):
+    data['updated'] = time.time()
     cache.set(KEY.format(job_id), data, TTL)
 
 
@@ -52,9 +78,23 @@ def _update(job_id, **fields):
 
 
 def spawn(job_id, sources, start, end):
-    """Run the fetch on a background thread. Returns immediately."""
+    """Run the fetch outside this request. Returns immediately.
+
+    A fetch takes minutes, and the web process is the wrong place for that:
+    gunicorn recycles a worker every few hundred requests, which silently
+    kills any thread still running in it — the job then never reports again.
+    The Celery worker already runs this exact fetch on a schedule and has no
+    such recycle, so hand it over there. A thread is kept for local runs,
+    where tasks execute inline and there is no worker to hand to.
+    """
+    ids = [s.pk for s in sources]
+    if not getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
+        from .tasks import run_scrape_job
+        run_scrape_job.delay(job_id, ids, start.isoformat(), end.isoformat())
+        return None
+
     thread = threading.Thread(
-        target=_run, args=(job_id, [s.pk for s in sources], start, end),
+        target=_run, args=(job_id, ids, start, end),
         daemon=True, name=f'scrape-{job_id[:8]}',
     )
     thread.start()
@@ -66,12 +106,21 @@ def _run(job_id, source_ids, start, end):
     from .models import NewsSource
     from .news_scraper import fetch_source, ScrapeError
 
+    # Celery carries the range as ISO strings; a thread passes datetimes.
+    start = parse_datetime(start) if isinstance(start, str) else start
+    end = parse_datetime(end) if isinstance(end, str) else end
+
     created = skipped = 0
     errors, truncated = [], False
     try:
         sources = list(NewsSource.objects.filter(pk__in=source_ids))
         for index, source in enumerate(sources):
             base = created, skipped
+            # Reading the source is the slow part and reports nothing while it
+            # runs, so name it up front rather than leave the page blank for
+            # minutes with no sign the run is alive.
+            _update(job_id, state='running', source=source.name,
+                    percent=int((index / len(sources)) * 100))
 
             def report(done, total, made, seen, _s=source, _b=base, _i=index):
                 # Weight each source's share of the overall bar equally.

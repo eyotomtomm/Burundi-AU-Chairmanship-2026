@@ -13,6 +13,8 @@ from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
 
+from .scrape_jobs import MAX_RUNTIME as SCRAPE_LIMIT
+
 logger = logging.getLogger(__name__)
 
 
@@ -589,6 +591,17 @@ def optimize_image_async(self, image_path):
     except Exception as exc:
         logger.error(f"Image optimization failed: {exc}")
         raise self.retry(exc=exc)
+
+
+@shared_task(soft_time_limit=SCRAPE_LIMIT, time_limit=SCRAPE_LIMIT + 60)
+def run_scrape_job(job_id, source_ids, start, end):
+    """The admin's Fetch button, run here instead of in the web process.
+
+    The default task time limit is five minutes; a fetch over a wide range
+    legitimately takes longer, so this one carries its own.
+    """
+    from . import scrape_jobs
+    scrape_jobs._run(job_id, source_ids, start, end)
 
 
 @shared_task

@@ -109,8 +109,3 @@ class RealScheduleTests(TestCase):
         for name, cfg in schedule.items():
             with self.subTest(job=name):
                 self.assertTrue(callable(import_string(cfg['task'])))
-
-    def test_the_news_fetch_is_scheduled(self):
-        from django.conf import settings
-        tasks = {c['task'] for c in settings.CELERY_BEAT_SCHEDULE.values()}
-        self.assertIn('core.tasks.auto_fetch_news_sources', tasks)

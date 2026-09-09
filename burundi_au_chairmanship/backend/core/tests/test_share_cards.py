@@ -89,5 +89,23 @@ class ShareCardTests(TestCase):
                     self.assertIn(image, names)
                 self.assertEqual(len(labels), 2)
 
+    def test_public_files_are_shareable_by_a_cache_but_the_page_is_not(self):
+        # Vary: Cookie from the session middleware makes an edge cache keep one
+        # copy per visitor, which is why none of this was cacheable in
+        # production. The card and the two association files are identical for
+        # everyone; the share page branches on User-Agent and must not be.
+        for path in ('/.well-known/assetlinks.json',
+                     '/.well-known/apple-app-site-association',
+                     f'/articles/{self.article.pk}/card.jpg'):
+            with self.subTest(path=path):
+                res = self.client.get(path)
+                self.assertEqual(res.status_code, 200)
+                self.assertIn('public', res['Cache-Control'])
+                self.assertNotIn('Cookie', res.get('Vary', ''))
+
+        page = self.client.get(f'/articles/{self.article.pk}/share/')
+        self.assertIn('no-store', page['Cache-Control'])
+        self.assertIn('User-Agent', page['Vary'])
+
     def test_unknown_kind_is_rejected(self):
         self.assertEqual(self.client.get('/widgets/1/share/').status_code, 404)

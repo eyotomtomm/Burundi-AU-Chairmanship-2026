@@ -989,6 +989,178 @@ class AppLocalizationsGeneratedFr extends AppLocalizationsGenerated {
   String get xt_field_phone => 'votre numéro de téléphone';
 
   @override
+  String get xt_point1_title => 'Publiez en votre nom';
+
+  @override
+  String get xt_point1_body =>
+      'Votre nom, votre photo et votre pays apparaissent sur tout ce que vous publiez. Aucun compte anonyme.';
+
+  @override
+  String get xt_point2_title => 'Critiquez l\'idée, pas la personne';
+
+  @override
+  String get xt_point2_body =>
+      'Exprimez votre désaccord aussi vivement que vous le souhaitez. Le harcèlement, la haine et les menaces sont supprimés.';
+
+  @override
+  String get xt_point3_title => 'Soyez honnête sur vos sources';
+
+  @override
+  String get xt_point3_body =>
+      'Ne présentez pas une rumeur comme un fait. La désinformation sur l\'agenda est retirée.';
+
+  @override
+  String get xt_point4_title => 'Signaler, c\'est aussi votre rôle';
+
+  @override
+  String get xt_point4_body =>
+      'Si vous voyez un contenu qui enfreint ces règles, signalez-le. Les modérateurs examinent chaque signalement.';
+
+  @override
+  String get xt_field_email => 'votre adresse e-mail';
+
+  @override
+  String get xt_field_gender => 'votre genre';
+
+  @override
+  String get w_reason_spam => 'Spam ou contenu trompeur';
+
+  @override
+  String get w_reason_harassment => 'Harcèlement ou haine';
+
+  @override
+  String get w_reason_violence => 'Violence ou menaces';
+
+  @override
+  String get w_reason_sexual => 'Contenu sexuel';
+
+  @override
+  String get w_reason_misinformation => 'Fausse information';
+
+  @override
+  String get w_reason_other => 'Autre chose';
+
+  @override
+  String get w_pw_weak => 'Faible';
+
+  @override
+  String get w_pw_fair => 'Moyen';
+
+  @override
+  String get w_pw_good => 'Bon';
+
+  @override
+  String get w_pw_strong => 'Fort';
+
+  @override
+  String get ydd_camera_denied =>
+      'Accès à la caméra refusé. Activez-le dans les Réglages.';
+
+  @override
+  String get ydd_camera_open_failed => 'Impossible d\'ouvrir la caméra';
+
+  @override
+  String get ydd_camera_unavailable_gallery =>
+      'Caméra indisponible. Choisissez une photo de la galerie.';
+
+  @override
+  String get ydd_camera_open_failed_gallery =>
+      'Impossible d\'ouvrir la caméra. Choisissez de la galerie.';
+
+  @override
+  String get ydd_take_photo => 'Prendre une photo';
+
+  @override
+  String get ydd_upload => 'Télécharger';
+
+  @override
+  String get res_file_not_available =>
+      'Ce fichier n\'est pas encore disponible.';
+
+  @override
+  String get res_could_not_open_file => 'Impossible d\'ouvrir ce fichier.';
+
+  @override
+  String get res_downloaded_no_app =>
+      'Téléchargé, mais aucune application de cet appareil ne peut ouvrir ce type de fichier.';
+
+  @override
+  String get res_download_failed =>
+      'Échec du téléchargement. Veuillez réessayer.';
+
+  @override
+  String get vr_title_mr => 'M.';
+
+  @override
+  String get vr_title_mrs => 'Mme';
+
+  @override
+  String get vr_title_ms => 'Mlle';
+
+  @override
+  String get vr_title_dr => 'Dr';
+
+  @override
+  String get vr_title_prof => 'Pr';
+
+  @override
+  String get vr_title_he => 'S.E. (Son Excellence)';
+
+  @override
+  String get vr_title_amb => 'Ambassadeur';
+
+  @override
+  String get vr_title_hon => 'Honorable';
+
+  @override
+  String get vr_hint_phone_or_link => 'Numéro de téléphone ou lien wa.me';
+
+  @override
+  String get vr_hint_url_or_username => 'URL ou nom d\'utilisateur';
+
+  @override
+  String get wx_clear => 'Dégagé';
+
+  @override
+  String get wx_partly_cloudy => 'Partiellement nuageux';
+
+  @override
+  String get wx_cloudy => 'Nuageux';
+
+  @override
+  String get wx_overcast => 'Couvert';
+
+  @override
+  String get wx_mist => 'Brume';
+
+  @override
+  String get wx_foggy => 'Brouillard';
+
+  @override
+  String get wx_drizzle => 'Bruine';
+
+  @override
+  String get wx_rain => 'Pluie';
+
+  @override
+  String get wx_snow => 'Neige';
+
+  @override
+  String get wx_rain_showers => 'Averses';
+
+  @override
+  String get wx_snow_showers => 'Averses de neige';
+
+  @override
+  String get wx_thunderstorm => 'Orage';
+
+  @override
+  String get ydm_view_status => 'Voir le statut';
+
+  @override
+  String get ydm_manage_documents => 'Gérer les documents';
+
+  @override
   String get w_appeal_explain =>
       'Expliquez-nous pourquoi vous pensez qu\'il s\'agit d\'une erreur.';
 

@@ -977,6 +977,176 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
   String get xt_field_phone => 'your phone number';
 
   @override
+  String get xt_point1_title => 'Post as yourself';
+
+  @override
+  String get xt_point1_body =>
+      'Your name, photo and country appear on everything you post. No anonymous accounts.';
+
+  @override
+  String get xt_point2_title => 'Argue the point, not the person';
+
+  @override
+  String get xt_point2_body =>
+      'Disagree as sharply as you like. Harassment, hate and threats are removed.';
+
+  @override
+  String get xt_point3_title => 'Be honest about sources';
+
+  @override
+  String get xt_point3_body =>
+      'Do not present rumour as fact. Misinformation about the agenda gets taken down.';
+
+  @override
+  String get xt_point4_title => 'Reporting is on you too';
+
+  @override
+  String get xt_point4_body =>
+      'If you see something that breaks these terms, report it. Moderators review every report.';
+
+  @override
+  String get xt_field_email => 'your email address';
+
+  @override
+  String get xt_field_gender => 'your gender';
+
+  @override
+  String get w_reason_spam => 'Spam or misleading';
+
+  @override
+  String get w_reason_harassment => 'Harassment or hate';
+
+  @override
+  String get w_reason_violence => 'Violence or threats';
+
+  @override
+  String get w_reason_sexual => 'Sexual content';
+
+  @override
+  String get w_reason_misinformation => 'False information';
+
+  @override
+  String get w_reason_other => 'Something else';
+
+  @override
+  String get w_pw_weak => 'Weak';
+
+  @override
+  String get w_pw_fair => 'Fair';
+
+  @override
+  String get w_pw_good => 'Good';
+
+  @override
+  String get w_pw_strong => 'Strong';
+
+  @override
+  String get ydd_camera_denied =>
+      'Camera access denied. Enable it in Settings.';
+
+  @override
+  String get ydd_camera_open_failed => 'Could not open camera';
+
+  @override
+  String get ydd_camera_unavailable_gallery =>
+      'Camera unavailable. Choose a photo from gallery instead.';
+
+  @override
+  String get ydd_camera_open_failed_gallery =>
+      'Could not open camera. Choose from gallery instead.';
+
+  @override
+  String get ydd_take_photo => 'Take Photo';
+
+  @override
+  String get ydd_upload => 'Upload';
+
+  @override
+  String get res_file_not_available => 'This file is not available yet.';
+
+  @override
+  String get res_could_not_open_file => 'Could not open this file.';
+
+  @override
+  String get res_downloaded_no_app =>
+      'Downloaded, but no app on this device can open this file type.';
+
+  @override
+  String get res_download_failed => 'Download failed. Please try again.';
+
+  @override
+  String get vr_title_mr => 'Mr.';
+
+  @override
+  String get vr_title_mrs => 'Mrs.';
+
+  @override
+  String get vr_title_ms => 'Ms.';
+
+  @override
+  String get vr_title_dr => 'Dr.';
+
+  @override
+  String get vr_title_prof => 'Prof.';
+
+  @override
+  String get vr_title_he => 'H.E. (His/Her Excellency)';
+
+  @override
+  String get vr_title_amb => 'Ambassador';
+
+  @override
+  String get vr_title_hon => 'Honorable';
+
+  @override
+  String get vr_hint_phone_or_link => 'Phone number or wa.me link';
+
+  @override
+  String get vr_hint_url_or_username => 'URL or username';
+
+  @override
+  String get wx_clear => 'Clear';
+
+  @override
+  String get wx_partly_cloudy => 'Partly cloudy';
+
+  @override
+  String get wx_cloudy => 'Cloudy';
+
+  @override
+  String get wx_overcast => 'Overcast';
+
+  @override
+  String get wx_mist => 'Mist';
+
+  @override
+  String get wx_foggy => 'Foggy';
+
+  @override
+  String get wx_drizzle => 'Drizzle';
+
+  @override
+  String get wx_rain => 'Rain';
+
+  @override
+  String get wx_snow => 'Snow';
+
+  @override
+  String get wx_rain_showers => 'Rain showers';
+
+  @override
+  String get wx_snow_showers => 'Snow showers';
+
+  @override
+  String get wx_thunderstorm => 'Thunderstorm';
+
+  @override
+  String get ydm_view_status => 'View Status';
+
+  @override
+  String get ydm_manage_documents => 'Manage Documents';
+
+  @override
   String get w_appeal_explain => 'Tell us why you think this was a mistake.';
 
   @override

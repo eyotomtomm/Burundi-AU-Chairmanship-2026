@@ -15,6 +15,18 @@ class ExploreTermsScreen extends StatefulWidget {
 
   const ExploreTermsScreen({super.key, this.missingFields = const []});
 
+  /// Shared with the post composer's profile prompt.
+  static String fieldLabel(AppLocalizations l10n, String field) => switch (field) {
+        'profile_picture' => l10n.translate('xt_field_photo'),
+        'date_of_birth' => l10n.translate('xt_field_dob'),
+        'name' => l10n.translate('xt_field_name'),
+        'nationality' => l10n.translate('xt_field_country'),
+        'phone' => l10n.translate('xt_field_phone'),
+        'email' => l10n.translate('xt_field_email'),
+        'gender' => l10n.translate('xt_field_gender'),
+        _ => field.replaceAll('_', ' '),
+      };
+
   @override
   State<ExploreTermsScreen> createState() => _ExploreTermsScreenState();
 }
@@ -22,6 +34,7 @@ class ExploreTermsScreen extends StatefulWidget {
 class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
   bool _agreed = false;
   bool _busy = false;
+  late List<String> _missing = widget.missingFields;
 
   // (icon, title key, body key) — resolved through l10n at build time.
   static const _points = [
@@ -31,14 +44,18 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
     (Icons.flag_rounded, 'xt_point4_title', 'xt_point4_body'),
   ];
 
-  static String _label(AppLocalizations l10n, String field) => switch (field) {
-        'profile_picture' => l10n.translate('xt_field_photo'),
-        'date_of_birth' => l10n.translate('xt_field_dob'),
-        'name' => l10n.translate('xt_field_name'),
-        'nationality' => l10n.translate('xt_field_country'),
-        'phone' => l10n.translate('xt_field_phone'),
-        _ => field.replaceAll('_', ' '),
-      };
+  /// Re-check after the profile screen, so filled-in fields stop blocking.
+  Future<void> _completeProfile() async {
+    await Navigator.pushNamed(context, '/profile-completion');
+    try {
+      final state = await ApiService().getExploreTerms();
+      if (!mounted) return;
+      setState(() => _missing =
+          (state['missing_fields'] as List?)?.cast<String>() ?? const []);
+    } catch (_) {
+      // Keep the last known list; the server still checks on post.
+    }
+  }
 
   Future<void> _accept() async {
     setState(() => _busy = true);
@@ -59,7 +76,7 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final missing = widget.missingFields;
+    final missing = _missing;
     final ready = _agreed && missing.isEmpty;
 
     return Scaffold(
@@ -188,15 +205,14 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '${l10n.translate('xt_we_still_need')} ${missing.map((m) => _label(l10n, m)).join(', ')}. '
+                          '${l10n.translate('xt_we_still_need')} ${missing.map((m) => ExploreTermsScreen.fieldLabel(l10n, m)).join(', ')}. '
                           '${l10n.translate('xt_accountable')}',
                           style: TextStyle(
                               fontSize: 13, height: 1.45, color: Ds.body(context)),
                         ),
                         const SizedBox(height: 12),
                         GestureDetector(
-                          onTap: () =>
-                              Navigator.pushNamed(context, '/profile-completion'),
+                          onTap: _completeProfile,
                           child: Container(
                             height: 44,
                             alignment: Alignment.center,

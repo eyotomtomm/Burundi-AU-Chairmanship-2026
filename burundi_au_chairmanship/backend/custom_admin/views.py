@@ -189,6 +189,108 @@ def _fetch_youtube_thumbnail(video_url):
     return None
 
 
+_X_STATUS = re.compile(r'(?:x|twitter)\.com/[^/]+/status(?:es)?/(\d+)', re.I)
+
+
+def _x_post_media(url):
+    """Photo URLs and MP4 URLs of an X post, from the public embed endpoint.
+
+    This is the endpoint X's own embed widget reads; it needs no account, but
+    it is undocumented, so any failure just means "no media found".
+    """
+    m = _X_STATUS.search(url or '')
+    if not m:
+        return None
+    tweet_id = m.group(1)
+    # The widget's token: (id / 1e15 * pi) in base 36, zeros and point removed.
+    x = int(tweet_id) / 1e15 * 3.141592653589793
+    digits = '0123456789abcdefghijklmnopqrstuvwxyz'
+    whole, frac, token = int(x), x - int(x), ''
+    while whole:
+        token, whole = digits[whole % 36] + token, whole // 36
+    for _ in range(12):
+        frac *= 36
+        token += digits[int(frac)]
+        frac -= int(frac)
+    token = re.sub(r'0+', '', token)
+    photos, videos = [], []
+    try:
+        req = urllib.request.Request(
+            f'https://cdn.syndication.twimg.com/tweet-result?id={tweet_id}&token={token}',
+            headers={'User-Agent': 'Mozilla/5.0'})
+        data = json.load(urllib.request.urlopen(req, timeout=10))
+    except Exception:
+        logger.warning('Could not read X post %s', tweet_id, exc_info=True)
+        return photos, videos
+    for item in data.get('mediaDetails') or []:
+        mp4s = [v for v in (item.get('video_info') or {}).get('variants', [])
+                if v.get('content_type') == 'video/mp4']
+        if mp4s:
+            videos.append(max(mp4s, key=lambda v: v.get('bitrate', 0))['url'])
+        if item.get('media_url_https'):
+            # A video's entry carries its poster frame here.
+            photos.append((item['media_url_https'], bool(mp4s)))
+    return photos, videos
+
+
+def _download_image(url, name):
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        return ContentFile(urllib.request.urlopen(req, timeout=15).read(), name=name)
+    except Exception:
+        logger.warning('Could not download %s', url, exc_info=True)
+        return None
+
+
+def _attach_media_links(request, article):
+    """Turn the pasted YouTube / X links into the article's media.
+
+    YouTube links become in-app videos. An X post's photos and videos are
+    pulled in as if uploaded. With no cover image, the first photo (or a video's
+    poster frame) becomes the cover, as the X importer does.
+    """
+    from core.models import ArticleMedia
+
+    links = [l.strip() for l in request.POST.get('media_links', '').splitlines() if l.strip()]
+    order = article.media.count()
+    for link in links:
+        if _extract_youtube_id(link):
+            if not article.image:
+                thumb = _fetch_youtube_thumbnail(link)
+                if thumb:
+                    article.image.save(thumb.name, thumb)
+            ArticleMedia.objects.create(
+                article=article, media_type='video', video_url=link, order=order)
+            order += 1
+            continue
+
+        found = _x_post_media(link)
+        if found is None:
+            messages.warning(request, f'Skipped {link} — only YouTube and X post links are supported.')
+            continue
+        photos, videos = found
+        if not photos and not videos:
+            messages.warning(request, f'Found no photo or video in {link}.')
+            continue
+        for i, (photo_url, is_poster) in enumerate(photos):
+            if article.image and is_poster:
+                continue  # a poster frame only matters as a cover
+            image = _download_image(photo_url, f'x_{article.pk}_{order}_{i}.jpg')
+            if not image:
+                continue
+            if not article.image:
+                article.image.save(image.name, image)
+            elif not is_poster:
+                ArticleMedia.objects.create(
+                    article=article, media_type='image', image=image, order=order)
+                order += 1
+        for video_url in videos:
+            # ponytail: plays straight from X's CDN; it breaks if the post is deleted.
+            ArticleMedia.objects.create(
+                article=article, media_type='video', video_url=video_url, order=order)
+            order += 1
+
+
 def _catch_upload_errors(view_func):
     """Decorator: catch file-upload / S3 errors on POST and show a message instead of 500."""
     @functools.wraps(view_func)
@@ -844,6 +946,7 @@ def article_create(request):
             scheduled_publish_date=scheduled_publish_date,
             expires_at=expires_at,
         )
+        _attach_media_links(request, article)
         log_admin_action(request, 'create', 'Article', object_id=article.pk, object_repr=article.title)
         if content_status == 'draft':
             messages.success(request, 'Article saved as draft!')
@@ -912,6 +1015,7 @@ def article_edit(request, pk):
         article.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         article.expires_at = request.POST.get('expires_at') or None
         article.save()
+        _attach_media_links(request, article)
         log_admin_action(request, 'update', 'Article', object_id=article.pk, object_repr=article.title, changes=changes)
         if content_status == 'draft':
             messages.success(request, 'Article saved as draft!')

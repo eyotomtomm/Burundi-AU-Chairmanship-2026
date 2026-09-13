@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../config/app_colors.dart';
+import '../l10n/app_localizations.dart';
 
 /// A reusable password strength meter widget.
 ///
@@ -74,7 +75,7 @@ class PasswordStrengthMeter extends StatelessWidget {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
           child: Text(
-            info.label,
+            AppLocalizations.of(context).translate(info.label),
             key: ValueKey(info.label),
             style: TextStyle(
               fontSize: 12,

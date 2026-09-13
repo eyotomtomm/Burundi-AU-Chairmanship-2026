@@ -318,7 +318,12 @@ class Command(BaseCommand):
                 existing = Article.objects.filter(
                     publish_date=post_date_aware, author=AUTHOR).first()
                 if existing:
-                    if refresh and not dry_run:
+                    # A translated article holds two different languages. A
+                    # refresh writes the post's own wording into both, which
+                    # would undo the translation, so it leaves those alone.
+                    translated = (existing.title_fr.strip()
+                                  and existing.title_fr != existing.title)
+                    if refresh and not dry_run and not translated:
                         existing.title = title
                         existing.title_fr = title if is_french else ''
                         existing.content = body

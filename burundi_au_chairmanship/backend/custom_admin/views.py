@@ -9606,15 +9606,11 @@ def error_tracking_api(request):
 @login_required(login_url='/admin/')
 @user_passes_test(lambda u: u.is_staff)
 def auto_translate(request):
-    """Auto-translate text between EN and FR using free translation APIs.
-    Uses MyMemory API (free, no key) with LibreTranslate fallback.
-    """
+    """Auto-translate text between EN and FR over free endpoints, no key."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    import urllib.request
-    import urllib.parse
-    import json
+    from core.translation import translate_text
 
     text = request.POST.get('text', '').strip()
     source_lang = request.POST.get('source', 'en')
@@ -9622,98 +9618,18 @@ def auto_translate(request):
 
     if not text:
         return JsonResponse({'error': 'No text provided'}, status=400)
-
     if source_lang not in ('en', 'fr') or target_lang not in ('en', 'fr'):
         return JsonResponse({'error': 'Only EN and FR are supported'}, status=400)
 
-    def _translate_chunk(chunk, sl, tl):
-        """Try multiple free translation APIs in order."""
-
-        # 1) Google Translate (gtx client — free, no key)
-        try:
-            encoded = urllib.parse.quote(chunk)
-            url = f'https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl}&tl={tl}&dt=t&q={encoded}'
-            req = urllib.request.Request(url)
-            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read())
-            if data and data[0]:
-                result = ''.join(seg[0] for seg in data[0] if seg and seg[0])
-                if result and result.strip():
-                    return result
-        except Exception:
-            pass
-
-        # 2) Lingva Translate (Google Translate proxy)
-        try:
-            encoded = urllib.parse.quote(chunk)
-            url = f'https://lingva.ml/api/v1/{sl}/{tl}/{encoded}'
-            req = urllib.request.Request(url)
-            req.add_header('User-Agent', 'Mozilla/5.0')
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read())
-            result = data.get('translation', '')
-            if result and result.strip():
-                return result
-        except Exception:
-            pass
-
-        # 3) MyMemory API — check both translatedText and matches
-        try:
-            encoded = urllib.parse.quote(chunk)
-            url = f'https://api.mymemory.translated.net/get?q={encoded}&langpair={sl}|{tl}'
-            req = urllib.request.Request(url)
-            req.add_header('User-Agent', 'Mozilla/5.0')
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read())
-            result = data.get('responseData', {}).get('translatedText', '')
-            if result and result.strip():
-                return result
-            # Fallback: use best match from matches array
-            matches = data.get('matches', [])
-            for m in matches:
-                t = m.get('translation', '')
-                if t and t.strip():
-                    return t
-        except Exception:
-            pass
-
-        return None
-
     try:
-        # Split long texts into ~450 char chunks at sentence boundaries
-        if len(text) <= 450:
-            chunks = [text]
-        else:
-            chunks = []
-            remaining = text
-            while remaining:
-                if len(remaining) <= 450:
-                    chunks.append(remaining)
-                    break
-                # Find last sentence break before 450 chars
-                cut = 450
-                for sep in ['. ', '.\n', '! ', '? ', '\n']:
-                    pos = remaining[:cut].rfind(sep)
-                    if pos > 100:
-                        cut = pos + len(sep)
-                        break
-                chunks.append(remaining[:cut])
-                remaining = remaining[cut:]
-
-        translated_parts = []
-        for chunk in chunks:
-            result = _translate_chunk(chunk, source_lang, target_lang)
-            if result:
-                translated_parts.append(result)
-            else:
-                return JsonResponse({'error': 'Translation service unavailable. Please try again later.'}, status=502)
-
-        translated = ''.join(translated_parts)
-        return JsonResponse({'translated': translated})
-
+        translated = translate_text(text, source_lang, target_lang)
     except Exception as e:
-        return JsonResponse({'error': f'Translation failed: {str(e)}'}, status=500)
+        return JsonResponse({'error': f'Translation failed: {e}'}, status=500)
+    if not translated:
+        return JsonResponse(
+            {'error': 'Translation service unavailable. Please try again later.'},
+            status=502)
+    return JsonResponse({'translated': translated})
 
 
 # ═══════════════════════════════════════════════════════════════

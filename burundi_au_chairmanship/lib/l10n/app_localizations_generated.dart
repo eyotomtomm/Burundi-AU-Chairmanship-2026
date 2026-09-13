@@ -1991,6 +1991,330 @@ abstract class AppLocalizationsGenerated {
   /// **'your phone number'**
   String get xt_field_phone;
 
+  /// No description provided for @xt_point1_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Post as yourself'**
+  String get xt_point1_title;
+
+  /// No description provided for @xt_point1_body.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name, photo and country appear on everything you post. No anonymous accounts.'**
+  String get xt_point1_body;
+
+  /// No description provided for @xt_point2_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Argue the point, not the person'**
+  String get xt_point2_title;
+
+  /// No description provided for @xt_point2_body.
+  ///
+  /// In en, this message translates to:
+  /// **'Disagree as sharply as you like. Harassment, hate and threats are removed.'**
+  String get xt_point2_body;
+
+  /// No description provided for @xt_point3_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Be honest about sources'**
+  String get xt_point3_title;
+
+  /// No description provided for @xt_point3_body.
+  ///
+  /// In en, this message translates to:
+  /// **'Do not present rumour as fact. Misinformation about the agenda gets taken down.'**
+  String get xt_point3_body;
+
+  /// No description provided for @xt_point4_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Reporting is on you too'**
+  String get xt_point4_title;
+
+  /// No description provided for @xt_point4_body.
+  ///
+  /// In en, this message translates to:
+  /// **'If you see something that breaks these terms, report it. Moderators review every report.'**
+  String get xt_point4_body;
+
+  /// No description provided for @xt_field_email.
+  ///
+  /// In en, this message translates to:
+  /// **'your email address'**
+  String get xt_field_email;
+
+  /// No description provided for @xt_field_gender.
+  ///
+  /// In en, this message translates to:
+  /// **'your gender'**
+  String get xt_field_gender;
+
+  /// No description provided for @w_reason_spam.
+  ///
+  /// In en, this message translates to:
+  /// **'Spam or misleading'**
+  String get w_reason_spam;
+
+  /// No description provided for @w_reason_harassment.
+  ///
+  /// In en, this message translates to:
+  /// **'Harassment or hate'**
+  String get w_reason_harassment;
+
+  /// No description provided for @w_reason_violence.
+  ///
+  /// In en, this message translates to:
+  /// **'Violence or threats'**
+  String get w_reason_violence;
+
+  /// No description provided for @w_reason_sexual.
+  ///
+  /// In en, this message translates to:
+  /// **'Sexual content'**
+  String get w_reason_sexual;
+
+  /// No description provided for @w_reason_misinformation.
+  ///
+  /// In en, this message translates to:
+  /// **'False information'**
+  String get w_reason_misinformation;
+
+  /// No description provided for @w_reason_other.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get w_reason_other;
+
+  /// No description provided for @w_pw_weak.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak'**
+  String get w_pw_weak;
+
+  /// No description provided for @w_pw_fair.
+  ///
+  /// In en, this message translates to:
+  /// **'Fair'**
+  String get w_pw_fair;
+
+  /// No description provided for @w_pw_good.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get w_pw_good;
+
+  /// No description provided for @w_pw_strong.
+  ///
+  /// In en, this message translates to:
+  /// **'Strong'**
+  String get w_pw_strong;
+
+  /// No description provided for @ydd_camera_denied.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access denied. Enable it in Settings.'**
+  String get ydd_camera_denied;
+
+  /// No description provided for @ydd_camera_open_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open camera'**
+  String get ydd_camera_open_failed;
+
+  /// No description provided for @ydd_camera_unavailable_gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera unavailable. Choose a photo from gallery instead.'**
+  String get ydd_camera_unavailable_gallery;
+
+  /// No description provided for @ydd_camera_open_failed_gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open camera. Choose from gallery instead.'**
+  String get ydd_camera_open_failed_gallery;
+
+  /// No description provided for @ydd_take_photo.
+  ///
+  /// In en, this message translates to:
+  /// **'Take Photo'**
+  String get ydd_take_photo;
+
+  /// No description provided for @ydd_upload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get ydd_upload;
+
+  /// No description provided for @res_file_not_available.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is not available yet.'**
+  String get res_file_not_available;
+
+  /// No description provided for @res_could_not_open_file.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open this file.'**
+  String get res_could_not_open_file;
+
+  /// No description provided for @res_downloaded_no_app.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded, but no app on this device can open this file type.'**
+  String get res_downloaded_no_app;
+
+  /// No description provided for @res_download_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed. Please try again.'**
+  String get res_download_failed;
+
+  /// No description provided for @vr_title_mr.
+  ///
+  /// In en, this message translates to:
+  /// **'Mr.'**
+  String get vr_title_mr;
+
+  /// No description provided for @vr_title_mrs.
+  ///
+  /// In en, this message translates to:
+  /// **'Mrs.'**
+  String get vr_title_mrs;
+
+  /// No description provided for @vr_title_ms.
+  ///
+  /// In en, this message translates to:
+  /// **'Ms.'**
+  String get vr_title_ms;
+
+  /// No description provided for @vr_title_dr.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr.'**
+  String get vr_title_dr;
+
+  /// No description provided for @vr_title_prof.
+  ///
+  /// In en, this message translates to:
+  /// **'Prof.'**
+  String get vr_title_prof;
+
+  /// No description provided for @vr_title_he.
+  ///
+  /// In en, this message translates to:
+  /// **'H.E. (His/Her Excellency)'**
+  String get vr_title_he;
+
+  /// No description provided for @vr_title_amb.
+  ///
+  /// In en, this message translates to:
+  /// **'Ambassador'**
+  String get vr_title_amb;
+
+  /// No description provided for @vr_title_hon.
+  ///
+  /// In en, this message translates to:
+  /// **'Honorable'**
+  String get vr_title_hon;
+
+  /// No description provided for @vr_hint_phone_or_link.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number or wa.me link'**
+  String get vr_hint_phone_or_link;
+
+  /// No description provided for @vr_hint_url_or_username.
+  ///
+  /// In en, this message translates to:
+  /// **'URL or username'**
+  String get vr_hint_url_or_username;
+
+  /// No description provided for @wx_clear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get wx_clear;
+
+  /// No description provided for @wx_partly_cloudy.
+  ///
+  /// In en, this message translates to:
+  /// **'Partly cloudy'**
+  String get wx_partly_cloudy;
+
+  /// No description provided for @wx_cloudy.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloudy'**
+  String get wx_cloudy;
+
+  /// No description provided for @wx_overcast.
+  ///
+  /// In en, this message translates to:
+  /// **'Overcast'**
+  String get wx_overcast;
+
+  /// No description provided for @wx_mist.
+  ///
+  /// In en, this message translates to:
+  /// **'Mist'**
+  String get wx_mist;
+
+  /// No description provided for @wx_foggy.
+  ///
+  /// In en, this message translates to:
+  /// **'Foggy'**
+  String get wx_foggy;
+
+  /// No description provided for @wx_drizzle.
+  ///
+  /// In en, this message translates to:
+  /// **'Drizzle'**
+  String get wx_drizzle;
+
+  /// No description provided for @wx_rain.
+  ///
+  /// In en, this message translates to:
+  /// **'Rain'**
+  String get wx_rain;
+
+  /// No description provided for @wx_snow.
+  ///
+  /// In en, this message translates to:
+  /// **'Snow'**
+  String get wx_snow;
+
+  /// No description provided for @wx_rain_showers.
+  ///
+  /// In en, this message translates to:
+  /// **'Rain showers'**
+  String get wx_rain_showers;
+
+  /// No description provided for @wx_snow_showers.
+  ///
+  /// In en, this message translates to:
+  /// **'Snow showers'**
+  String get wx_snow_showers;
+
+  /// No description provided for @wx_thunderstorm.
+  ///
+  /// In en, this message translates to:
+  /// **'Thunderstorm'**
+  String get wx_thunderstorm;
+
+  /// No description provided for @ydm_view_status.
+  ///
+  /// In en, this message translates to:
+  /// **'View Status'**
+  String get ydm_view_status;
+
+  /// No description provided for @ydm_manage_documents.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Documents'**
+  String get ydm_manage_documents;
+
   /// No description provided for @w_appeal_explain.
   ///
   /// In en, this message translates to:

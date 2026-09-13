@@ -8,6 +8,7 @@ import '../../config/app_ds.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../screens/feed/explore_terms_screen.dart';
 
 /// A file queued in the composer, not yet uploaded.
 class ComposerAttachment {
@@ -128,8 +129,9 @@ class PostComposer {
         builder: (ctx) => AlertDialog(
           title: Text(AppLocalizations.of(ctx).translate('w_complete_profile_title')),
           content: Text(
-            '${AppLocalizations.of(ctx).translate('w_complete_profile_body')}'
-            '${missing.map(_fieldLabel).join(', ')}.',
+            '${AppLocalizations.of(ctx).translate('w_complete_profile_body')} '
+            '${AppLocalizations.of(ctx).translate('xt_we_still_need')} '
+            '${missing.map((f) => ExploreTermsScreen.fieldLabel(AppLocalizations.of(ctx), f)).join(', ')}.',
           ),
           actions: [
             TextButton(
@@ -152,11 +154,6 @@ class PostComposer {
     }
   }
 
-  static String _fieldLabel(String field) => switch (field) {
-        'profile_picture' => 'profile photo',
-        'date_of_birth' => 'date of birth',
-        _ => field.replaceAll('_', ' '),
-      };
 
   /// Creates the post, then attaches the poll and uploads each file, showing
   /// real upload progress — a 300 MB video otherwise looks like a hang.

@@ -750,13 +750,15 @@ class ApiService {
   /// Every post. News and articles were never two things editorially — the
   /// admin form preselected 'article', so the split only recorded which
   /// option happened to be highlighted. One feed now.
-  Future<List<Article>> getNews({bool? featured}) async {
-    String endpoint = 'articles/?';
-    if (featured != null) endpoint += 'is_featured=$featured';
-    final data = await _get(endpoint);
-    return _extractResults(data)
-        .map((j) => Article.fromJson(j))
-        .toList();
+  /// One page of articles (the server pages at 20), optionally one category.
+  Future<({List<Article> articles, bool hasMore})> getNews(
+      {int? categoryId, int page = 1}) async {
+    final params = ['page=$page', if (categoryId != null) 'category=$categoryId'];
+    final data = await _get('articles/?${params.join('&')}');
+    return (
+      articles: _extractResults(data).map((j) => Article.fromJson(j)).toList(),
+      hasMore: data is Map && data['next'] != null,
+    );
   }
 
   Future<Article> getArticle(String articleId) async {

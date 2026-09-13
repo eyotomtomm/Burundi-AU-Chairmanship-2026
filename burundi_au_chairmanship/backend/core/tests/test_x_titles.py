@@ -46,3 +46,38 @@ class MakeTitleTests(SimpleTestCase):
         self.assertEqual(
             clean_prose('[LIVE NOW]\nOpening Ceremony https://x.com/i/broadcasts/1PK'),
             '[LIVE NOW] Opening Ceremony')
+
+    def test_rank_does_not_end_the_sentence(self):
+        # "…African Union, H.E. Gen." was shipped as a whole headline.
+        title = make_title(
+            'Burundi’s President and Chairperson of the African Union, '
+            'H.E. Gen. Évariste Ndayishimiye arrived in New Delhi.')
+        # A sentence this length is still a headline; it must arrive whole.
+        self.assertTrue(title.endswith('arrived in New Delhi.'), title)
+
+    def test_paragraph_sentence_is_cut_to_a_headline(self):
+        # The whole story used to land in the title with nothing left to read.
+        title = make_title(
+            'Lors des échanges sur les travaux de la CVR BURUNDI, à '
+            'l’Ambassade du Burundi à Addis-Abeba, M. Salvator Nkeshimana, '
+            'Vice-Président de la Communauté Burundaise, a souligné la '
+            'nécessité de faire connaître le rapport.')
+        self.assertLessEqual(len(title), 130)
+        self.assertFalse(title.endswith('…'))
+        self.assertTrue(title.startswith('Lors des échanges'), title)
+
+    def test_tagged_account_beside_the_name_is_dropped(self):
+        # "H.E. Ndayishimiye (SE Evariste Ndayishimiye)" named him twice.
+        title = make_title(
+            'Arrival of H.E. Évariste Ndayishimiye (@GeneralNeva) in New Delhi.',
+            mentions=[{'name': 'GeneralNeva', 'nick': 'SE Evariste Ndayishimiye'}],
+        )
+        self.assertEqual(title, 'Arrival of H.E. Évariste Ndayishimiye in New Delhi.')
+
+    def test_account_branding_leaves_the_person(self):
+        title = make_title(
+            'Minister @MFABurundi was received at the airport in New Delhi.',
+            mentions=[{'name': 'MFABurundi', 'nick': 'Edouard Bizimana/ MoFA 🇧🇮'}],
+        )
+        self.assertEqual(
+            title, 'Minister Edouard Bizimana was received at the airport in New Delhi.')

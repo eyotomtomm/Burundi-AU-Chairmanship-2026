@@ -132,6 +132,8 @@ jobs:
     env:
       # gradle.properties sets -Xmx4G; 7 GB runners can't take more.
       GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+      # Job-level so the signing step's `if` can see it (step env is not in scope there).
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
     steps:
       - uses: actions/checkout@v4
@@ -163,7 +165,6 @@ jobs:
       - name: Write signing keystore + key.properties
         if: env.KEYSTORE_B64 != ''
         env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}

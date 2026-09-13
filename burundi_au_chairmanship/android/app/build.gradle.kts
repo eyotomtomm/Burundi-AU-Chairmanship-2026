@@ -50,7 +50,10 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Without key.properties (CI with no secrets) fall back to debug signing
+            // instead of crashing; Play rejects a debug-signed upload, so it can't slip out.
+            signingConfig = if (keystorePropertiesFile.exists()) signingConfigs.getByName("release")
+                else signingConfigs.getByName("debug").also { logger.warn("key.properties missing: release is DEBUG-signed") }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

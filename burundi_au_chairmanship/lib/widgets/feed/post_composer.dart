@@ -26,8 +26,7 @@ class PostComposer {
   static const maxAttachments = 4;
 
   static const _requiredProfileFields = [
-    'name', 'email', 'profile_picture', 'nationality', 'gender',
-    'date_of_birth', 'phone',
+    'name', 'email',
   ];
 
   static const categories = [

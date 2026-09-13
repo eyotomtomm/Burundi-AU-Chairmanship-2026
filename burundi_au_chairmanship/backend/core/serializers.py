@@ -588,7 +588,13 @@ class ArticleMediaSerializer(serializers.ModelSerializer):
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for article list/feed — omits full body content."""
+    """Serializer for article list/feed.
+
+    Carries the body too: app builds up to 2.0.0+59 open an article straight
+    from the list item and never fetch the detail, so without it they show a
+    title and an image over an empty page. Drop 'content' once those builds
+    are gone; newer builds fetch the body themselves.
+    """
     category = CategorySerializer(read_only=True)
     media = ArticleMediaSerializer(many=True, read_only=True)
     comment_count = serializers.IntegerField(read_only=True, default=0)
@@ -604,7 +610,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
                   'image', 'thumbnail_url', 'medium_url',
                   'author', 'category', 'publish_date', 'content_type', 'is_featured',
                   'view_count', 'comment_count', 'like_count', 'is_liked', 'media',
-                  'recent_likers']
+                  'recent_likers', 'content', 'content_fr']
 
     def get_recent_likers(self, obj):
         request = self.context.get('request')
@@ -614,7 +620,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
 class ArticleSerializer(ArticleListSerializer):
     """Full serializer for article detail — includes body content."""
     class Meta(ArticleListSerializer.Meta):
-        fields = ArticleListSerializer.Meta.fields + ['content', 'content_fr']
+        fields = ArticleListSerializer.Meta.fields
 
 
 class EmbassyLocationSerializer(serializers.ModelSerializer):

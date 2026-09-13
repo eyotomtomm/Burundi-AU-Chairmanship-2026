@@ -1790,10 +1790,25 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
         return response
 
 
+class ArticlePagination(PageNumberPagination):
+    """App builds already in the stores request ``articles/?`` with no page and
+    never ask for page two, so their news screen stopped at 20. Hand those the
+    whole list; anything that sends ``?page=`` pages at the normal 20."""
+
+    # ponytail: ~1 KB per list row, fine at hundreds; once old builds are gone, drop this.
+    UNPAGED_MAX = 500
+
+    def get_page_size(self, request):
+        if self.page_query_param in request.query_params:
+            return super().get_page_size(request)
+        return self.UNPAGED_MAX
+
+
 class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can read articles, but authentication required to like/comment"""
     permission_classes = [AllowAny]
     serializer_class = ArticleSerializer
+    pagination_class = ArticlePagination
     # 'content_type' is deliberately absent: news and articles are one
     # feed now, and old app builds still send ?content_type=news.
     filterset_fields = ['category', 'is_featured']

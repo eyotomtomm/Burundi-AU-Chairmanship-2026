@@ -158,6 +158,24 @@
         <p class="text-xs text-on-surface-variant mt-2">Recommended: 1200x630px. JPG, PNG, or WebP. Max size: 10 MB</p>
       </div>
 
+      <!-- Media links -->
+      <div class="mb-6">
+        <label for="media_links" class="block font-headline font-bold text-on-surface mb-2">
+          Photos &amp; videos from YouTube or X
+        </label>
+        {% if article and article.media.exists %}
+        <p class="text-sm text-on-surface-variant mb-2">This article already has {{ article.media.count }} photo{{ article.media.count|pluralize }}/video{{ article.media.count|pluralize }}. Links below are added to them.</p>
+        {% endif %}
+        <textarea
+          id="media_links"
+          name="media_links"
+          rows="3"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
+          placeholder="https://www.youtube.com/watch?v=...&#10;https://x.com/BurundinAddis/status/..."
+        ></textarea>
+        <p class="text-xs text-on-surface-variant mt-2">One link per line. YouTube videos play in the app; an X post's photos and videos are copied in. With no featured image, the first photo or video frame becomes it.</p>
+      </div>
+
       <!-- Publish Date -->
       <div class="mb-6">
         <label for="publish_date" class="block font-headline font-bold text-on-surface mb-2">

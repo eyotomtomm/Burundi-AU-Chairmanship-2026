@@ -64,10 +64,21 @@ class DiscussionPostingTests(TestCase):
             'title': 'Water policy', 'content': 'Debate this', 'category': 'arise',
         })
 
-    def test_incomplete_profile_cannot_post(self):
+    def test_a_name_and_an_email_are_enough_to_post(self):
+        # A photo, a nationality, a gender, a birth date and a phone number
+        # are no longer asked of someone before their first post.
+        self.profile.explore_terms_accepted_at = timezone.now()
+        self.profile.save()
+        resp = self._post()
+        assert resp.status_code == 201, resp.data
+
+    def test_a_nameless_account_cannot_post(self):
+        # A post carries who wrote it, so that much is still required.
+        self.user.first_name = self.user.last_name = ''
+        self.user.save()
         resp = self._post()
         assert resp.status_code == 403, resp.status_code
-        assert 'phone' in resp.data['missing_fields'], resp.data
+        assert 'name' in resp.data['missing_fields'], resp.data
 
     def test_complete_profile_can_post_to_arise(self):
         self._complete_profile()

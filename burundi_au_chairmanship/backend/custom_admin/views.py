@@ -619,7 +619,7 @@ def dashboard(request):
         'live_feeds_active': live_feeds_active,
         'active_today': active_today,
         'total_content': total_content or 1,
-        'recent_articles': Article.objects.order_by('-created_at')[:5],
+        'recent_articles': Article.objects.order_by('-publish_date')[:5],
         'recent_events': Event.objects.order_by('-event_date')[:5],
         'deletion_scheduled': deletion_scheduled,
         'deactivated_users': deactivated_users,
@@ -801,7 +801,7 @@ def hero_text_delete(request, pk):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def articles_list(request):
-    articles = Article.objects.all().select_related('category').order_by('-created_at')
+    articles = Article.objects.all().select_related('category').order_by('-publish_date')
     search = request.GET.get('search')
     if search:
         articles = articles.filter(
@@ -5129,6 +5129,28 @@ def discussion_create(request):
                 request.FILES.getlist('images')[:DiscussionMedia.MAX_PER_DISCUSSION]):
             DiscussionMedia.objects.create(
                 discussion=discussion, media_type='image', image=image, order=order)
+
+        # Tell every phone an official account just posted; a tap opens the post.
+        name = author.first_name or author.username
+        preview = discussion.title or content
+        preview = preview[:140] + ('…' if len(preview) > 140 else '')
+        notification = Notification.objects.create(
+            title=f'{name} posted on Explore',
+            title_fr=f'{name} a publié sur Explore',
+            message=preview,
+            message_fr=preview,
+            notification_type='general',
+            source='system',
+            is_global=True,
+            action_type='route',
+            action_value=f'/discussion/{discussion.pk}',
+        )
+        try:
+            from core.tasks import send_notification_push_async
+            send_notification_push_async.delay(notification.pk)
+        except Exception:
+            # The post is already live; a failed push must not look like a failed post.
+            logger.exception('Push for discussion %s failed', discussion.pk)
 
         messages.success(
             request,

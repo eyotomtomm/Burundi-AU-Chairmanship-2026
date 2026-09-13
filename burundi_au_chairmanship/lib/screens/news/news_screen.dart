@@ -42,6 +42,11 @@ class _NewsScreenState extends State<NewsScreen> {
   int _featuredPage = 0;
   Timer? _featuredTimer;
   VoidCallback? _removeLikeListener;
+  // The server pages at 20; the next page loads as the reader nears the end.
+  final ScrollController _scroll = ScrollController();
+  int _page = 1;
+  bool _hasMore = false;
+  bool _loadingMore = false;
 
 
   List<Category> _categories = [];
@@ -54,6 +59,7 @@ class _NewsScreenState extends State<NewsScreen> {
     _removeLikeListener = _likeService.addListener((key, state) {
       if (key.startsWith('article:') && mounted) setState(() {});
     });
+    _scroll.addListener(_onScroll);
     _loadArticles();
     _loadCategories();
   }
@@ -64,6 +70,7 @@ class _NewsScreenState extends State<NewsScreen> {
     _removeLikeListener?.call();
     _featuredTimer?.cancel();
     _featuredController.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -81,19 +88,28 @@ class _NewsScreenState extends State<NewsScreen> {
   }
 
   Future<void> _loadArticles() async {
+    final categoryId = _selectedCategoryId;
     try {
-      final articles = await ApiService().getNews();
-      if (!mounted) return;
-      ContentCacheService().cacheArticles(ContentCacheService.keyNews, articles);
+      final page = await ApiService().getNews(categoryId: categoryId);
+      // A chip tapped mid-request owns the list now.
+      if (!mounted || categoryId != _selectedCategoryId) return;
+      if (categoryId == null) {
+        ContentCacheService().cacheArticles(ContentCacheService.keyNews, page.articles);
+      }
       setState(() {
-        _articles = articles;
+        _articles = page.articles;
+        _page = 1;
+        _hasMore = page.hasMore;
         _isLoading = false;
         _hasError = false;
       });
     } catch (_) {
-      if (!mounted) return;
-      // Fall back to cache
-      final cached = ContentCacheService().getArticles(ContentCacheService.keyNews);
+      if (!mounted || categoryId != _selectedCategoryId) return;
+      _hasMore = false;
+      // Fall back to cache, which only ever holds the unfiltered first page.
+      final cached = categoryId == null
+          ? ContentCacheService().getArticles(ContentCacheService.keyNews)
+          : null;
       if (cached != null && cached.isNotEmpty) {
         setState(() {
           _articles = cached;
@@ -109,9 +125,48 @@ class _NewsScreenState extends State<NewsScreen> {
     }
   }
 
-  List<Article> _filterArticles(List<Article> articles) {
-    if (_selectedCategoryId == null) return articles;
-    return articles.where((a) => a.category?.id == _selectedCategoryId).toList();
+  void _onScroll() {
+    // Guests see a handful of rows behind the login gate; more pages buy nothing.
+    if (!_scroll.hasClients || !_hasMore || _loadingMore || _isLoading) return;
+    if (!context.read<AuthProvider>().isAuthenticated) return;
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 600) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final categoryId = _selectedCategoryId;
+    setState(() => _loadingMore = true);
+    try {
+      final next = await ApiService().getNews(categoryId: categoryId, page: _page + 1);
+      if (!mounted || categoryId != _selectedCategoryId) return;
+      final seen = {for (final a in _articles ?? <Article>[]) a.id};
+      setState(() {
+        _page += 1;
+        _articles = [
+          ...?_articles,
+          ...next.articles.where((a) => !seen.contains(a.id)),
+        ];
+        _hasMore = next.hasMore;
+      });
+    } catch (_) {
+      // Stop asking rather than retrying every scroll frame; pull to refresh starts over.
+      if (mounted) setState(() => _hasMore = false);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _selectCategory(int? id) {
+    if (id == _selectedCategoryId) return;
+    setState(() {
+      _selectedCategoryId = id;
+      _isLoading = true;
+      _hasError = false;
+      _hasMore = false;
+      _loadingMore = false;
+    });
+    _loadArticles();
   }
 
   @override
@@ -132,10 +187,9 @@ class _NewsScreenState extends State<NewsScreen> {
     }
 
     final allArticles = _articles ?? [];
-    final filtered = _filterArticles(allArticles);
     // Featured articles in the current filter get hero cards; the rest are rows.
-    final featured = filtered.where((a) => a.isFeatured).toList();
-    final listArticles = filtered.where((a) => !a.isFeatured).toList();
+    final featured = allArticles.where((a) => a.isFeatured).toList();
+    final listArticles = allArticles.where((a) => !a.isFeatured).toList();
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
@@ -176,6 +230,7 @@ class _NewsScreenState extends State<NewsScreen> {
               },
               child: CustomScrollView(
                 key: const PageStorageKey<String>('news_scroll'),
+                controller: _scroll,
                 slivers: [
                   SliverToBoxAdapter(child: _buildHeader(l10n, langCode)),
 
@@ -245,6 +300,20 @@ class _NewsScreenState extends State<NewsScreen> {
                         ),
                       ),
                     ),
+                  if (_loadingMore)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: 16),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Ds.green),
+                          ),
+                        ),
+                      ),
+                    ),
                   SliverToBoxAdapter(
                       child: SizedBox(height: Ds.navSpace(context))),
                 ],
@@ -270,7 +339,7 @@ class _NewsScreenState extends State<NewsScreen> {
                 l10n.translate('all_categories'),
                 selected: _selectedCategoryId == null,
                 onGreen: true,
-                onTap: () => setState(() => _selectedCategoryId = null),
+                onTap: () => _selectCategory(null),
               ),
             ),
             for (final cat in _categories)
@@ -280,7 +349,7 @@ class _NewsScreenState extends State<NewsScreen> {
                   cat.getDisplayName(langCode),
                   selected: _selectedCategoryId == cat.id,
                   onGreen: true,
-                  onTap: () => setState(() => _selectedCategoryId = cat.id),
+                  onTap: () => _selectCategory(cat.id),
                 ),
               ),
           ],

@@ -21,10 +21,11 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from core.models import Article, Event, LiveFeed, Category
+from core.models import Article, ArticleMedia, Event, LiveFeed, Category
 
 
 # Keywords used to auto-categorize posts
@@ -107,20 +108,80 @@ def is_livefeed_post(text):
     return any(kw in text_lower for kw in LIVEFEED_KEYWORDS)
 
 
-def make_title(text, max_len=200):
-    """Extract a title from tweet text (first sentence or first N chars)."""
-    # Remove hashtags and URLs for title
-    clean = re.sub(r'https?://\S+', '', text)
-    clean = re.sub(r'#\S+', '', clean).strip()
-    # Take first sentence
-    for sep in ['. ', '.\n', '!\n', '! ', '?\n', '? ']:
-        if sep in clean:
-            clean = clean[:clean.index(sep) + 1]
-            break
-    clean = clean.strip()
+# A run of two or more handles or tags in a row is a credit dump, not part of
+# the sentence — the old code deleted every tag instead, which turned
+# "#Burundi joins the AU family" into a headline starting mid-air.
+MENTION_RUN = re.compile(r'(?:@\w+\s*){2,}')
+HASHTAG_RUN = re.compile(r'(?:#\w+\s*){2,}')
+# Periods that close an abbreviation rather than a sentence: "H.E.", "Amb.".
+ABBREV_END = re.compile(
+    r'(?:\b[A-Z]|\b(?:H\.E|Hon|Amb|Dr|Mr|Mrs|Ms|Prof|St|No|Jr|Sr|etc|vs'
+    r'|Gen|Col|Lt|Maj|Capt|Brig|Adm|Sgt|Sen|Rev|Msgr|Mme|Mlle|Pres))\.$', re.I)
+
+# Display names arrive carrying their own honorific ("Amb. Willy Nyamitwe"),
+# which doubles up when the sentence already opened with one.
+NICK_HONORIFIC = re.compile(r'^(?:H\.E|Amb|Hon|Dr|Prof|Mr|Mrs|Ms)\.?\s+', re.I)
+# Display names carry account branding after a slash or pipe, and a flag or
+# two at the end: "Edouard Bizimana/ MoFA 🇧🇮" is one person named twice.
+NICK_BRANDING = re.compile(r'\s*[/|].*$')
+NICK_TRAILING = re.compile(r'[^\w)\]]+$')
+# The post writes the name and then tags the account: "H.E. Ndayishimiye
+# (@GeneralNeva)". The tag is a link, and an article has nothing to link to.
+PAREN_HANDLE = re.compile(r'\s*[(\[]\s*@\w+\s*[)\]]')
+
+IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.webp')
+VIDEO_EXTS = ('.mp4', '.webm')
+
+
+def clean_nick(nick):
+    """The person inside a display name, without the account's branding."""
+    nick = NICK_HONORIFIC.sub('', nick.strip())
+    return NICK_TRAILING.sub('', NICK_BRANDING.sub('', nick)).strip()
+
+
+def clean_prose(text, mentions=()):
+    """Tweet text as prose: no t.co links, tags as words, handles as names."""
+    nicks = {
+        m['name'].lower(): clean_nick(m.get('nick') or m['name'])
+        for m in mentions or () if m.get('name')
+    }
+    clean = PAREN_HANDLE.sub('', re.sub(r'https?://\S+', ' ', text))
+    clean = HASHTAG_RUN.sub(' ', MENTION_RUN.sub(' ', clean))
+    # A lone handle names a person; X shows the display name, so we do too.
+    clean = re.sub(r'@(\w+)', lambda m: nicks.get(m.group(1).lower(), m.group(1)), clean)
+    clean = re.sub(r'#(\w+)', r'\1', clean)
+    clean = re.sub(r'\s+', ' ', clean)
+    # Removing markup leaves its space behind: "Nyamitwe , Permanent".
+    clean = re.sub(r'\s+([,.;:!?\u00bb)\]])', r'\1', clean)
+    return clean.strip(' ,;:-\u2013\u2014')
+
+
+def first_sentence(text, min_len=25):
+    """The first real sentence, ignoring the periods inside abbreviations."""
+    for m in re.finditer(r'[.!?](?=\s|$)', text):
+        head = text[:m.end()]
+        if len(head) >= min_len and not ABBREV_END.search(head):
+            return head
+    return text
+
+
+# Where a too-long sentence can be cut and still read as a headline.
+CLAUSE_BREAK = re.compile(r'[,;:\u2013\u2014]\s')
+
+
+def make_title(text, max_len=130, mentions=()):
+    """A headline a reader would say out loud, cut on a word boundary."""
+    clean = first_sentence(clean_prose(text, mentions))
     if len(clean) > max_len:
-        clean = clean[:max_len - 3] + '...'
-    return clean or text[:max_len]
+        # A clause boundary ends a headline cleanly; a word boundary needs
+        # the ellipsis to admit the sentence kept going.
+        breaks = [m.start() for m in CLAUSE_BREAK.finditer(clean)
+                  if m.start() <= max_len]
+        if breaks and breaks[-1] >= max_len // 3:
+            clean = clean[:breaks[-1]]
+        else:
+            clean = clean[:max_len].rsplit(' ', 1)[0].rstrip(' ,;:') + '\u2026'
+    return clean.rstrip(' ,;:') or text[:max_len]
 
 
 class Command(BaseCommand):
@@ -144,9 +205,39 @@ class Command(BaseCommand):
             default='',
             help='Path to gallery-dl output directory (default: media/x_scrape)',
         )
+        parser.add_argument(
+            '--refresh',
+            action='store_true',
+            help='Rewrite the title and body of posts already imported',
+        )
+
+    def attach_media(self, article, images, videos, caption, is_french):
+        """Fill the article's gallery from the post's remaining media."""
+        caption_fr = caption if is_french else ''
+        for order, image in enumerate(images):
+            media = ArticleMedia(
+                article=article, media_type='image',
+                caption=caption, caption_fr=caption_fr, order=order,
+            )
+            with open(image, 'rb') as img_f:
+                media.image.save(image.name, ContentFile(img_f.read()), save=False)
+            media.save()
+        for order, video in enumerate(videos, start=len(images)):
+            # ArticleMedia holds videos by URL and the app plays that URL
+            # in-app, so the file has to reach the same storage the images do
+            # before there is anything to point at.
+            with open(video, 'rb') as vid_f:
+                stored = default_storage.save(
+                    f'article_media/{video.name}', ContentFile(vid_f.read()))
+            ArticleMedia.objects.create(
+                article=article, media_type='video',
+                video_url=default_storage.url(stored),
+                caption=caption, caption_fr=caption_fr, order=order,
+            )
 
     def handle(self, *args, **options):
         dry_run = options['dry_run']
+        refresh = options['refresh']
         since_str = options['since']
         since_date = datetime.strptime(since_str, '%Y-%m-%d')
 
@@ -172,6 +263,7 @@ class Command(BaseCommand):
         self.stdout.write(f'Found {len(json_files)} scraped posts\n')
 
         articles_created = 0
+        refreshed = 0
         events_created = 0
         livefeeds_created = 0
         skipped = 0
@@ -210,10 +302,27 @@ class Command(BaseCommand):
                 if not text:
                     continue
 
-                # Check if already imported
-                title = make_title(text)
-                if Article.objects.filter(title=title).exists():
-                    skipped += 1
+                # Check if already imported. Keyed on when the post went out,
+                # not on any text: title and body are both derived, so
+                # improving how they read must not re-import every post that
+                # already landed, nor leave the old wording behind.
+                title = make_title(text, mentions=data.get('mentions'))
+                body = clean_prose(text, data.get('mentions'))
+                is_french = data.get('lang') == 'fr'
+                existing = Article.objects.filter(
+                    publish_date=post_date_aware, author=AUTHOR).first()
+                if existing:
+                    if refresh and not dry_run:
+                        existing.title = title
+                        existing.title_fr = title if is_french else ''
+                        existing.content = body
+                        existing.content_fr = body if is_french else ''
+                        existing.save(update_fields=[
+                            'title', 'title_fr', 'content', 'content_fr'])
+                        refreshed += 1
+                        self.stdout.write(f'  [refreshed] {title[:70]}')
+                    else:
+                        skipped += 1
                     continue
 
                 # Classify
@@ -221,16 +330,18 @@ class Command(BaseCommand):
                 should_be_event = is_event_post(text)
                 should_be_livefeed = is_livefeed_post(text)
 
-                # Find associated image files
-                image_files = []
-                json_stem = json_file.stem  # e.g. "1884308412479201379"
+                # Find the post's media. gallery-dl names them "<id>_1.jpg"
+                # and leaves ".part" files behind mid-download, hence the
+                # extension whitelist rather than a bare glob.
                 parent_dir = json_file.parent
-                for ext in ('jpg', 'jpeg', 'png', 'webp'):
-                    image_files.extend(parent_dir.glob(f'{json_stem}*.{ext}'))
-                # Also check for _1, _2 pattern
-                for ext in ('jpg', 'jpeg', 'png', 'webp'):
-                    image_files.extend(parent_dir.glob(f'{tweet_id}_*.{ext}'))
-                image_files = sorted(set(image_files))
+                media_files = sorted({
+                    path
+                    for stem in (json_file.stem, str(tweet_id))
+                    for path in parent_dir.glob(f'{stem}_*')
+                    if path.suffix.lower() in IMAGE_EXTS + VIDEO_EXTS
+                })
+                image_files = [p for p in media_files if p.suffix.lower() in IMAGE_EXTS]
+                video_files = [p for p in media_files if p.suffix.lower() in VIDEO_EXTS]
 
                 if not dry_run:
                     # Get or create category
@@ -242,10 +353,14 @@ class Command(BaseCommand):
                         },
                     )
 
-                    # Create Article
+                    # Create Article. A French post fills the French fields
+                    # too, so the app shows it as written instead of falling
+                    # back to an English version that does not exist.
                     article = Article(
                         title=title,
-                        content=text,
+                        title_fr=title if is_french else '',
+                        content=body,
+                        content_fr=body if is_french else '',
                         author=AUTHOR,
                         category=category,
                         publish_date=post_date_aware,
@@ -260,6 +375,14 @@ class Command(BaseCommand):
                                 save=False,
                             )
                     article.save()
+
+                    # The lead image sits at the top of the article; the rest
+                    # of the post's media becomes the gallery, each piece
+                    # captioned so it is not a bare photo.
+                    self.attach_media(
+                        article, image_files[1:], video_files,
+                        title[:300], is_french,
+                    )
 
                     # Create Event if applicable
                     if should_be_event:
@@ -293,6 +416,10 @@ class Command(BaseCommand):
 
                 articles_created += 1
                 img_count = len(image_files)
+                if video_files:
+                    flags_extra = f', {len(video_files)} video'
+                else:
+                    flags_extra = ''
                 flags = []
                 if should_be_event:
                     flags.append('EVENT')
@@ -301,7 +428,7 @@ class Command(BaseCommand):
                 flag_str = f' [{", ".join(flags)}]' if flags else ''
                 self.stdout.write(
                     f'  [{cat_name}]{flag_str} {title[:70]} '
-                    f'({img_count} img{"s" if img_count != 1 else ""})'
+                    f'({img_count} img{"s" if img_count != 1 else ""}{flags_extra})'
                 )
 
             except Exception as e:
@@ -310,8 +437,9 @@ class Command(BaseCommand):
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
-            f'Done! Articles: {articles_created}, Events: {events_created}, '
-            f'LiveFeeds: {livefeeds_created}, Skipped: {skipped}, Errors: {errors}'
+            f'Done! Articles: {articles_created}, Refreshed: {refreshed}, '
+            f'Events: {events_created}, LiveFeeds: {livefeeds_created}, '
+            f'Skipped: {skipped}, Errors: {errors}'
         ))
         self.stdout.write(f'Total JSON files processed: {len(json_files)}')
         if events_created:

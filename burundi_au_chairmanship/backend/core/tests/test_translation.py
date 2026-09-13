@@ -46,6 +46,21 @@ class TranslateTextTests(SimpleTestCase):
     def test_a_failed_chunk_gives_no_half_translation(self):
         # Half an article in each language reads as a bug to the reader.
         text = ('Burundi joined the meeting. ' * 40).strip()
-        with mock.patch.object(translation, 'translate_chunk',
-                               side_effect=['Le Burundi.', None]):
+        with mock.patch.object(translation, '_gemini', return_value=None), \
+                mock.patch.object(translation, 'translate_chunk',
+                                  side_effect=['Le Burundi.', None]):
             self.assertIsNone(translation.translate_text(text, 'en', 'fr'))
+
+    def test_gemini_failing_falls_back_to_the_free_providers(self):
+        with mock.patch.object(translation, '_gemini', side_effect=RuntimeError('429')), \
+                mock.patch.object(translation, 'translate_chunk', return_value='Le Burundi.'):
+            self.assertEqual(translation.translate_text('Burundi.', 'en', 'fr'), 'Le Burundi.')
+
+
+class MyMemoryTests(SimpleTestCase):
+    def test_quota_warning_is_not_a_translation(self):
+        quota = {'responseStatus': 429, 'responseDetails': 'quota',
+                 'responseData': {'translatedText': 'MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS'}}
+        with mock.patch.object(translation, '_get', return_value=quota):
+            with self.assertRaises(RuntimeError):
+                translation._mymemory('Hello', 'en', 'fr')

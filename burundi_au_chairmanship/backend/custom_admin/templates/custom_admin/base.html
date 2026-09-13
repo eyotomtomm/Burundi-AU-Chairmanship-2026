@@ -1693,7 +1693,10 @@ function toggleDarkMode() {
       headers: { 'X-CSRFToken': csrfToken.value },
       body: fd,
     })
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      // An access-denied or error page is HTML; say what happened instead of "unavailable".
+      return r.json().catch(function() { return { error: 'Translation failed (HTTP ' + r.status + ').' }; });
+    })
     .then(function(data) {
       if (data.translated) {
         targetEl.value = data.translated;

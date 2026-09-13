@@ -146,7 +146,10 @@ AUTH_FLOW_URLS = {'login', 'logout', '2fa_verify', '2fa_setup', 'force_password_
 # Explicit menu-key -> URL-names map. Every custom_admin URL name must appear
 # here or in UNRESTRICTED_URLS (tests enforce this). Unmapped names are denied.
 _SECTION_URLS = {
-    'dashboard': ('dashboard', 'widget_data', 'global_search', 'global_search_api', 'ping'),
+    # auto_translate is the EN/FR button on every bilingual form, so it goes
+    # wherever any staff member can go; it reads and writes nothing.
+    'dashboard': ('dashboard', 'widget_data', 'global_search', 'global_search_api', 'ping',
+                  'auto_translate'),
     'content_calendar': ('content_calendar',),
     'analytics': ('analytics', 'analytics_export_pdf', 'nationality_map', 'export_analytics_csv',
                   'ab_test_list', 'ab_test_create', 'ab_test_detail', 'ab_test_edit', 'ab_test_delete'),
@@ -229,8 +232,7 @@ _SECTION_URLS = {
     'app_settings': ('app_settings',),
     'about_features_list': ('about_features_list', 'about_feature_create', 'about_feature_edit',
                             'about_feature_delete'),
-    'translation_manager': ('translation_manager', 'translation_queue_list', 'translation_queue_update',
-                            'auto_translate'),
+    'translation_manager': ('translation_manager', 'translation_queue_list', 'translation_queue_update'),
     'reorder': ('reorder', 'reorder_save', 'bulk_content_action'),
     'system_health': ('system_health', 'system_health_api'),
     'database_backup': ('database_backup', 'create_backup', 'download_backup', 'delete_backup'),

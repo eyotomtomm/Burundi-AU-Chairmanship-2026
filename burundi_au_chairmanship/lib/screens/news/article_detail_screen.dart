@@ -90,6 +90,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       }
     });
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
+    _loadBody();
     _recordView();
     _loadComments();
     _loadRelatedArticles();
@@ -222,6 +223,20 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   }
 
   // ── Existing methods ─────────────────────────────────────
+
+  // Lists hand over an article without its body (the feed serializer omits
+  // it), so fetch the full article when the text is missing.
+  Future<void> _loadBody() async {
+    if (_article.content.isNotEmpty || _article.contentFr.isNotEmpty) return;
+    try {
+      final full = await ApiService().getArticle(_article.id);
+      if (mounted) {
+        setState(() {
+          _article = _article.copyWith(content: full.content, contentFr: full.contentFr);
+        });
+      }
+    } catch (_) {}
+  }
 
   Future<void> _recordView() async {
     try {

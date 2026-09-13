@@ -402,6 +402,8 @@ class Article {
   String get categorySlug => category?.name.toLowerCase() ?? '';
 
   Article copyWith({
+    String? content,
+    String? contentFr,
     int? viewCount,
     int? commentCount,
     int? likeCount,
@@ -413,8 +415,8 @@ class Article {
       id: id,
       title: title,
       titleFr: titleFr,
-      content: content,
-      contentFr: contentFr,
+      content: content ?? this.content,
+      contentFr: contentFr ?? this.contentFr,
       imageUrl: imageUrl,
       author: author,
       publishDate: publishDate,

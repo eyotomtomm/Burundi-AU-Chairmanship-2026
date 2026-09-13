@@ -5130,6 +5130,28 @@ def discussion_create(request):
             DiscussionMedia.objects.create(
                 discussion=discussion, media_type='image', image=image, order=order)
 
+        # Tell every phone an official account just posted; a tap opens the post.
+        name = author.first_name or author.username
+        preview = discussion.title or content
+        preview = preview[:140] + ('…' if len(preview) > 140 else '')
+        notification = Notification.objects.create(
+            title=f'{name} posted on Explore',
+            title_fr=f'{name} a publié sur Explore',
+            message=preview,
+            message_fr=preview,
+            notification_type='general',
+            source='system',
+            is_global=True,
+            action_type='route',
+            action_value=f'/discussion/{discussion.pk}',
+        )
+        try:
+            from core.tasks import send_notification_push_async
+            send_notification_push_async.delay(notification.pk)
+        except Exception:
+            # The post is already live; a failed push must not look like a failed post.
+            logger.exception('Push for discussion %s failed', discussion.pk)
+
         messages.success(
             request,
             f'Posted to Explore as {author.first_name or author.username}.')

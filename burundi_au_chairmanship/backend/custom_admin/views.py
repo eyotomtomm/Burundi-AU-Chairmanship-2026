@@ -619,7 +619,7 @@ def dashboard(request):
         'live_feeds_active': live_feeds_active,
         'active_today': active_today,
         'total_content': total_content or 1,
-        'recent_articles': Article.objects.order_by('-created_at')[:5],
+        'recent_articles': Article.objects.order_by('-publish_date')[:5],
         'recent_events': Event.objects.order_by('-event_date')[:5],
         'deletion_scheduled': deletion_scheduled,
         'deactivated_users': deactivated_users,
@@ -801,7 +801,7 @@ def hero_text_delete(request, pk):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def articles_list(request):
-    articles = Article.objects.all().select_related('category').order_by('-created_at')
+    articles = Article.objects.all().select_related('category').order_by('-publish_date')
     search = request.GET.get('search')
     if search:
         articles = articles.filter(

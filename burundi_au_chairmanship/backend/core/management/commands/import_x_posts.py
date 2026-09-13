@@ -210,6 +210,11 @@ class Command(BaseCommand):
             action='store_true',
             help='Rewrite the title and body of posts already imported',
         )
+        parser.add_argument(
+            '--refresh-only',
+            action='store_true',
+            help='Rewrite posts already imported and import nothing new',
+        )
 
     def attach_media(self, article, images, videos, caption, is_french):
         """Fill the article's gallery from the post's remaining media."""
@@ -237,7 +242,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options['dry_run']
-        refresh = options['refresh']
+        refresh_only = options['refresh_only']
+        refresh = options['refresh'] or refresh_only
         since_str = options['since']
         since_date = datetime.strptime(since_str, '%Y-%m-%d')
 
@@ -323,6 +329,13 @@ class Command(BaseCommand):
                         self.stdout.write(f'  [refreshed] {title[:70]}')
                     else:
                         skipped += 1
+                    continue
+
+                # A rewrite pass is not an import: without this, --refresh
+                # over a year of posts also creates every one that was never
+                # imported, which is a very different thing to ask for.
+                if refresh_only:
+                    skipped += 1
                     continue
 
                 # Classify

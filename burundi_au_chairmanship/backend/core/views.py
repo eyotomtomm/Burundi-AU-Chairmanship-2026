@@ -139,10 +139,14 @@ def _require_verified_email(request):
     return None
 
 
-# Fields a user must fill before they can author a post. Verification is
-# deliberately absent: it is an admin approval that only adds a badge.
+# Fields a user must fill before they can author a post. Kept to what makes
+# a post answerable for: a real name and a reachable address. Asking for a
+# photo, a nationality, a gender, a birth date and a phone number before
+# someone's first post turned an ordinary account into a form to fill in.
+# Verification is deliberately absent too: it is an admin approval that only
+# adds a badge.
 PROFILE_REQUIRED_FOR_POSTING = (
-    'name', 'email', 'profile_picture', 'nationality', 'gender', 'date_of_birth', 'phone',
+    'name', 'email',
 )
 
 

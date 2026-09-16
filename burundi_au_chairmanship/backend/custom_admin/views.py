@@ -242,6 +242,33 @@ def _download_image(url, name):
         return None
 
 
+_IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
+_VIDEO_EXTS = ('.mp4', '.mov', '.m4v', '.webm')
+
+
+def _playable_videos():
+    """The video library, for the article form's picker."""
+    return Video.objects.exclude(video_url='', video_file='').order_by('-publish_date')[:200]
+
+
+def _own_media_path(url):
+    """Storage path for a link pointing at a file we already host, else None.
+
+    Lets a gallery photo or a library video be reused in an article by its
+    URL, without a second copy of the file.
+    """
+    prefix = urllib.parse.urlparse(settings.MEDIA_URL).path
+    path = urllib.parse.urlparse(url).path
+    if not prefix or not path.startswith(prefix):
+        return None
+    rel = urllib.parse.unquote(path[len(prefix):])
+    try:
+        return rel if rel and default_storage.exists(rel) else None
+    except Exception:
+        logger.warning('Could not check storage for %s', url, exc_info=True)
+        return None
+
+
 def _attach_media_links(request, article):
     """Turn the pasted YouTube / X links into the article's media.
 
@@ -264,9 +291,27 @@ def _attach_media_links(request, article):
             order += 1
             continue
 
+        # Already ours (a gallery photo, or a video's uploaded file): point at
+        # the stored file instead of copying it.
+        own = _own_media_path(link)
+        link_path = urllib.parse.urlparse(link).path.lower()
+        if own and link_path.endswith(_IMAGE_EXTS):
+            if not article.image:
+                article.image = own
+                article.save(update_fields=['image'])
+            ArticleMedia.objects.create(
+                article=article, media_type='image', image=own, order=order)
+            order += 1
+            continue
+        if link_path.endswith(_VIDEO_EXTS):
+            ArticleMedia.objects.create(
+                article=article, media_type='video', video_url=link, order=order)
+            order += 1
+            continue
+
         found = _x_post_media(link)
         if found is None:
-            messages.warning(request, f'Skipped {link} — only YouTube and X post links are supported.')
+            messages.warning(request, f"Skipped {link} — only YouTube, X posts, and the app’s own photos and videos are supported.")
             continue
         photos, videos = found
         if not photos and not videos:
@@ -958,6 +1003,7 @@ def article_create(request):
     return render(request, 'custom_admin/articles/form.html', {
         'categories': categories, 'action': 'Create',
         'prefill_date': request.GET.get('date', ''),
+        'videos': _playable_videos(),
     })
 
 
@@ -1023,7 +1069,8 @@ def article_edit(request, pk):
             messages.success(request, 'Article updated successfully!')
         return redirect('custom_admin:articles_list')
     return render(request, 'custom_admin/articles/form.html', {
-        'article': article, 'categories': categories, 'action': 'Edit'
+        'article': article, 'categories': categories, 'action': 'Edit',
+        'videos': _playable_videos(),
     })
 
 

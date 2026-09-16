@@ -205,6 +205,14 @@
     }
 
     window.selectMediaImage = function(path, filename, url) {
+        // A textarea target (the article's media links) collects URLs, one per line.
+        var textarea = document.getElementById(mlTargetField);
+        if (textarea && textarea.tagName === 'TEXTAREA') {
+            textarea.value = (textarea.value.trim() + '\n' + url).trim();
+            closeMediaLibrary();
+            return;
+        }
+
         // Set hidden input value
         var hiddenInput = document.getElementById('existing_image_' + mlTargetField);
         if (hiddenInput) hiddenInput.value = path;

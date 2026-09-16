@@ -3,6 +3,7 @@ from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from django.urls import reverse
+from django.contrib.messages.storage.base import BaseStorage
 from django_otp.oath import totp
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
@@ -183,3 +184,43 @@ class EngagementViewTests(TestCase):
     def test_article_row_links_to_engagement_page(self):
         page = self.client.get(reverse('custom_admin:articles_list'))
         self.assertContains(page, f'{self.url}?type=article&amp;content={self.article.pk}')
+
+
+class ReuseAppMediaInArticleTests(TestCase):
+    """A gallery photo or library video can be put in an article by its URL."""
+
+    def setUp(self):
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+        from io import BytesIO
+        from PIL import Image
+        buf = BytesIO()
+        Image.new('RGB', (4, 4)).save(buf, 'JPEG')
+        self.path = default_storage.save('gallery/photos/reuse_test.jpg', ContentFile(buf.getvalue()))
+        self.addCleanup(default_storage.delete, self.path)
+        self.article = Article.objects.create(
+            title='t', content='c', author='a', publish_date=timezone.now())
+
+    def _post(self, links):
+        from django.test import RequestFactory
+        from custom_admin.views import _attach_media_links
+        request = RequestFactory().post('/', {'media_links': links})
+        request._messages = BaseStorage(request)
+        _attach_media_links(request, self.article)
+
+    def test_gallery_photo_is_reused_not_copied(self):
+        from django.core.files.storage import default_storage
+        self._post(default_storage.url(self.path))
+        media = self.article.media.get()
+        self.assertEqual(media.media_type, 'image')
+        self.assertEqual(media.image.name, self.path)
+
+    def test_video_file_becomes_a_playable_link(self):
+        url = 'https://cdn.example.com/media/videos/files/speech.mp4'
+        self._post(url)
+        media = self.article.media.get()
+        self.assertEqual((media.media_type, media.video_url), ('video', url))
+
+    def test_foreign_image_is_not_reused(self):
+        self._post('https://example.com/not-ours.jpg')
+        self.assertFalse(self.article.media.exists())

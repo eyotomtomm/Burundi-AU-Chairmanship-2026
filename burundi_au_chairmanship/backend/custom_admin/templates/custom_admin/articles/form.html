@@ -161,7 +161,7 @@
       <!-- Media links -->
       <div class="mb-6">
         <label for="media_links" class="block font-headline font-bold text-on-surface mb-2">
-          Photos &amp; videos from YouTube or X
+          Photos &amp; videos
         </label>
         {% if article and article.media.exists %}
         <p class="text-sm text-on-surface-variant mb-2">This article already has {{ article.media.count }} photo{{ article.media.count|pluralize }}/video{{ article.media.count|pluralize }}. Links below are added to them.</p>
@@ -173,7 +173,26 @@
           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
           placeholder="https://www.youtube.com/watch?v=...&#10;https://x.com/BurundinAddis/status/..."
         ></textarea>
-        <p class="text-xs text-on-surface-variant mt-2">One link per line. YouTube videos play in the app; an X post's photos and videos are copied in. With no featured image, the first photo or video frame becomes it.</p>
+        <div class="flex flex-wrap items-center gap-3 mt-3">
+          <button type="button" onclick="openMediaLibrary('media_links')" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors whitespace-nowrap">
+            Add a photo from the gallery
+          </button>
+          <select id="video_picker" onchange="addVideoLink(this)" class="bg-surface-container-low border-0 border-b-2 border-outline-variant py-2 text-sm focus:ring-0 focus:border-secondary">
+            <option value="">Add a video from the app…</option>
+            {% for v in videos %}
+            <option value="{% if v.video_url %}{{ v.video_url }}{% else %}{{ v.video_file.url }}{% endif %}">{{ v.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <p class="text-xs text-on-surface-variant mt-2">One link per line. Photos and videos already in the app are reused as they are — no second copy. YouTube videos play in the app; an X post's photos and videos are copied in. With no featured image, the first photo or video frame becomes it.</p>
+        <script>
+          function addVideoLink(select) {
+            if (!select.value) return;
+            var box = document.getElementById('media_links');
+            box.value = (box.value.trim() + '\n' + select.value).trim();
+            select.value = '';
+          }
+        </script>
       </div>
 
       <!-- Publish Date -->

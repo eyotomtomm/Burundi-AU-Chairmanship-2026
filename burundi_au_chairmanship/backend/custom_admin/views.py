@@ -270,16 +270,27 @@ def _own_media_path(url):
 
 
 def _attach_media_links(request, article):
-    """Turn the pasted YouTube / X links into the article's media.
+    """Turn the uploaded photos and the pasted YouTube / X links into media.
 
-    YouTube links become in-app videos. An X post's photos and videos are
-    pulled in as if uploaded. With no cover image, the first photo (or a video's
-    poster frame) becomes the cover, as the X importer does.
+    Uploaded photos are attached as they come. YouTube links become in-app
+    videos. An X post's photos and videos are pulled in as if uploaded. With no
+    cover image, the first photo (or a video's poster frame) becomes the cover,
+    as the X importer does.
     """
     from core.models import ArticleMedia
 
-    links = [l.strip() for l in request.POST.get('media_links', '').splitlines() if l.strip()]
     order = article.media.count()
+
+    # Straight uploads first, so their order matches the order they were picked.
+    for upload in request.FILES.getlist('media_images'):
+        media = ArticleMedia.objects.create(
+            article=article, media_type='image', image=upload, order=order)
+        if not article.image:
+            article.image = media.image.name
+            article.save(update_fields=['image'])
+        order += 1
+
+    links = [l.strip() for l in request.POST.get('media_links', '').splitlines() if l.strip()]
     for link in links:
         if _extract_youtube_id(link):
             if not article.image:

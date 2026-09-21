@@ -64,8 +64,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function buildFormData() {
+    function buildFormData(submitter) {
         var formData = new FormData(form);
+        // A clicked submit button's name is not in FormData unless we add it,
+        // and this form has more than one ("Save as Draft").
+        if (submitter && submitter.name) {
+            formData.append(submitter.name, submitter.value);
+        }
         var inputs = Array.prototype.slice.call(form.querySelectorAll('input[type=file]'))
             .filter(function(input) { return input.name && input.files && input.files.length; });
         if (!inputs.length) return Promise.resolve(formData);
@@ -152,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Upload failed due to a network error. Please try again.');
         });
 
-        buildFormData().then(function(formData) {
+        buildFormData(e.submitter).then(function(formData) {
             statusText.textContent = 'Uploading... 0%';
             xhr.open(form.method, form.action || window.location.href);
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');

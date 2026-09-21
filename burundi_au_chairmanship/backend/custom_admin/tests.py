@@ -224,3 +224,22 @@ class ReuseAppMediaInArticleTests(TestCase):
     def test_foreign_image_is_not_reused(self):
         self._post('https://example.com/not-ours.jpg')
         self.assertFalse(self.article.media.exists())
+
+    def test_uploaded_photos_all_attach_and_first_becomes_the_cover(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.test import RequestFactory
+        from custom_admin.views import _attach_media_links
+        from io import BytesIO
+        from PIL import Image
+        buf = BytesIO()
+        Image.new('RGB', (4, 4)).save(buf, 'JPEG')
+        shot = buf.getvalue()
+        uploads = [SimpleUploadedFile(f'p{i}.jpg', shot, 'image/jpeg') for i in range(3)]
+        request = RequestFactory().post('/', {'media_images': uploads})
+        request._messages = BaseStorage(request)
+        _attach_media_links(request, self.article)
+        media = list(self.article.media.all())
+        self.assertEqual(len(media), 3)
+        for m in media:
+            self.addCleanup(m.image.delete, save=False)
+        self.assertEqual(self.article.image.name, media[0].image.name)

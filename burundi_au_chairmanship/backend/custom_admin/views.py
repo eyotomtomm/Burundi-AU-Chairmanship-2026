@@ -2887,6 +2887,9 @@ def event_registration_create(request):
             venue=request.POST.get('venue', ''),
             venue_fr=request.POST.get('venue_fr', ''),
             venue_address=request.POST.get('venue_address', ''),
+            meeting_url=request.POST.get('meeting_url', ''),
+            meeting_id=request.POST.get('meeting_id', ''),
+            meeting_passcode=request.POST.get('meeting_passcode', ''),
             contact_email=request.POST.get('contact_email', ''),
             contact_phone=request.POST.get('contact_phone', ''),
             is_registration_enabled=request.POST.get('is_registration_enabled') == 'on',
@@ -2934,6 +2937,9 @@ def event_registration_edit(request, pk):
         reg.venue = request.POST.get('venue', '')
         reg.venue_fr = request.POST.get('venue_fr', '')
         reg.venue_address = request.POST.get('venue_address', '')
+        reg.meeting_url = request.POST.get('meeting_url', '')
+        reg.meeting_id = request.POST.get('meeting_id', '')
+        reg.meeting_passcode = request.POST.get('meeting_passcode', '')
         reg.contact_email = request.POST.get('contact_email', '')
         reg.contact_phone = request.POST.get('contact_phone', '')
         reg.is_registration_enabled = request.POST.get('is_registration_enabled') == 'on'

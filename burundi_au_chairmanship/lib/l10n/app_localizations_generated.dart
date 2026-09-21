@@ -6622,6 +6622,36 @@ abstract class AppLocalizationsGenerated {
   /// In en, this message translates to:
   /// **'Bookmarked'**
   String get w_bookmarked;
+
+  /// No description provided for @join_online.
+  ///
+  /// In en, this message translates to:
+  /// **'Join Online'**
+  String get join_online;
+
+  /// No description provided for @online_event.
+  ///
+  /// In en, this message translates to:
+  /// **'Online event'**
+  String get online_event;
+
+  /// No description provided for @sign_in_for_link.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to get the joining link'**
+  String get sign_in_for_link;
+
+  /// No description provided for @meeting_id.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting ID'**
+  String get meeting_id;
+
+  /// No description provided for @meeting_passcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Passcode'**
+  String get meeting_passcode;
 }
 
 class _AppLocalizationsGeneratedDelegate

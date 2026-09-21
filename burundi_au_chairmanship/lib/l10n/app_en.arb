@@ -1086,5 +1086,10 @@
   "ydd_status_not_uploaded": "Not uploaded",
   "ydd_status_photo_required": "Photo required",
   "w_bookmark": "Bookmark",
-  "w_bookmarked": "Bookmarked"
+  "w_bookmarked": "Bookmarked",
+  "join_online": "Join Online",
+  "online_event": "Online event",
+  "sign_in_for_link": "Sign in to get the joining link",
+  "meeting_id": "Meeting ID",
+  "meeting_passcode": "Passcode"
 }

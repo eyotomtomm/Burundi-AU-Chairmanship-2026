@@ -1086,5 +1086,10 @@
   "ydd_status_not_uploaded": "Non téléversé",
   "ydd_status_photo_required": "Photo requise",
   "w_bookmark": "Enregistrer",
-  "w_bookmarked": "Enregistré"
+  "w_bookmarked": "Enregistré",
+  "join_online": "Rejoindre en ligne",
+  "online_event": "Événement en ligne",
+  "sign_in_for_link": "Connectez-vous pour obtenir le lien de connexion",
+  "meeting_id": "ID de réunion",
+  "meeting_passcode": "Code d'accès"
 }

@@ -3411,4 +3411,19 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
 
   @override
   String get w_bookmarked => 'Bookmarked';
+
+  @override
+  String get join_online => 'Join Online';
+
+  @override
+  String get online_event => 'Online event';
+
+  @override
+  String get sign_in_for_link => 'Sign in to get the joining link';
+
+  @override
+  String get meeting_id => 'Meeting ID';
+
+  @override
+  String get meeting_passcode => 'Passcode';
 }

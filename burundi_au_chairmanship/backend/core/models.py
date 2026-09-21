@@ -723,6 +723,26 @@ class Event(models.Model):
         return get_variant_url(self.image, 'medium')
 
 
+def detect_stream_platform(url):
+    """Which meeting or streaming platform a URL belongs to.
+
+    Falls back to 'video' — a plain file or an unrecognised site, which the
+    app opens in a player rather than handing to another app.
+    """
+    url = (url or '').lower()
+    if 'zoom.us' in url or 'zoom.com' in url:
+        return 'zoom'
+    if 'youtube.com' in url or 'youtu.be' in url:
+        return 'youtube'
+    if 'teams.microsoft.com' in url or 'teams.live.com' in url:
+        return 'teams'
+    if 'webex.com' in url:
+        return 'webex'
+    if 'meet.google.com' in url:
+        return 'meet'
+    return 'video'
+
+
 class LiveFeed(models.Model):
     STATUS_CHOICES = [
         ('live', 'Live'),
@@ -783,20 +803,7 @@ class LiveFeed(models.Model):
         return f"[{self.get_status_display()}] {self.title}"
 
     def save(self, *args, **kwargs):
-        # Auto-detect stream type from URL
-        url = self.stream_url.lower()
-        if 'zoom.us' in url or 'zoom.com' in url:
-            self.stream_type = 'zoom'
-        elif 'youtube.com' in url or 'youtu.be' in url:
-            self.stream_type = 'youtube'
-        elif 'teams.microsoft.com' in url or 'teams.live.com' in url:
-            self.stream_type = 'teams'
-        elif 'webex.com' in url:
-            self.stream_type = 'webex'
-        elif 'meet.google.com' in url:
-            self.stream_type = 'meet'
-        else:
-            self.stream_type = 'video'
+        self.stream_type = detect_stream_platform(self.stream_url)
         super().save(*args, **kwargs)
 
 
@@ -1123,6 +1130,14 @@ class EventRegistration(models.Model):
     venue_fr = models.CharField(max_length=300, blank=True)
     venue_address = models.CharField(max_length=500, blank=True, help_text='Full address for directions')
 
+    # Where an online or hybrid event is actually held. Shown to signed-in
+    # users only, so a meeting link is not left open to anyone with the app.
+    meeting_url = models.URLField(
+        max_length=500, blank=True,
+        help_text='Google Meet / Zoom / Teams link, for Online and Hybrid events')
+    meeting_id = models.CharField(max_length=100, blank=True, help_text='Meeting ID, if the platform shows one')
+    meeting_passcode = models.CharField(max_length=100, blank=True, help_text='Meeting passcode, if there is one')
+
     # Contact
     contact_email = models.EmailField(blank=True, help_text='Contact email for "Contact Us" button')
     contact_phone = models.CharField(max_length=50, blank=True, help_text='Contact phone for "Contact Us" button')
@@ -1150,6 +1165,15 @@ class EventRegistration(models.Model):
 
     def __str__(self):
         return f"{self.event_title} - {self.get_card_type_display()}"
+
+    @property
+    def is_online(self):
+        return self.event_type in ('online', 'hybrid')
+
+    @property
+    def meeting_platform(self):
+        """'meet', 'zoom', 'teams'... so the app can label the join button."""
+        return detect_stream_platform(self.meeting_url) if self.meeting_url else ''
 
     class Meta:
         ordering = ['order', 'event_date', '-created_at']

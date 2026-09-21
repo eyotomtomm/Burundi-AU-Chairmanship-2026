@@ -70,6 +70,57 @@ class EventInfoCard extends StatelessWidget {
             _infoRow(Icons.location_on, venue, isDark),
           ],
 
+          // Joining an online or hybrid event
+          if (event.meeting != null) ...[
+            const SizedBox(height: 10),
+            _infoRow(
+              Icons.videocam,
+              event.meeting!.platformLabel.isNotEmpty
+                  ? event.meeting!.platformLabel
+                  : AppLocalizations.of(context).translate('online_event'),
+              isDark,
+            ),
+            const SizedBox(height: 12),
+            if (event.meeting!.requiresSignIn)
+              Text(
+                AppLocalizations.of(context).translate('sign_in_for_link'),
+                style: TextStyle(fontSize: 13, color: Ds.muted(context)),
+              )
+            else ...[
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _openMeeting(event.meeting!.url),
+                  icon: const Icon(Icons.videocam, size: 18),
+                  label: Text(AppLocalizations.of(context).translate('join_online')),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Ds.green,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(Ds.rPill),
+                    ),
+                  ),
+                ),
+              ),
+              if (event.meeting!.meetingId.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _infoRow(
+                  Icons.tag,
+                  '${AppLocalizations.of(context).translate('meeting_id')}: ${event.meeting!.meetingId}',
+                  isDark,
+                ),
+              ],
+              if (event.meeting!.passcode.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _infoRow(
+                  Icons.key,
+                  '${AppLocalizations.of(context).translate('meeting_passcode')}: ${event.meeting!.passcode}',
+                  isDark,
+                ),
+              ],
+            ],
+          ],
+
           // Directions button
           if (event.venueAddress.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -126,6 +177,12 @@ class EventInfoCard extends StatelessWidget {
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  void _openMeeting(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   void _openDirections(String address) {

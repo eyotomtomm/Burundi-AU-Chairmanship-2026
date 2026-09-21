@@ -3472,4 +3472,20 @@ class AppLocalizationsGeneratedFr extends AppLocalizationsGenerated {
 
   @override
   String get w_bookmarked => 'Enregistré';
+
+  @override
+  String get join_online => 'Rejoindre en ligne';
+
+  @override
+  String get online_event => 'Événement en ligne';
+
+  @override
+  String get sign_in_for_link =>
+      'Connectez-vous pour obtenir le lien de connexion';
+
+  @override
+  String get meeting_id => 'ID de réunion';
+
+  @override
+  String get meeting_passcode => 'Code d\'accès';
 }

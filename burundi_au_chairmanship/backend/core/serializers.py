@@ -1264,12 +1264,14 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
     is_registration_open = serializers.SerializerMethodField()
     current_registration_count = serializers.SerializerMethodField()
     spots_remaining = serializers.SerializerMethodField()
+    meeting = serializers.SerializerMethodField()
 
     class Meta:
         model = EventRegistration
         fields = ['id', 'card_type', 'event_type', 'category_data', 'event_title', 'event_title_fr',
                   'event_description', 'event_description_fr', 'event_poster',
                   'event_date', 'event_end_date', 'venue', 'venue_fr', 'venue_address',
+                  'meeting',
                   'contact_email', 'contact_phone',
                   'is_registration_enabled', 'registration_deadline',
                   'max_registrations', 'allow_proxy_registration',
@@ -1280,6 +1282,26 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
                   'user_submission_id',
                   'is_registration_open', 'current_registration_count',
                   'spots_remaining']
+
+    def get_meeting(self, obj):
+        """How to join an online or hybrid event — signed-in users only.
+
+        A guest is still told the event has a meeting, so the app can invite
+        them to sign in; it just withholds the link, which would otherwise be
+        open to anyone who installs the app.
+        """
+        if not (obj.is_online and obj.meeting_url):
+            return None
+        request = self.context.get('request')
+        if not (request and request.user.is_authenticated):
+            return {'requires_sign_in': True}
+        return {
+            'requires_sign_in': False,
+            'url': obj.meeting_url,
+            'platform': obj.meeting_platform,
+            'meeting_id': obj.meeting_id,
+            'passcode': obj.meeting_passcode,
+        }
 
     def get_has_registered(self, obj):
         if hasattr(obj, '_has_registered'):

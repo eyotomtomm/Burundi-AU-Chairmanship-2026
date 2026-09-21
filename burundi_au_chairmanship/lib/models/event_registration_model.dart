@@ -40,10 +40,15 @@ class EventRegistrationModel {
   final int likeCount;
   final List<Map<String, dynamic>> recentLikers;
 
+  /// How to join, for an online or hybrid event. Null when there is nothing to
+  /// join; [EventMeeting.requiresSignIn] when the server withheld the link.
+  final EventMeeting? meeting;
+
   EventRegistrationModel({
     required this.id,
     required this.cardType,
     this.eventType = 'in_person',
+    this.meeting,
     this.categoryName,
     this.categoryNameFr,
     this.categoryColor,
@@ -88,6 +93,9 @@ class EventRegistrationModel {
       id: json['id'] as int,
       cardType: json['card_type'] as String? ?? 'event',
       eventType: json['event_type'] as String? ?? 'in_person',
+      meeting: json['meeting'] is Map<String, dynamic>
+          ? EventMeeting.fromJson(json['meeting'] as Map<String, dynamic>)
+          : null,
       categoryName: (json['category_data'] as Map<String, dynamic>?)?['name'] as String?,
       categoryNameFr: (json['category_data'] as Map<String, dynamic>?)?['name_fr'] as String?,
       categoryColor: (json['category_data'] as Map<String, dynamic>?)?['color'] as String?,
@@ -138,6 +146,7 @@ class EventRegistrationModel {
         'id': id,
         'card_type': cardType,
         'event_type': eventType,
+        if (meeting != null) 'meeting': meeting!.toJson(),
         'category_data': categoryName != null
             ? {'name': categoryName, 'name_fr': categoryNameFr, 'color': categoryColor}
             : null,
@@ -309,4 +318,59 @@ class RegistrationFormField {
 
   String getHelpText(String langCode) =>
       langCode == 'fr' && helpTextFr.isNotEmpty ? helpTextFr : helpText;
+}
+
+/// Joining details for an online or hybrid event.
+///
+/// The server only sends the link to a signed-in user; for a guest it sends
+/// [requiresSignIn] alone, so the app can say the event is online and offer to
+/// sign them in without leaking the link.
+class EventMeeting {
+  final bool requiresSignIn;
+  final String url;
+  final String platform;
+  final String meetingId;
+  final String passcode;
+
+  const EventMeeting({
+    required this.requiresSignIn,
+    this.url = '',
+    this.platform = '',
+    this.meetingId = '',
+    this.passcode = '',
+  });
+
+  factory EventMeeting.fromJson(Map<String, dynamic> json) => EventMeeting(
+        requiresSignIn: json['requires_sign_in'] == true,
+        url: json['url'] as String? ?? '',
+        platform: json['platform'] as String? ?? '',
+        meetingId: json['meeting_id'] as String? ?? '',
+        passcode: json['passcode'] as String? ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'requires_sign_in': requiresSignIn,
+        'url': url,
+        'platform': platform,
+        'meeting_id': meetingId,
+        'passcode': passcode,
+      };
+
+  /// What to call the button: "Join on Google Meet", "Join on Zoom"...
+  String get platformLabel {
+    switch (platform) {
+      case 'meet':
+        return 'Google Meet';
+      case 'zoom':
+        return 'Zoom';
+      case 'teams':
+        return 'Microsoft Teams';
+      case 'webex':
+        return 'Webex';
+      case 'youtube':
+        return 'YouTube';
+      default:
+        return '';
+    }
+  }
 }

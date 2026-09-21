@@ -92,6 +92,28 @@
                     <input type="email" id="contact_email" name="contact_email" value="{{ reg.contact_email|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
                 </div>
 
+                <!-- Online meeting — only for Online / Hybrid events -->
+                <div class="md:col-span-2 hidden" id="meeting_block">
+                    <div class="border border-slate-200 dark:border-slate-600 rounded-lg p-4 bg-slate-50 dark:bg-slate-800/50">
+                        <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Joining the meeting</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Google Meet, Zoom or Teams. Only signed-in users see these in the app.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="md:col-span-2">
+                                <label for="meeting_url" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Meeting Link</label>
+                                <input type="url" id="meeting_url" name="meeting_url" value="{{ reg.meeting_url|default:'' }}" placeholder="https://meet.google.com/abc-defg-hij" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                            </div>
+                            <div>
+                                <label for="meeting_id" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Meeting ID</label>
+                                <input type="text" id="meeting_id" name="meeting_id" value="{{ reg.meeting_id|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                            </div>
+                            <div>
+                                <label for="meeting_passcode" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Passcode</label>
+                                <input type="text" id="meeting_passcode" name="meeting_passcode" value="{{ reg.meeting_passcode|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Row 4: Event Poster (full width) -->
                 <div class="md:col-span-2">
                     <label for="event_poster" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Poster</label>
@@ -681,6 +703,21 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         addFormField();
     }
+});
+</script>
+
+<script>
+// The meeting box only makes sense for an event people join online.
+document.addEventListener('DOMContentLoaded', function() {
+    var type = document.getElementById('event_type');
+    var block = document.getElementById('meeting_block');
+    if (!type || !block) return;
+    function sync() {
+        var online = type.value === 'online' || type.value === 'hybrid';
+        block.classList.toggle('hidden', !online);
+    }
+    type.addEventListener('change', sync);
+    sync();
 });
 </script>
 {% endblock %}

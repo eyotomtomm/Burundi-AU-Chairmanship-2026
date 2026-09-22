@@ -187,9 +187,11 @@ class _NewsScreenState extends State<NewsScreen> {
     }
 
     final allArticles = _articles ?? [];
-    // Featured articles in the current filter get hero cards; the rest are rows.
-    final featured = allArticles.where((a) => a.isFeatured).toList();
-    final listArticles = allArticles.where((a) => !a.isFeatured).toList();
+    // The newest few featured posts also get hero cards on top. They stay in
+    // the list below: pulling them out left gaps in the dateline, and a reader
+    // scrolling for a post from last week has no reason to look in a carousel.
+    final featured = allArticles.where((a) => a.isFeatured).take(5).toList();
+    final listArticles = allArticles;
 
     return Scaffold(
       backgroundColor: Ds.bg(context),

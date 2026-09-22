@@ -171,7 +171,7 @@
                     type="date"
                     id="publish_date"
                     name="publish_date"
-                    value="{% if magazine %}{{ magazine.publish_date|date:'Y-m-d' }}{% endif %}"
+                    value="{% if magazine %}{{ magazine.publish_date|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}"
                     required
                     class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
                 >

@@ -47,3 +47,32 @@ class MeetingLinkVisibilityTests(TestCase):
         self.assertEqual(detect_stream_platform('https://zoom.us/j/1'), 'zoom')
         self.assertEqual(detect_stream_platform('https://teams.microsoft.com/l/x'), 'teams')
         self.assertEqual(detect_stream_platform(''), 'video')
+
+
+class QuickAccessLinkTests(TestCase):
+    """A link typed without a scheme must still open in the app."""
+
+    def _item(self, **kw):
+        from core.models import QuickAccessMenuItem
+        return QuickAccessMenuItem.objects.create(
+            title_en=kw.pop('title_en', 'Join Live'),
+            action_type=kw.pop('action_type', 'url'),
+            action_value=kw.pop('action_value', ''),
+            **kw)
+
+    def test_bare_host_gets_https(self):
+        item = self._item(action_value='meet.google.com/hsh-eirx-aas')
+        self.assertEqual(item.action_value, 'https://meet.google.com/hsh-eirx-aas')
+
+    def test_existing_scheme_is_left_alone(self):
+        item = self._item(action_value='http://example.com/x')
+        self.assertEqual(item.action_value, 'http://example.com/x')
+
+    def test_a_route_is_never_given_a_scheme(self):
+        item = self._item(action_type='route', action_value='/live-feeds')
+        self.assertEqual(item.action_value, '/live-feeds')
+
+    def test_stray_spaces_are_trimmed(self):
+        item = self._item(title_en=' Join Live ', action_value=' meet.google.com/x ')
+        self.assertEqual(item.title_en, 'Join Live')
+        self.assertEqual(item.action_value, 'https://meet.google.com/x')

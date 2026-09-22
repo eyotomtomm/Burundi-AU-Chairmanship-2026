@@ -215,7 +215,7 @@
           type="datetime-local"
           id="publish_date"
           name="publish_date"
-          value="{% if article %}{{ article.publish_date|date:'Y-m-d\TH:i' }}{% endif %}"
+          value="{% if article %}{{ article.publish_date|date:'Y-m-d\TH:i' }}{% else %}{% now 'Y-m-d\TH:i' %}{% endif %}"
           required
           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
         />

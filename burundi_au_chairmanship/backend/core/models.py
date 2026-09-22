@@ -2249,6 +2249,18 @@ class QuickAccessMenuItem(models.Model):
         verbose_name = 'Quick Access Menu Item'
         verbose_name_plural = 'Quick Access Menu Items'
 
+    def save(self, *args, **kwargs):
+        # The app opens a url tile only when the scheme is http or https, so a
+        # link typed as "meet.google.com/abc" does nothing at all when tapped,
+        # with no error to show for it. Assume https rather than let that ship.
+        self.action_value = (self.action_value or '').strip()
+        if self.action_type == 'url' and self.action_value and '://' not in self.action_value:
+            self.action_value = 'https://' + self.action_value.lstrip('/')
+        # A stray space in a pasted title shows up in the tile.
+        self.title_en = (self.title_en or '').strip()
+        self.title_fr = (self.title_fr or '').strip()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.title_en
 

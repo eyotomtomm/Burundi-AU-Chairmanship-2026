@@ -1,6 +1,7 @@
 import re
 import io
 import logging
+from datetime import timedelta
 
 from django.db import models, transaction
 from django.contrib.auth.models import User
@@ -428,8 +429,26 @@ class Category(models.Model):
         return self.name
 
 
+# How long a post keeps its hero card after publication. An editor ticks
+# Featured and moves on; without a window every old post holds a hero card
+# forever and crowds out the new ones.
+FEATURED_DAYS = 5
+
+
 class ArticleQuerySet(models.QuerySet):
     """Visibility rules shared by every public article query."""
+
+    def featured(self, now=None):
+        """Featured *and* still recent. The flag itself is never rewritten, so
+        the editor's choice survives; the window is applied on read.
+
+        Object form: `Article.is_featured_now`. Keep the two in step.
+        """
+        now = now or timezone.now()
+        return self.filter(
+            is_featured=True,
+            publish_date__gte=now - timedelta(days=FEATURED_DAYS),
+        )
 
     def public(self, now=None):
         """Only what a reader may see: published, live, not yet expired.
@@ -533,6 +552,15 @@ class Article(models.Model):
         if self.status in ('draft', 'scheduled', 'archived'):
             return False
         return not self.is_draft and not self.is_scheduled and not self.is_expired
+
+    @property
+    def is_featured_now(self):
+        """The queryset form is `Article.objects.featured()`; keep them in step."""
+        return bool(
+            self.is_featured
+            and self.publish_date
+            and self.publish_date >= timezone.now() - timedelta(days=FEATURED_DAYS)
+        )
 
     @property
     def thumbnail_url(self):

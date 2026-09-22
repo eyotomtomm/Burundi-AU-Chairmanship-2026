@@ -603,6 +603,9 @@ class ArticleListSerializer(serializers.ModelSerializer):
     thumbnail_url = serializers.CharField(read_only=True)
     medium_url = serializers.CharField(read_only=True)
     recent_likers = serializers.SerializerMethodField()
+    # Expires on its own after FEATURED_DAYS — the stored flag says what the
+    # editor ticked, this says whether it still counts.
+    is_featured = serializers.BooleanField(source='is_featured_now', read_only=True)
 
     class Meta:
         model = Article

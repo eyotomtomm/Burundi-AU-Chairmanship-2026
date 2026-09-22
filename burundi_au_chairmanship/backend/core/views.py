@@ -3330,7 +3330,7 @@ def home_feed(request):
     # landed there. `articles` and `featured_articles` stay empty rather than
     # being dropped: an installed build reads both keys and concatenates them,
     # so duplicating the list into both would show every post twice.
-    featured_news = base_articles.filter(is_featured=True)[:5]
+    featured_news = base_articles.featured(now)[:5]
     news_items = base_articles[:10]
     featured_articles = Article.objects.none()
     articles = Article.objects.none()
@@ -6543,7 +6543,7 @@ def widget_feature(request):
     now = timezone.now()
     published = Article.objects.select_related('category').public(now)
 
-    article = (published.filter(is_featured=True).order_by('-publish_date', '-id').first()
+    article = (published.featured(now).order_by('-publish_date', '-id').first()
                or published.order_by('-publish_date', '-id').first())
 
     if article is None:
@@ -6558,7 +6558,7 @@ def widget_feature(request):
         'category': article.category.name if article.category else '',
         'published_at': article.publish_date,
         'image': image,
-        'is_featured': article.is_featured,
+        'is_featured': article.is_featured_now,
         'deep_link': f'/article/{article.id}',
     })
 

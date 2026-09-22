@@ -404,6 +404,31 @@ class PublicEndpointTests(TestCase):
         titles = {a['title'] for a in resp.json()['news_items']}
         self.assertEqual(titles, {live.title})
 
+    def test_featured_expires_after_five_days(self):
+        # An editor ticks Featured and never unticks it, so without a window
+        # every old post keeps its hero card and buries the new ones.
+        AppSettings.objects.create(summit_year='2026')
+        now = timezone.now()
+        fresh = Article.objects.create(
+            title='Fresh hero', content='x', publish_date=now - timedelta(days=4),
+            content_type='news', status='published', is_featured=True)
+        stale = Article.objects.create(
+            title='Stale hero', content='x', publish_date=now - timedelta(days=6),
+            content_type='news', status='published', is_featured=True)
+
+        self.assertTrue(fresh.is_featured_now)
+        self.assertFalse(stale.is_featured_now)
+
+        home = self.client.get('/api/home-feed/').json()
+        self.assertEqual({a['title'] for a in home['featured_news']}, {'Fresh hero'})
+        # Both still belong to the feed itself — expiring only drops the hero card.
+        self.assertEqual({a['title'] for a in home['news_items']},
+                         {'Fresh hero', 'Stale hero'})
+
+        listed = self.client.get('/api/articles/').json()
+        by_title = {a['title']: a['is_featured'] for a in listed.get('results', listed)}
+        self.assertEqual(by_title, {'Fresh hero': True, 'Stale hero': False})
+
     def test_news_and_articles_are_one_feed(self):
         # content_type defaulted to 'article' and the admin form preselected
         # it, so the split only recorded which option happened to be

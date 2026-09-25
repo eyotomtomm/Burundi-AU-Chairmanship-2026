@@ -24,7 +24,7 @@ Environment (all optional):
 | ---------------- | --------------------------------- | ----------------------------------------------------------------------- |
 | `API_BASE`       | `https://burundi4africa.com/api`  | Django API to read from. Use `http://127.0.0.1:8000/api` for local data.  |
 | `API_REVALIDATE` | `300`                             | Seconds a fetched API response is cached on the server (ISR).            |
-| `BACKEND_ORIGIN` | unset                             | When set, `/api`, `/admin`, `/media`, `/static`, `/app`, share cards… are proxied there. Locally: `http://127.0.0.1:8000`. |
+| `BACKEND_ORIGIN` | unset                             | Django origin for the share-card proxy and, in development, for `/api`, `/admin`, `/media`, `/static`, `/app` rewrites. Locally: `http://127.0.0.1:8010`. |
 | `SITE_URL`       | `https://burundi4africa.com`      | Canonical origin for metadata, sitemap and robots.                       |
 
 Language: the header toggle hits `/lang/en` or `/lang/fr`, which sets a `lang` cookie.
@@ -39,7 +39,7 @@ API fields use the `_fr` variant when present; static copy is translated inline 
 | `/events`             | events, event registrations, live feeds                     |
 | `/au-2026`            | priority agendas, gallery, live feeds, videos, magazines, resources, settings |
 | `/au-2026/priorities` | priority agendas, articles                                  |
-| `/media`, `/media/albums/[id]`, `/media/videos/[id]` | live feeds, videos, magazines, gallery, resources, social links |
+| `/media-centre`, `/media-centre/albums/[id]`, `/media-centre/videos/[id]` | live feeds, videos, magazines, gallery, resources, social links (Django owns `/media`) |
 | `/services`           | static                                                      |
 | `/embassy`            | embassy locations (new `/api/embassy-locations/` endpoint)  |
 | `/burundi`            | facts, resources                                            |
@@ -58,7 +58,9 @@ The Django app keeps serving `/api`, `/admin`, `/media`, `/static`, `/app` (stor
 On DigitalOcean App Platform, add the website as a second component of the existing app:
 
 1. **Component**: Web Service, source directory `burundi_au_chairmanship/website`,
-   build `npm ci && npm run build`, run `npm run start`, HTTP port 3000, Node 20+.
+   build `npm ci && npm run build`, run `npm run start`, HTTP port 3000, Node 22. TypeScript and
+   the `@types` packages are in `dependencies` on purpose: App Platform sets `NODE_ENV=production`
+   at build time, which makes `npm ci` skip devDependencies.
 2. **Routes**: give the website `/`. Keep the backend's routes as explicit prefixes:
    `/api`, `/admin`, `/media`, `/static`, `/app`, `/register`, `/verify`, `/privacy-policy`,
    `/terms-of-service`, `/support`, `/delete-account`, `/.well-known`,
@@ -66,8 +68,8 @@ On DigitalOcean App Platform, add the website as a second component of the exist
    keep reaching Django while `/` falls through to the site.
 3. **Share cards** live under paths the site also owns (`/events/7/share/`), so set
    `BACKEND_ORIGIN` on the website to the backend component's *private* URL
-   (`${backend.PRIVATE_URL}`); `next.config.ts` rewrites those two patterns to it. Add that
-   private hostname to the backend's `DJANGO_ALLOWED_HOSTS`.
+   (`${backend.PRIVATE_URL}`); the `app/[kind]/[pk]/*` route handlers proxy them there with the
+   public host and https forwarded. Add that private hostname to the backend's `DJANGO_ALLOWED_HOSTS`.
 4. Set `SITE_URL=https://burundi4africa.com`. `API_BASE` can stay on the public domain or
    use the private URL as well.
 

@@ -553,3 +553,23 @@ class UserProfileSignalTests(TestCase):
         user.first_name = 'Updated'
         user.save()
         self.assertEqual(UserProfile.objects.filter(user=user).count(), 1)
+
+
+class EmbassyLocationApiTests(TestCase):
+    """The public website's Embassy and Travel pages read missions from this endpoint."""
+
+    def test_lists_missions_without_auth_or_pagination(self):
+        from core.models import EmbassyLocation
+        EmbassyLocation.objects.create(
+            name='Embassy of Burundi', address='Bole', city='Addis Ababa', country='Ethiopia',
+            latitude=9.0, longitude=38.7, phone_number='+251 114 651 300', type='embassy',
+        )
+        EmbassyLocation.objects.create(
+            name='Burundi Consulate', address='Ngong Road', city='Nairobi', country='Kenya',
+            latitude=-1.28, longitude=36.8, type='consulate',
+        )
+        res = APIClient().get('/api/embassy-locations/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(res.json(), list)
+        self.assertEqual([m['city'] for m in res.json()], ['Nairobi', 'Addis Ababa'])
+        self.assertEqual(res.json()[1]['phone_number'], '+251 114 651 300')

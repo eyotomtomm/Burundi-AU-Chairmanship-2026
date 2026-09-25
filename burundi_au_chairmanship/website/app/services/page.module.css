@@ -1,0 +1,24 @@
+.titleRow { display: flex; align-items: flex-end; justify-content: space-between; gap: 48px; flex-wrap: wrap; }
+.visitCard { width: 360px; max-width: 100%; padding: 22px 24px; gap: 6px; font-size: 15px; }
+.tabsBar { background: var(--ivory); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; }
+.tabsBar :global(.chips) { flex-wrap: nowrap; overflow-x: auto; }
+.tableWrap { overflow-x: auto; }
+.visaTable { font-size: 16px; min-width: 720px; }
+.visaTable th { border-bottom: 2px solid var(--ink); color: var(--ink-2); }
+.bring { background: var(--ivory); border-radius: var(--r); padding: 36px; }
+.numList { display: flex; flex-direction: column; gap: 12px; }
+.numList li { display: flex; gap: 14px; }
+.numList li > span:first-child { width: 24px; flex-shrink: 0; }
+.fee { display: flex; align-items: baseline; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.feeNum { font-family: var(--display); font-size: 40px; font-weight: 500; line-height: 1; }
+.feeNote { margin-left: auto; font-size: 14px; color: var(--ink-2); text-align: right; }
+.bullets { display: flex; flex-direction: column; gap: 6px; font-size: 15px; list-style: disc; padding-left: 1.1em; }
+.fact { padding: 8px 14px; border-radius: 999px; background: var(--ivory); font-weight: 700; }
+.steps { display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+.steps li { display: flex; gap: 14px; }
+.steps li > span:first-child { width: 28px; height: 28px; border-radius: 999px; background: var(--ink); color: var(--gold); font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.helpBand { border-radius: var(--r-lg); background: var(--ink); color: var(--white); padding: 44px 48px; display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+@media (max-width: 900px) {
+  .bring { padding: 24px; }
+  .helpBand { padding: 28px 24px; }
+}

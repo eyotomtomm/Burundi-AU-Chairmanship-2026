@@ -4,7 +4,8 @@ Custom throttling classes for the Be 4 Africa API.
 Provides rate limiting to prevent abuse and manipulation of analytics.
 """
 
-from rest_framework.throttling import SimpleRateThrottle
+from django.conf import settings
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
 
 
 class AuthRateThrottle(SimpleRateThrottle):
@@ -187,3 +188,20 @@ class ShareCardThrottle(SimpleRateThrottle):
 
     def get_cache_key(self, request, view):
         return self.cache_format % {'scope': self.scope, 'ident': self.get_ident(request)}
+
+
+class SiteKeyAnonThrottle(AnonRateThrottle):
+    """The anonymous rate limit, except for the public website's server.
+
+    burundi4africa.com renders on its own server from this API and revalidates
+    every endpoint on a timer, so it would exhaust 100/hour on its own. It
+    sends `X-Site-Key`; when that matches `SITE_API_KEY` the request is not
+    counted. Read-only endpoints only ever see this key, so a leaked key buys
+    nothing but unthrottled reads.
+    """
+
+    def allow_request(self, request, view):
+        key = getattr(settings, 'SITE_API_KEY', '')
+        if key and request.META.get('HTTP_X_SITE_KEY') == key:
+            return True
+        return super().allow_request(request, view)

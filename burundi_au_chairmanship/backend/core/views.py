@@ -2824,6 +2824,14 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
         return Response({'is_liked': is_liked, 'like_count': new_count})
 
 
+class EmbassyLocationViewSet(viewsets.ReadOnlyModelViewSet):
+    """Embassies, consulates and offices — read by the public website's Embassy and Travel pages."""
+    permission_classes = [AllowAny]
+    queryset = EmbassyLocation.objects.all().order_by('type', 'country', 'name')
+    serializer_class = EmbassyLocationSerializer
+    pagination_class = None
+
+
 class SocialMediaLinkViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view social media links"""
     permission_classes = [AllowAny]

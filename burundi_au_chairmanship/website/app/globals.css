@@ -434,8 +434,8 @@ a:hover .fig img, a.fig:hover img, a.card:hover img { transform: scale(1.04); }
 .chip:hover { border-color: var(--ink); }
 .more { position: relative; display: inline-block; transition: transform 0.2s ease; }
 .more:hover { transform: translateX(3px); }
-.rule-list > li > a { transition: padding-left 0.2s ease, background-color 0.2s ease; }
-.rule-list > li > a:hover { padding-left: 8px; text-decoration: none; }
+.rule-list > li > a { transition: transform 0.2s ease, background-color 0.2s ease; }
+.rule-list > li > a:hover { transform: translateX(8px); text-decoration: none; }
 .nav > .nav-item > a, .nav > a { position: relative; border-bottom: 0; }
 .nav > .nav-item > a::after, .nav > a::after { content: ''; position: absolute; left: 0; right: 0; bottom: 4px; height: 3px; background: var(--gold); transform: scaleX(0); transform-origin: left; transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1); }
 .nav > .nav-item > a[aria-current]::after, .nav > a[aria-current]::after, .nav > .nav-item:hover > a::after, .nav > .nav-item:focus-within > a::after, .nav > a:hover::after { transform: scaleX(1); }

@@ -16,6 +16,8 @@ const DJANGO_PREFIXES = [
 const nextConfig: NextConfig = {
   // Media lives on DigitalOcean Spaces behind a CDN; plain <img> is enough.
   images: { unoptimized: true },
+  // Share-card URLs are shared with a trailing slash (/articles/5/share/); serve them directly.
+  skipTrailingSlashRedirect: true,
   async rewrites() {
     const backend = process.env.BACKEND_ORIGIN?.replace(/\/$/, "");
     if (!backend) return [];

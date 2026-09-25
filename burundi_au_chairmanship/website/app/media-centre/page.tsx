@@ -78,7 +78,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
                   <span className="play"><Play size={38} /></span>
                 </a>
               ) : hero ? (
-                <Link className={s.player} href={`/media/videos/${hero.id}`}>
+                <Link className={s.player} href={`/media-centre/videos/${hero.id}`}>
                   <img src={media(hero.medium_url || hero.thumbnail) || "/img/drummers.jpg"} alt="" />
                   <span className="scrim" />
                   <span className="tag tag--gold" style={{ position: "absolute", left: 24, top: 24 }}>{t(lang, "LATEST", "DERNIÈRE")}</span>
@@ -105,7 +105,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
               <ol className={s.upnext}>
                 {upNext.map((v) => (
                   <li key={v.id}>
-                    <Link href={`/media/videos/${v.id}`}>
+                    <Link href={`/media-centre/videos/${v.id}`}>
                       <span className={s.thumb}>
                         <img src={media(v.medium_url || v.thumbnail) || "/img/karera-falls.jpg"} alt="" loading="lazy" />
                         {v.duration && <span className={s.dur}>{v.duration}</span>}
@@ -134,15 +134,15 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
         <div className="wrap">
           <SectionHead eyebrow={t(lang, "Video library", "Vidéothèque")} title={t(lang, "Speeches, sessions and stories", "Discours, sessions et récits")} more={t(lang, "Watch in the B4Africa app", "Regarder dans l’app B4Africa")} moreHref="/app" />
           <div className="chips" role="group" aria-label={t(lang, "Filter videos", "Filtrer les vidéos")} style={{ marginTop: 28 }}>
-            <Link className="chip" href="/media#videos" aria-current={!category ? "true" : undefined}>{t(lang, "All videos", "Toutes les vidéos")}</Link>
+            <Link className="chip" href="/media-centre#videos" aria-current={!category ? "true" : undefined}>{t(lang, "All videos", "Toutes les vidéos")}</Link>
             {VIDEO_CATEGORIES.map(([k, en, fr]) => (
-              <Link key={k} className="chip" href={`/media?category=${k}#videos`} aria-current={category === k ? "true" : undefined}>{t(lang, en, fr)}</Link>
+              <Link key={k} className="chip" href={`/media-centre?category=${k}#videos`} aria-current={category === k ? "true" : undefined}>{t(lang, en, fr)}</Link>
             ))}
           </div>
           {shown.length ? (
             <div className={s.videos} style={{ marginTop: 36 }}>
               {shown.map((v) => (
-                <Link key={v.id} className={`${s.video} no-ul`} href={`/media/videos/${v.id}`}>
+                <Link key={v.id} className={`${s.video} no-ul`} href={`/media-centre/videos/${v.id}`}>
                   <span className={s.still}>
                     <img src={media(v.medium_url || v.thumbnail) || "/img/president-podium.jpg"} alt="" loading="lazy" />
                     <span className={s.smallPlay}><Play /></span>
@@ -215,7 +215,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
           <SectionHead eyebrow={t(lang, "Photo galleries", "Galeries photo")} title={t(lang, "Albums", "Albums")} />
           {leadAlbum ? (
             <div className="grid" style={{ alignItems: "start" }}>
-              <Link className="span-7 stack no-ul" style={{ gap: 18 }} href={`/media/albums/${leadAlbum.id}`}>
+              <Link className="span-7 stack no-ul" style={{ gap: 18 }} href={`/media-centre/albums/${leadAlbum.id}`}>
                 <span className={s.albumLead}>
                   {[leadAlbum.cover_image, ...leadAlbum.photos.map((p) => p.medium_url || p.image)].slice(0, 4).map((src, i) => (
                     <span key={i} className={`fig ${i === 0 ? "" : ""}`}><img src={media(src)} alt="" loading="lazy" /></span>
@@ -231,7 +231,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
               </Link>
               <div className="span-5 start-8 stack">
                 {otherAlbums.slice(0, 2).map((a) => (
-                  <Link key={a.id} className="stack no-ul" style={{ gap: 14 }} href={`/media/albums/${a.id}`}>
+                  <Link key={a.id} className="stack no-ul" style={{ gap: 14 }} href={`/media-centre/albums/${a.id}`}>
                     <span className={s.albumSmall}>
                       {[a.cover_image, ...a.photos.map((p) => p.medium_url || p.image)].slice(0, 3).map((src, i) => (
                         <span key={i} className="fig"><img src={media(src)} alt="" loading="lazy" /></span>
@@ -246,7 +246,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
               </div>
               {otherAlbums.length > 2 && (
                 <div className="span-12 chips">
-                  {otherAlbums.slice(2).map((a) => <Link key={a.id} className="chip" href={`/media/albums/${a.id}`}>{tr(a, "title", lang)} · {a.photo_count}</Link>)}
+                  {otherAlbums.slice(2).map((a) => <Link key={a.id} className="chip" href={`/media-centre/albums/${a.id}`}>{tr(a, "title", lang)} · {a.photo_count}</Link>)}
                 </div>
               )}
             </div>
@@ -265,9 +265,9 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
               <h2 className="h2">{t(lang, "Documents", "Documents")}</h2>
             </div>
             <div className="chips" role="group" aria-label={t(lang, "Filter documents by category", "Filtrer les documents par catégorie")}>
-              <Link className="chip" href="/media#documents" aria-current={!doc ? "true" : undefined}>{t(lang, "All", "Tous")}</Link>
+              <Link className="chip" href="/media-centre#documents" aria-current={!doc ? "true" : undefined}>{t(lang, "All", "Tous")}</Link>
               {RESOURCE_CATEGORIES.map(([k, en, fr]) => (
-                <Link key={k} className="chip" href={`/media?doc=${k}#documents`} aria-current={doc === k ? "true" : undefined}>{t(lang, en, fr)}</Link>
+                <Link key={k} className="chip" href={`/media-centre?doc=${k}#documents`} aria-current={doc === k ? "true" : undefined}>{t(lang, en, fr)}</Link>
               ))}
             </div>
           </div>

@@ -59,8 +59,8 @@ export function navGroups(lang: Lang): NavGroup[] {
       children: [
         { href: "/news", label: t(lang, "All news", "Toutes les actualités") },
         { href: "/events", label: t(lang, "Events", "Événements") },
-        { href: "/media", label: t(lang, "Media centre", "Médiathèque"), hint: t(lang, "Videos, magazine, albums", "Vidéos, magazine, albums") },
-        { href: "/media#documents", label: t(lang, "Documents", "Documents") },
+        { href: "/media-centre", label: t(lang, "Media centre", "Médiathèque"), hint: t(lang, "Videos, magazine, albums", "Vidéos, magazine, albums") },
+        { href: "/media-centre#documents", label: t(lang, "Documents", "Documents") },
       ],
     },
   ];

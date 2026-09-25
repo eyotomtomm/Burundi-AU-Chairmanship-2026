@@ -35,13 +35,13 @@ export default async function ChairmanshipPage() {
   const watch = liveNow
     ? { href: liveNow.stream_url, img: media(liveNow.thumbnail), title: tr(liveNow, "title", lang), live: true }
     : video
-      ? { href: "/media", img: media(video.medium_url || video.thumbnail_url || video.thumbnail), title: tr(video, "title", lang), live: false }
+      ? { href: "/media-centre", img: media(video.medium_url || video.thumbnail_url || video.thumbnail), title: tr(video, "title", lang), live: false }
       : null;
   const docs = resources.results.filter((r) => r.category === "official_documents").slice(0, 3);
   const magazine = magazines.results[0];
   const tiles = MOSAIC_FALLBACK.map(([src, cap], i) => {
     const a = albums.results[i];
-    return a ? { src: media(a.photos[0]?.medium_url || a.cover_image) || src, cap: tr(a, "title", lang), href: `/media#album-${a.id}` } : { src, cap, href: "/media" };
+    return a ? { src: media(a.photos[0]?.medium_url || a.cover_image) || src, cap: tr(a, "title", lang), href: `/media-centre#album-${a.id}` } : { src, cap, href: "/media-centre" };
   });
 
   return (
@@ -90,7 +90,7 @@ export default async function ChairmanshipPage() {
 
       <section className="sec sec--ivory">
         <div className="wrap stack">
-          <SectionHead eyebrow={t(lang, "Gallery", "Galerie")} title={t(lang, "The year in pictures", "L’année en images")} more={t(lang, "All albums", "Tous les albums")} moreHref="/media#albums" />
+          <SectionHead eyebrow={t(lang, "Gallery", "Galerie")} title={t(lang, "The year in pictures", "L’année en images")} more={t(lang, "All albums", "Tous les albums")} moreHref="/media-centre#albums" />
           <div className="mosaic">
             {tiles.map((tile, i) => (
               <Link key={i} className="fig" style={MOSAIC_CELLS[i]} href={tile.href}>
@@ -118,7 +118,7 @@ export default async function ChairmanshipPage() {
             <p className="lede lede--sm">{t(lang, "Sessions, speeches and interviews, with chapters and subtitles in English and French. Get notified in the B4Africa app when a session goes live.", "Sessions, discours et entretiens, avec chapitres et sous-titres en anglais et en français. Soyez notifié dans l’app B4Africa quand une session passe en direct.")}</p>
             <div className="row" style={{ gap: 16 }}>
               <img src="/img/b4africa.png" alt="B4Africa" width={150} height={50} style={{ width: 150, height: "auto" }} />
-              <Link className="btn btn--md" href="/media">{t(lang, "Media centre", "Médiathèque")}</Link>
+              <Link className="btn btn--md" href="/media-centre">{t(lang, "Media centre", "Médiathèque")}</Link>
             </div>
           </div>
         </div>
@@ -138,13 +138,13 @@ export default async function ChairmanshipPage() {
               </a></li>
             ))}
             {magazine && (
-              <li><a href={media(magazine.effective_pdf_url) || "/media#magazine"} rel="noopener">
+              <li><a href={media(magazine.effective_pdf_url) || "/media-centre#magazine"} rel="noopener">
                 <span className="stack" style={{ gap: 4 }}><span className="meta">Magazine · {fmtDate(magazine.publish_date, lang, { day: undefined })}</span><span className="h3 h3--sm">{tr(magazine, "title", lang)}</span></span>
                 <span className="badge-pdf">{t(lang, "Read", "Lire")} →</span>
               </a></li>
             )}
             {!docs.length && !magazine && <li><div className="muted">{t(lang, "Speeches and communiqués are published here as they are released.", "Les discours et communiqués sont publiés ici dès leur parution.")}</div></li>}
-            <li><Link href="/media#documents"><span className="h3 h3--sm">{t(lang, "All documents and publications", "Tous les documents et publications")}</span><span aria-hidden="true">→</span></Link></li>
+            <li><Link href="/media-centre#documents"><span className="h3 h3--sm">{t(lang, "All documents and publications", "Tous les documents et publications")}</span><span aria-hidden="true">→</span></Link></li>
           </ul>
         </div>
       </section>

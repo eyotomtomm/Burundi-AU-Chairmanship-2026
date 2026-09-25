@@ -32,7 +32,7 @@ export default async function VideoPage({ params }: Props) {
     <>
       <section className="sec--dark" style={{ padding: "48px 0 72px" }}>
         <div className="wrap stack">
-          <div style={{ color: "var(--mint-2)" }}><Crumbs lang={lang} items={[[t(lang, "Media centre", "Médiathèque"), "/media"], [t(lang, "Videos", "Vidéos"), "/media#videos"], [tr(video, "title", lang)]]} /></div>
+          <div style={{ color: "var(--mint-2)" }}><Crumbs lang={lang} items={[[t(lang, "Media centre", "Médiathèque"), "/media-centre"], [t(lang, "Videos", "Vidéos"), "/media-centre#videos"], [tr(video, "title", lang)]]} /></div>
           <div className="embed">
             {yt ? (
               <iframe src={`https://www.youtube-nocookie.com/embed/${yt}`} title={tr(video, "title", lang)} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
@@ -68,7 +68,7 @@ export default async function VideoPage({ params }: Props) {
             <ol className={s.upnext} style={{ borderTopColor: "var(--ink)" }}>
               {more.map((v) => (
                 <li key={v.id}>
-                  <Link href={`/media/videos/${v.id}`} style={{ borderBottomColor: "var(--line-2)" }}>
+                  <Link href={`/media-centre/videos/${v.id}`} style={{ borderBottomColor: "var(--line-2)" }}>
                     <span className={s.thumb}>
                       <img src={media(v.medium_url || v.thumbnail) || "/img/karera-falls.jpg"} alt="" loading="lazy" />
                       {v.duration && <span className={s.dur}>{v.duration}</span>}
@@ -81,7 +81,7 @@ export default async function VideoPage({ params }: Props) {
                 </li>
               ))}
             </ol>
-            <Link className="more arrow" href="/media#videos">{t(lang, "All videos", "Toutes les vidéos")}</Link>
+            <Link className="more arrow" href="/media-centre#videos">{t(lang, "All videos", "Toutes les vidéos")}</Link>
           </aside>
         </div>
       </section>

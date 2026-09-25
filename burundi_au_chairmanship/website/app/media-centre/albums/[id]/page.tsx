@@ -25,7 +25,7 @@ export default async function AlbumPage({ params }: Props) {
     <>
       <section className="page-hero sec--ivory">
         <div className="wrap stack" style={{ gap: 20 }}>
-          <Crumbs lang={lang} items={[[t(lang, "Media centre", "Médiathèque"), "/media"], [t(lang, "Albums", "Albums"), "/media#albums"], [tr(album, "title", lang)]]} />
+          <Crumbs lang={lang} items={[[t(lang, "Media centre", "Médiathèque"), "/media-centre"], [t(lang, "Albums", "Albums"), "/media-centre#albums"], [tr(album, "title", lang)]]} />
           <span className="eyebrow">{t(lang, "Photo album", "Album photo")} · {fmtDate(album.created_at, lang)}</span>
           <h1 className="h1">{tr(album, "title", lang)}</h1>
           {tr(album, "description", lang) && <p className="lede">{tr(album, "description", lang)}</p>}
@@ -48,7 +48,7 @@ export default async function AlbumPage({ params }: Props) {
               </figure>
             ))}
           </div>
-          <div><Link className="btn btn--outline btn--md" href="/media#albums">{t(lang, "All albums", "Tous les albums")}</Link></div>
+          <div><Link className="btn btn--outline btn--md" href="/media-centre#albums">{t(lang, "All albums", "Tous les albums")}</Link></div>
         </div>
       </section>
     </>

@@ -213,7 +213,7 @@ export default async function Discover() {
       {guides.length > 0 && (
         <section className="sec">
           <div className="wrap stack">
-            <SectionHead eyebrow={t(lang, "Downloads", "Téléchargements")} title={t(lang, "Guides to Burundi", "Guides du Burundi")} more={t(lang, "All documents", "Tous les documents")} moreHref="/media#documents" />
+            <SectionHead eyebrow={t(lang, "Downloads", "Téléchargements")} title={t(lang, "Guides to Burundi", "Guides du Burundi")} more={t(lang, "All documents", "Tous les documents")} moreHref="/media-centre#documents" />
             <ul className="rule-list rule-list--strong">
               {guides.map((r) => (
                 <li key={r.id}><a href={media(r.file)} rel="noopener"><span className="h3 h3--sm">{tr(r, "title", lang)}</span><span className="badge-pdf">{r.file_type.toUpperCase()} · {r.file_size} ↓</span></a></li>

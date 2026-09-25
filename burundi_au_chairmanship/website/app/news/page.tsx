@@ -200,7 +200,7 @@ export default async function Newsroom({ searchParams }: { searchParams: Promise
       {frontPage && (
         <section className="sec sec--ivory" id="documents">
           <div className="wrap stack stack--lg">
-            <SectionHead eyebrow={t(lang, "Official texts", "Textes officiels")} title={t(lang, "Communiqués, speeches and publications", "Communiqués, discours et publications")} more={t(lang, "All documents", "Tous les documents")} moreHref="/media#documents" />
+            <SectionHead eyebrow={t(lang, "Official texts", "Textes officiels")} title={t(lang, "Communiqués, speeches and publications", "Communiqués, discours et publications")} more={t(lang, "All documents", "Tous les documents")} moreHref="/media-centre#documents" />
             {documents.length ? (
               <ul className="rule-list rule-list--strong cols cols-2" style={{ gap: "0 32px" }}>
                 {documents.slice(0, 8).map((d) => (
@@ -225,9 +225,9 @@ export default async function Newsroom({ searchParams }: { searchParams: Promise
       {frontPage && (
         <section className="sec">
           <div className="wrap stack stack--lg">
-            <SectionHead eyebrow={t(lang, "Media", "Médias")} title={t(lang, "Watch, read, browse", "Regarder, lire, parcourir")} more={t(lang, "Open the media library", "Ouvrir la médiathèque")} moreHref="/media" />
+            <SectionHead eyebrow={t(lang, "Media", "Médias")} title={t(lang, "Watch, read, browse", "Regarder, lire, parcourir")} more={t(lang, "Open the media library", "Ouvrir la médiathèque")} moreHref="/media-centre" />
             <div className="grid" style={{ gap: 24 }}>
-              <Link className="span-6 fig" href="/media#videos" style={{ height: 460 }}>
+              <Link className="span-6 fig" href="/media-centre#videos" style={{ height: 460 }}>
                 <img src={media(video?.medium_url || video?.thumbnail) || "/img/drummers.jpg"} alt="" loading="lazy" style={{ objectPosition: "45% 40%" }} />
                 <span className="scrim" style={{ background: "rgba(15,42,27,0.22)" }} /><PlayIcon />
                 <span className="panel between" style={{ position: "absolute", left: 20, right: 20, bottom: 20, borderRadius: 18, padding: "20px 22px", alignItems: "center", flexWrap: "nowrap" }}>
@@ -239,7 +239,7 @@ export default async function Newsroom({ searchParams }: { searchParams: Promise
                   <span aria-hidden="true" className="icon-btn" style={{ borderColor: "var(--ink)", borderWidth: 1.5, flexShrink: 0 }}>→</span>
                 </span>
               </Link>
-              <Link className="span-3 fig" href="/media#magazine" style={{ height: 460 }}>
+              <Link className="span-3 fig" href="/media-centre#magazine" style={{ height: 460 }}>
                 <img src={media(magazine?.medium_url || magazine?.cover_image) || "/img/dancers.jpg"} alt="" loading="lazy" style={{ objectPosition: "60% center" }} />
                 <span className="panel" style={{ position: "absolute", left: 16, right: 16, bottom: 16, padding: "18px 20px", gap: 4 }}>
                   <span className="eyebrow" style={{ fontSize: 15 }}>{t(lang, "Digital magazine", "Magazine numérique")}</span>
@@ -247,7 +247,7 @@ export default async function Newsroom({ searchParams }: { searchParams: Promise
                   <span className="small muted">{t(lang, "Read online, or save editions offline in the app.", "À lire en ligne, ou hors ligne dans l’app.")}</span>
                 </span>
               </Link>
-              <Link className="span-3 fig" href="/media#albums" style={{ height: 460 }}>
+              <Link className="span-3 fig" href="/media-centre#albums" style={{ height: 460 }}>
                 <img src={media(album?.cover_image) || "/img/lake-tanganyika.jpg"} alt="" loading="lazy" style={{ objectPosition: "22% center" }} />
                 <span className="panel" style={{ position: "absolute", left: 16, right: 16, bottom: 16, padding: "18px 20px", gap: 4 }}>
                   <span className="eyebrow" style={{ fontSize: 15 }}>{t(lang, "Photo galleries", "Galeries photo")}</span>

@@ -171,7 +171,7 @@ export default async function Invest() {
               const d = docFor(words);
               return (
                 <li key={label}>
-                  <a href={d ? media(d.file) : "/media#documents"} rel={d ? "noopener" : undefined}>
+                  <a href={d ? media(d.file) : "/media-centre#documents"} rel={d ? "noopener" : undefined}>
                     <span className="display" style={{ fontSize: 24 }}>{label}</span>
                     <span className="badge-pdf">{d ? `${d.file_type.toUpperCase()} ↓` : t(lang, "Media centre →", "Médiathèque →")}</span>
                   </a>

@@ -14,7 +14,7 @@ export function Footer({ lang, settings, social }: { lang: Lang; settings: AppSe
     ["/au-2026/priorities", t(lang, "AU priority agenda", "Agenda prioritaire UA")],
     ["/events", t(lang, "Events", "Événements")],
     ["/news", t(lang, "Newsroom", "Actualités")],
-    ["/media", t(lang, "Media centre", "Médiathèque")],
+    ["/media-centre", t(lang, "Media centre", "Médiathèque")],
     ["/invest", t(lang, "Invest in Burundi", "Investir au Burundi")],
   ];
   return (
@@ -46,7 +46,7 @@ export function Footer({ lang, settings, social }: { lang: Lang; settings: AppSe
             <Link href="/invest#texts">Vision 2040–2060</Link>
             <Link href="/invest#texts">Investment Code · Mining Code</Link>
             <Link href="/invest#texts">PPP, VAT and Banking laws</Link>
-            <Link href="/media#documents">{t(lang, "All documents", "Tous les documents")}</Link>
+            <Link href="/media-centre#documents">{t(lang, "All documents", "Tous les documents")}</Link>
             <h3 style={{ marginTop: 12 }}>{t(lang, "Regional bodies", "Organisations régionales")}</h3>
             <span>AU · EAC · CEPGL · ICGLR · COMESA · ECCAS</span>
           </div>

@@ -5,7 +5,7 @@ const SITE = process.env.SITE_URL ?? "https://burundi4africa.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPaths = ["", "/services", "/embassy", "/burundi", "/diaspora", "/travel", "/invest",
-    "/au-2026", "/au-2026/priorities", "/events", "/news", "/media"];
+    "/au-2026", "/au-2026/priorities", "/events", "/news", "/media-centre"];
   const [news, albums] = await Promise.all([api.articles({ page_size: 200 }), api.albums()]);
   return [
     ...staticPaths.map((p) => ({ url: `${SITE}${p}`, changeFrequency: "weekly" as const, priority: p === "" ? 1 : 0.7 })),

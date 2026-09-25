@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 
 // Paths that belong to Django, not to this site. In production the platform
 // routes these prefixes straight to the backend; the rewrites below cover the
-// two patterns a prefix cannot express (share cards live under /events/…,
-// /articles/… etc.) and make local development work against one origin.
+// prefixes for local development against one origin. Share cards (/events/7/share/,
+// /articles/5/card.jpg) are served by app/[kind]/[pk]/* route handlers, which proxy to
+// BACKEND_ORIGIN with the public host and https scheme preserved.
 // BACKEND_ORIGIN must be the backend's *private* URL in production — pointing
 // it at the public domain would loop back into this site.
 const DJANGO_PREFIXES = [
@@ -23,9 +24,6 @@ const nextConfig: NextConfig = {
         { source: `/${p}`, destination: `${backend}/${p}` },
         { source: `/${p}/:path*`, destination: `${backend}/${p}/:path*` },
       ]),
-      { source: "/:kind/:pk(\\d+)/share", destination: `${backend}/:kind/:pk/share/` },
-      { source: "/:kind/:pk(\\d+)/share/", destination: `${backend}/:kind/:pk/share/` },
-      { source: "/:kind/:pk(\\d+)/card.jpg", destination: `${backend}/:kind/:pk/card.jpg` },
     ];
   },
 };

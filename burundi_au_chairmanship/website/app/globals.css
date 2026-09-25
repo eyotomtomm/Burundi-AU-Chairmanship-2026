@@ -45,6 +45,16 @@ button { font: inherit; cursor: pointer; color: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ---------- layout ---------- */
+/* Grid and flex items default to min-width:auto, which lets a wide table or long word push the
+   whole page wider than a phone screen. Everything inside a section may shrink instead. */
+main .wrap, main .wrap > *, main .grid > *, main .cols > *, main .stack > *, main .row > *, main .card, main .card > * { min-width: 0; }
+main { overflow-x: clip; }
+h1, h2, h3, p, li, dd, dt, a, span { overflow-wrap: break-word; }
+.table-wrap, .tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 700px) {
+  .table { display: block; overflow-x: auto; white-space: nowrap; }
+  .table td, .table th { white-space: normal; min-width: 120px; }
+}
 .wrap { width: 100%; max-width: 1320px; margin: 0 auto; padding: 0 20px; }
 .sec { padding: 96px 0; }
 .sec--tight { padding: 72px 0; }

@@ -283,6 +283,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # Absolute base URL for building full media URLs (e.g. push notification images,
 # image variant URLs in API responses). Must be set in production.
+# Shared secret the public website sends as X-Site-Key to bypass the anonymous rate limit (core.throttling).
+SITE_API_KEY = os.environ.get('SITE_API_KEY', '').strip()
 SITE_URL = os.environ.get('SITE_URL', 'http://127.0.0.1:8000' if DEBUG else 'https://burundi4africa.com')
 
 # DigitalOcean Spaces for media files (production only)
@@ -404,7 +406,7 @@ REST_FRAMEWORK = {
         'django_filters.rest_framework.DjangoFilterBackend',
     ],
     'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
+        'core.throttling.SiteKeyAnonThrottle',
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {

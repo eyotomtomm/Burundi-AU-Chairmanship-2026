@@ -120,6 +120,28 @@ jobs:
       - name: Test
         run: flutter test
 
+  # ─── Website (Next.js) ─────────────────────────────────────
+  website:
+    name: Website (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: burundi_au_chairmanship/website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: burundi_au_chairmanship/website/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      # Pages render from the live API at build time; the build must not depend on it.
+      - run: npm run build
+        env:
+          API_BASE: http://127.0.0.1:9/api
+
   # ─── Build Android (AAB + APK) ─────────────────────────────
   build-android:
     name: Build Android

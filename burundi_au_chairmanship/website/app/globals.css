@@ -326,6 +326,7 @@ a.card:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(15,42,2
 }
 @media print {
   .topbar, .hdr, .promo, .ftr { display: none; }
+  *, *::before, *::after { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
 /* ---------- page pieces ---------- */

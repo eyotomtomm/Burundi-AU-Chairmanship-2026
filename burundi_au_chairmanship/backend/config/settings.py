@@ -378,7 +378,8 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     'https://burundi4africa.com',
     'https://www.burundi4africa.com',
-    'https://burundi4africa.com',
+    'https://burundichairship.africa',
+    'https://www.burundichairship.africa',
 ]
 if DEBUG:
     CORS_ALLOWED_ORIGINS += [
@@ -508,6 +509,8 @@ if not DEBUG:
     CSRF_TRUSTED_ORIGINS = [
         'https://burundi4africa.com',
         'https://www.burundi4africa.com',
+        'https://burundichairship.africa',
+        'https://www.burundichairship.africa',
         'https://burundi-au-api-mgo34.ondigitalocean.app',
     ]
 # ─── Email Configuration ──────────────────────────────────────

@@ -31,6 +31,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main id="main">{children}</main>
         <AppPromo lang={lang} settings={settings} />
         <Footer lang={lang} settings={settings} social={social} />
+        {/* A photo that fails to load hides itself, leaving the card's own background instead of a broken-image icon. */}
+        <script dangerouslySetInnerHTML={{ __html: "addEventListener('error',function(e){var t=e.target;if(t&&t.tagName==='IMG'){t.style.visibility='hidden'}},true)" }} />
       </body>
     </html>
   );

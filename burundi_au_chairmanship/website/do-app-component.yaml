@@ -1,0 +1,61 @@
+# App Platform component for the public website. This is a FRAGMENT to merge into the
+# live app's spec (`doctl apps spec get <app-id>`), not a whole spec: the existing
+# backend service, scheduler worker and database must stay exactly as they are.
+#
+#   doctl apps spec get <app-id> > live.yaml     # edit: add the service below, adjust backend routes
+#   doctl apps update <app-id> --spec live.yaml
+#
+# Routing: App Platform picks the longest matching path prefix, so the backend keeps its
+# explicit prefixes and everything else falls through to the website at "/".
+services:
+  - name: website
+    source_dir: burundi_au_chairmanship/website
+    github:
+      repo: eyotomtomm/Burundi-AU-Chairmanship-2026
+      branch: main
+      deploy_on_push: true
+    environment_slug: node-js
+    build_command: npm ci && npm run build
+    run_command: npm run start
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-1gb
+    routes:
+      - path: /
+    health_check:
+      http_path: /robots.txt
+    envs:
+      - key: SITE_URL
+        value: https://burundi4africa.com
+      - key: API_BASE
+        value: https://burundi4africa.com/api
+      # The backend's private URL: share cards (/events/7/share/) are rewritten there.
+      - key: BACKEND_ORIGIN
+        value: ${burundi-au-chairmanship-2026.PRIVATE_URL}
+      # Same value as SITE_API_KEY on the backend service; exempts the site from the anon rate limit.
+      - key: SITE_API_KEY
+        type: SECRET
+        value: "<generate: openssl rand -hex 32>"
+      - key: NODE_ENV
+        value: production
+
+# On the EXISTING backend service (burundi-au-chairmanship-2026), replace `routes: [{path: /}]` with:
+#   routes:
+#     - path: /api
+#     - path: /admin
+#     - path: /media
+#     - path: /static
+#     - path: /app
+#     - path: /register
+#     - path: /verify
+#     - path: /privacy-policy
+#     - path: /terms-of-service
+#     - path: /support
+#     - path: /delete-account
+#     - path: /.well-known
+#     - path: /apple-app-site-association
+# and add to its envs:
+#   - key: SITE_API_KEY
+#     type: SECRET
+#     value: "<the same key>"
+# and append the private hostname to DJANGO_ALLOWED_HOSTS so proxied share-card requests are accepted.

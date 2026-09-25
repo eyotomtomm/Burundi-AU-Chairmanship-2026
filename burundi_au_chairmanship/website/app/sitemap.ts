@@ -10,6 +10,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticPaths.map((p) => ({ url: `${SITE}${p}`, changeFrequency: "weekly" as const, priority: p === "" ? 1 : 0.7 })),
     ...news.results.map((a) => ({ url: `${SITE}/news/${a.id}`, lastModified: a.publish_date, changeFrequency: "monthly" as const, priority: 0.6 })),
-    ...albums.results.map((g) => ({ url: `${SITE}/media/albums/${g.id}`, lastModified: g.created_at, changeFrequency: "monthly" as const, priority: 0.4 })),
+    ...albums.results.map((g) => ({ url: `${SITE}/media-centre/albums/${g.id}`, lastModified: g.created_at, changeFrequency: "monthly" as const, priority: 0.4 })),
   ];
 }

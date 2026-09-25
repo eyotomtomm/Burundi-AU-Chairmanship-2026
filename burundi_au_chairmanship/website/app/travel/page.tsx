@@ -134,7 +134,7 @@ export default async function Travel() {
         </div>
       </section>
 
-      <section className="sec sec--ivory">
+      <section id="phrasebook" className="sec sec--ivory">
         <div className="wrap grid">
           <div className="span-4 stack" style={{ gap: 18 }}>
             <span className="eyebrow">{t(lang, "Kirundi phrasebook", "Lexique kirundi")}</span>

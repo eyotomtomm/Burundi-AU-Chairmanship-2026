@@ -25,6 +25,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.core.paginator import Paginator
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 from django.core.files.storage import default_storage
@@ -1062,6 +1063,13 @@ def article_edit(request, pk):
         if _img:
             article.image = _img
             changes['image'] = {'old': '', 'new': 'new image uploaded'}
+        # datetime-local posts a naive local time; the form shows minutes only.
+        publish_date = parse_datetime(request.POST.get('publish_date') or '')
+        if publish_date:
+            publish_date = timezone.make_aware(publish_date)
+            if publish_date != article.publish_date.replace(second=0, microsecond=0):
+                changes['publish_date'] = {'old': str(article.publish_date), 'new': str(publish_date)}
+                article.publish_date = publish_date
         article.is_featured = new_values['is_featured']
         article.is_draft = new_values['is_draft']
         content_status = request.POST.get('content_status', 'published')

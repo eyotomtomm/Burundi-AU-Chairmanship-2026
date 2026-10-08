@@ -243,3 +243,19 @@ class ReuseAppMediaInArticleTests(TestCase):
         for m in media:
             self.addCleanup(m.image.delete, save=False)
         self.assertEqual(self.article.image.name, media[0].image.name)
+
+
+class ArticleEditPublishDateTests(TestCase):
+    """Editing a posted article saves a new publish date."""
+
+    def setUp(self):
+        self.staff = User.objects.create_superuser('boss', 'boss@example.com', 'x')
+        login_with_2fa(self.client, self.staff)
+        self.article = Article.objects.create(title='t', content='c', author='a', publish_date=timezone.now())
+
+    def test_publish_date_is_updated(self):
+        self.client.post(reverse('custom_admin:article_edit', args=[self.article.pk]), {
+            'title': 't', 'content': 'c', 'author': 'a', 'publish_date': '2026-01-15T09:30',
+        })
+        self.article.refresh_from_db()
+        self.assertEqual(timezone.localtime(self.article.publish_date).strftime('%Y-%m-%d %H:%M'), '2026-01-15 09:30')

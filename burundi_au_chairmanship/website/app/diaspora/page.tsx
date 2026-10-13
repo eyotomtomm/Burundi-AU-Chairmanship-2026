@@ -45,8 +45,8 @@ export default async function Diaspora() {
   ];
 
   const services = [
-    ["/services#passport", t(lang, "Travel document · CGM", "Document de voyage · CGM"), t(lang, "Passport", "Passeport"), t(lang, "Ordinary, service and diplomatic passports.", "Passeports ordinaire, de service et diplomatique."), t(lang, "Ordinary 235,000 FBU", "Ordinaire 235 000 FBU")],
-    ["/services#laissez-passer", t(lang, "Travel document · CGM", "Document de voyage · CGM"), "Laissez-passer", t(lang, "For travel to other EAC countries, including South Sudan.", "Pour voyager dans les autres pays de l’EAC, dont le Soudan du Sud."), t(lang, "30,000 FBU · 1 year", "30 000 FBU · 1 an")],
+    ["/services#passport", t(lang, "Travel document · CGM", "Document de voyage · CGM"), t(lang, "Passport", "Passeport"), t(lang, "Ordinary, service and diplomatic passports.", "Passeports ordinaire, de service et diplomatique."), t(lang, "Valid 10 years", "Valable 10 ans")],
+    ["/services#laissez-passer", t(lang, "Travel document · CGM", "Document de voyage · CGM"), "Laissez-passer", t(lang, "For travel to other EAC countries, including South Sudan.", "Pour voyager dans les autres pays de l’EAC, dont le Soudan du Sud."), t(lang, "Valid 1 year", "Valable 1 an")],
     ["/embassy#contact", t(lang, "Consular service", "Service consulaire"), t(lang, "Civil status & administrative acts", "État civil et actes administratifs"), t(lang, "Civil marriage, administrative acts and legalisation.", "Mariage civil, actes administratifs et légalisation."), t(lang, "Consular desk", "Guichet consulaire")],
     ["/embassy#contact", t(lang, "Consular service", "Service consulaire"), t(lang, "Nationality", "Nationalité"), t(lang, "Nationality applications.", "Demandes de nationalité."), t(lang, "Consular desk", "Guichet consulaire")],
     ["/travel#emergency", t(lang, "Help in an emergency", "Aide en cas d’urgence"), t(lang, "Emergency assistance", "Assistance d’urgence"), t(lang, "The Embassy’s emergency line and emergency numbers in Burundi.", "La ligne d’urgence de l’Ambassade et les numéros d’urgence au Burundi."), t(lang, "Numbers to call", "Numéros à appeler")],
@@ -190,7 +190,7 @@ export default async function Diaspora() {
       <section className="sec">
         <div className="wrap stack">
           <SectionHead eyebrow={t(lang, "For Burundians abroad", "Pour les Burundais de l’étranger")} title={t(lang, "Services and notices", "Services et avis")} more={t(lang, "All consular services", "Tous les services consulaires")} moreHref="/services" />
-          <p className="lede lede--sm">{t(lang, "Passports and travel documents are issued by the Commissariat Général des Migrations (CGM). Fees and the documents to bring are on the consular services page.", "Les passeports et documents de voyage sont délivrés par le Commissariat Général des Migrations (CGM). Les frais et pièces à fournir sont sur la page des services consulaires.")}</p>
+          <p className="lede lede--sm">{t(lang, "Passports and travel documents are issued by the Commissariat Général des Migrations (CGM). The documents to bring are on the consular services page.", "Les passeports et documents de voyage sont délivrés par le Commissariat Général des Migrations (CGM). Les pièces à fournir sont sur la page des services consulaires.")}</p>
           <div className="cols cols-3">
             {services.map(([href, kicker, h, p, foot]) => (
               <Link key={h} className="card" href={href}>

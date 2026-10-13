@@ -6,7 +6,7 @@ import s from "./page.module.css";
 
 export const metadata: Metadata = {
   title: "Consular services",
-  description: "Visas, passports and laissez-passer: fees, documents and how to apply through the Embassy of Burundi in Addis Ababa.",
+  description: "Visas, passports and laissez-passer: documents and how to apply through the Embassy of Burundi in Addis Ababa.",
 };
 
 const MAIL = "mailto:info@burundiaddis.gov.bi";
@@ -27,7 +27,6 @@ export default async function Services() {
     [t(lang, "Certified copies, permanent resident visa", "Copies certifiées, visa de résident permanent"), t(lang, "Minor children of permanent residents", "Enfants mineurs de résidents permanents"), t(lang, "99 years", "99 ans")],
     [t(lang, "Transfer of a permanent resident visa", "Transfert d’un visa de résident permanent"), t(lang, "Holders with a new passport", "Titulaires d’un nouveau passeport"), t(lang, "99 years", "99 ans")],
     [t(lang, "EAC entry visa", "Visa d’entrée EAC"), t(lang, "Citizens of EAC member states", "Citoyens des États membres de l’EAC"), t(lang, "1 to 6 months", "1 à 6 mois")],
-    [t(lang, "CEPGL entry visa", "Visa d’entrée CEPGL"), t(lang, "Citizens of CEPGL member states", "Citoyens des États membres de la CEPGL"), t(lang, "1 to 3 months", "1 à 3 mois")],
     [t(lang, "EAC study visa", "Visa d’études EAC"), t(lang, "Students from EAC member states", "Étudiants des États membres de l’EAC"), t(lang, "1 year", "1 an")],
   ];
   const courtesyDocs = [
@@ -54,15 +53,15 @@ export default async function Services() {
   ];
   const passports = [
     {
-      title: t(lang, "Ordinary passport", "Passeport ordinaire"), fee: "235,000", note: <>{t(lang, "10 years adults", "10 ans adultes")}<br />{t(lang, "5 years children", "5 ans enfants")}</>,
+      title: t(lang, "Ordinary passport", "Passeport ordinaire"), note: <>{t(lang, "10 years adults", "10 ans adultes")}<br />{t(lang, "5 years children", "5 ans enfants")}</>,
       groups: [[t(lang, "Adults bring", "Adultes"), [...adultsStd, expired, photo]], [t(lang, "Minors bring", "Mineurs"), [...minorsStd, expired]]] as Array<[string, string[]]>,
     },
     {
-      title: t(lang, "Service passport", "Passeport de service"), fee: "135,000", note: <>{t(lang, "For government", "Pour les missions")}<br />{t(lang, "missions", "gouvernementales")}</>,
+      title: t(lang, "Service passport", "Passeport de service"), note: <>{t(lang, "For government", "Pour les missions")}<br />{t(lang, "missions", "gouvernementales")}</>,
       groups: [[t(lang, "Bring", "À fournir"), [...adultsStd, photo, t(lang, "Government mission order", "Ordre de mission gouvernemental")]]] as Array<[string, string[]]>,
     },
     {
-      title: t(lang, "Diplomatic passport", "Passeport diplomatique"), fee: "135,000", note: t(lang, "5 years", "5 ans"),
+      title: t(lang, "Diplomatic passport", "Passeport diplomatique"), note: t(lang, "5 years", "5 ans"),
       groups: [
         [t(lang, "Adults bring", "Adultes"), [...adultsStd, expired, photo, t(lang, "Note verbale from the Ministry of External Relations and Cooperation", "Note verbale du Ministère des Relations extérieures et de la Coopération")]],
         [t(lang, "Minors bring", "Mineurs"), [...minorsStd, expired, t(lang, "Copy of the parents’ diplomatic passports", "Copie des passeports diplomatiques des parents"), t(lang, "School certificate", "Attestation de scolarité")]],
@@ -74,7 +73,7 @@ export default async function Services() {
     t(lang, "Go to the CGM reception or the provincial one-stop desk with your full file.", "Présentez-vous à l’accueil du CGM ou au guichet unique provincial avec votre dossier complet."),
     t(lang, "Fill in the application form on site. Someone is there to help.", "Remplissez le formulaire de demande sur place. Une personne est là pour vous aider."),
     t(lang, "Hand in the file for registration and sign the confirmation page.", "Déposez le dossier pour enregistrement et signez la page de confirmation."),
-    t(lang, "Pay the 30,000 FBU fee at the BANCOBU counter.", "Payez les frais de 30 000 FBU au guichet BANCOBU."),
+    t(lang, "Pay the fee at the BANCOBU counter.", "Payez les frais au guichet BANCOBU."),
     t(lang, "Show the payment slip for your photo, and fingerprints for adults.", "Présentez le reçu de paiement pour la photo, et les empreintes pour les adultes."),
     t(lang, "Come back on the date given to collect your laissez-passer.", "Revenez à la date indiquée pour retirer votre laissez-passer."),
   ];
@@ -86,7 +85,7 @@ export default async function Services() {
           <div className="stack" style={{ gap: 16, maxWidth: 760 }}>
             <Crumbs lang={lang} items={[[t(lang, "Consular services", "Services consulaires")]]} />
             <h1 className="h1">{t(lang, "Consular services", "Services consulaires")}</h1>
-            <p className="lede">{t(lang, "Visas, passports and travel documents, with the fees and documents published by the Embassy. Documents are issued by the Commissariat Général des Migrations (CGM).", "Visas, passeports et documents de voyage, avec les frais et pièces publiés par l’Ambassade. Les documents sont délivrés par le Commissariat Général des Migrations (CGM).")}</p>
+            <p className="lede">{t(lang, "Visas, passports and travel documents, with the documents published by the Embassy. Documents are issued by the Commissariat Général des Migrations (CGM).", "Visas, passeports et documents de voyage, avec les pièces publiées par l’Ambassade. Les documents sont délivrés par le Commissariat Général des Migrations (CGM).")}</p>
           </div>
           <div className={`card card--ivory ${s.visitCard}`}>
             <span className="eyebrow">{t(lang, "Visiting the Embassy", "Venir à l’Ambassade")}</span>
@@ -106,7 +105,7 @@ export default async function Services() {
       <section id="visa" className="sec">
         <div className="wrap stack">
           <div className="between">
-            <div className="stack" style={{ gap: 6 }}><span className="eyebrow">01 · {t(lang, "Nine visa types", "Neuf types de visa")}</span><h2 className="h2">Visa</h2></div>
+            <div className="stack" style={{ gap: 6 }}><span className="eyebrow">01 · {t(lang, "Eight visa types", "Huit types de visa")}</span><h2 className="h2">Visa</h2></div>
             <a className="btn btn--outline btn--sm" href={ask(t(lang, "Visa guide request", "Demande de guide visa"))}><Ico d={ICONS.download} size={18} stroke="currentColor" />{t(lang, "Request the full visa guide (PDF, French)", "Demander le guide complet des visas (PDF)")}</a>
           </div>
           <div className={s.tableWrap}>
@@ -143,7 +142,7 @@ export default async function Services() {
             {passports.map((p) => (
               <article key={p.title} className="card" style={{ padding: 30, gap: 16, border: 0 }}>
                 <h3 className="h3 h3--lg" style={{ fontSize: 30 }}>{p.title}</h3>
-                <div className={s.fee}><span className={s.feeNum}>{p.fee}</span><span className="bold">FBU</span><span className={s.feeNote}>{p.note}</span></div>
+                <div className={s.fee}>{p.note}</div>
                 {p.groups.map(([label, items]) => (
                   <div key={label} className="stack" style={{ gap: 8 }}>
                     <span className="eyebrow" style={{ fontSize: 15 }}>{label}</span>
@@ -163,7 +162,7 @@ export default async function Services() {
             <article className="card" style={{ padding: 34, gap: 18 }}>
               <h3 className="h3 h3--lg">Laissez-passer</h3>
               <p className="muted">{t(lang, "Required for Burundians travelling to other EAC countries: Kenya, Rwanda, Uganda, Tanzania and South Sudan.", "Requis pour les Burundais se rendant dans les autres pays de l’EAC : Kenya, Rwanda, Ouganda, Tanzanie et Soudan du Sud.")}</p>
-              <div className="row"><span className={s.fact}>30,000 FBU</span><span className={s.fact}>{t(lang, "Valid 1 year", "Valable 1 an")}</span></div>
+              <div className="row"><span className={s.fact}>{t(lang, "Valid 1 year", "Valable 1 an")}</span></div>
               <span className="eyebrow" style={{ fontSize: 15 }}>{t(lang, "Bring", "À fournir")}</span>
               <ul className={s.bullets}>
                 <li>{t(lang, "One passport photo on a white background", "Une photo d’identité sur fond blanc")}</li>

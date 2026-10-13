@@ -9,9 +9,7 @@
 .numList { display: flex; flex-direction: column; gap: 12px; }
 .numList li { display: flex; gap: 14px; }
 .numList li > span:first-child { width: 24px; flex-shrink: 0; }
-.fee { display: flex; align-items: baseline; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
-.feeNum { font-family: var(--display); font-size: 40px; font-weight: 500; line-height: 1; }
-.feeNote { margin-left: auto; font-size: 14px; color: var(--ink-2); text-align: right; }
+.fee { padding-bottom: 16px; border-bottom: 1px solid var(--line); color: var(--ink-2); }
 .bullets { display: flex; flex-direction: column; gap: 6px; font-size: 15px; list-style: disc; padding-left: 1.1em; }
 .fact { padding: 8px 14px; border-radius: 999px; background: var(--ivory); font-weight: 700; }
 .steps { display: flex; flex-direction: column; gap: 10px; font-size: 15px; }

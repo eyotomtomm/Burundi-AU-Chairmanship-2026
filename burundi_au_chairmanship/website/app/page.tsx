@@ -26,9 +26,9 @@ export default async function Home() {
     : "Assuring Sustainable Water Availability and Safe Sanitation Systems to Achieve the Goals of Agenda 2063";
 
   const services = [
-    { href: "/services#visa", icon: ICONS.doc, title: "Visa", body: t(lang, "Nine visa types, from EAC entry to permanent residence.", "Neuf types de visa, de l’entrée EAC à la résidence permanente."), foot: t(lang, "Types and requirements", "Types et pièces à fournir") },
-    { href: "/services#passport", icon: ICONS.passport, title: t(lang, "Passport", "Passeport"), body: t(lang, "Ordinary, service and diplomatic passports.", "Passeports ordinaire, de service et diplomatique."), foot: `235,000 FBU · 10 ${t(lang, "years", "ans")}` },
-    { href: "/services#laissez-passer", icon: ICONS.send, title: "Laissez-passer", body: t(lang, "For Burundians travelling within the EAC.", "Pour les Burundais voyageant dans l’EAC."), foot: `30,000 FBU · 1 ${t(lang, "year", "an")}` },
+    { href: "/services#visa", icon: ICONS.doc, title: "Visa", body: t(lang, "Eight visa types, from EAC entry to permanent residence.", "Huit types de visa, de l’entrée EAC à la résidence permanente."), foot: t(lang, "Types and requirements", "Types et pièces à fournir") },
+    { href: "/services#passport", icon: ICONS.passport, title: t(lang, "Passport", "Passeport"), body: t(lang, "Ordinary, service and diplomatic passports.", "Passeports ordinaire, de service et diplomatique."), foot: t(lang, "Valid 10 years", "Valable 10 ans") },
+    { href: "/services#laissez-passer", icon: ICONS.send, title: "Laissez-passer", body: t(lang, "For Burundians travelling within the EAC.", "Pour les Burundais voyageant dans l’EAC."), foot: t(lang, "Valid 1 year", "Valable 1 an") },
   ];
   const places = [
     ["/img/karera-falls.jpg", "Karera Falls", "Karera waterfalls", ""],
@@ -68,7 +68,7 @@ export default async function Home() {
 
       <section className="sec sec--tight sec--ivory">
         <div className="wrap stack">
-          <SectionHead size="h2 h2--md" eyebrow={t(lang, "Consular services", "Services consulaires")} title={t(lang, "How can we help?", "Comment pouvons-nous vous aider ?")} more={t(lang, "All services and fees", "Tous les services et tarifs")} moreHref="/services" />
+          <SectionHead size="h2 h2--md" eyebrow={t(lang, "Consular services", "Services consulaires")} title={t(lang, "How can we help?", "Comment pouvons-nous vous aider ?")} more={t(lang, "All services", "Tous les services")} moreHref="/services" />
           <div className="cols cols-4">
             {services.map((s) => (
               <Link key={s.href} className="card svc-card" href={s.href}>

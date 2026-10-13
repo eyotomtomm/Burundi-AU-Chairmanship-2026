@@ -55,6 +55,7 @@ def _sanitize_csv_row(row):
     return [_sanitize_csv_value(v) for v in row]
 
 
+from custom_admin.middleware.staff_session import REMEMBER_ME_KEY
 from core.utils import log_admin_action, compute_model_diff
 from core.models import (
     DiscussionTopic, ContentReport,
@@ -412,10 +413,8 @@ def admin_login(request):
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             remember_me = bool(request.POST.get('remember_me'))
             request.session['_staff_session_created'] = time.time()
-            if remember_me:
-                request.session.set_expiry(settings.STAFF_SESSION_MAX_AGE)
-            else:
-                request.session.set_expiry(0)
+            request.session[REMEMBER_ME_KEY] = remember_me
+            request.session.set_expiry(settings.STAFF_REMEMBER_ME_MAX_AGE if remember_me else 0)
             request.session.save()
             log_admin_action(request, 'login', 'Auth', object_repr=user.username)
             if not settings.ADMIN_2FA_REQUIRED:

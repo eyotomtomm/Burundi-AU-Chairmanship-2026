@@ -98,6 +98,33 @@ class TwoFactorDisabledTests(TestCase):
                              reverse('custom_admin:force_password_change'), fetch_redirect_response=False)
 
 
+class RememberMeTests(TestCase):
+    """Remember me skips the 30-minute idle logout; without it, an idle hour logs you out."""
+
+    def setUp(self):
+        cache.clear()
+        User.objects.create_superuser('boss', 'boss@example.com', 'correct-horse-battery')
+
+    def _login_then_idle(self, remember):
+        data = {'username': 'boss', 'password': 'correct-horse-battery'}
+        if remember:
+            data['remember_me'] = '1'
+        self.client.post(reverse('custom_admin:login'), data)
+        self.client.get(reverse('custom_admin:dashboard'))
+        session = self.client.session
+        session['_staff_last_activity'] -= 60 * 60
+        session.save()
+        return self.client.get(reverse('custom_admin:dashboard'))
+
+    def test_remembered_session_survives_an_idle_hour(self):
+        r = self._login_then_idle(remember=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, 'id="sessionWarning"')
+
+    def test_unremembered_session_idles_out(self):
+        r = self._login_then_idle(remember=False)
+        self.assertRedirects(r, reverse('custom_admin:login'), fetch_redirect_response=False)
+
 class DestructiveViewsRequirePostTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_superuser('boss', 'boss@example.com', 'x')

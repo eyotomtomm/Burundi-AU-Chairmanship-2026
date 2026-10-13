@@ -465,6 +465,8 @@ SIMPLE_JWT = {
 SESSION_COOKIE_AGE = 60 * 60 * 24          # 24 hours (cookie level)
 SESSION_SAVE_EVERY_REQUEST = True           # Refresh cookie Max-Age on every request
 STAFF_SESSION_MAX_AGE = 60 * 60 * 24       # 24 hours — hard cap enforced by middleware
+# "Remember me": no 30-minute idle logout, and a 14-day cap instead of 24 hours.
+STAFF_REMEMBER_ME_MAX_AGE = 60 * 60 * 24 * 14
 # Admin TOTP. Off by default; set ADMIN_2FA_REQUIRED=True to enforce enrolment
 # and per-login verification. The setup/verify views stay reachable either way,
 # so admins can enrol voluntarily before it is switched on.

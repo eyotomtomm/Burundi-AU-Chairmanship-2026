@@ -1108,7 +1108,7 @@ function toggleDarkMode() {
 })();
 </script>
 
-{% if user.is_authenticated %}
+{% if user.is_authenticated and not request.session.staff_remember_me %}
 <!-- Auto-logout: 30 min session, 2 min warning before expiry -->
 <div id="sessionWarning" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center backdrop-blur-sm">
   <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center">

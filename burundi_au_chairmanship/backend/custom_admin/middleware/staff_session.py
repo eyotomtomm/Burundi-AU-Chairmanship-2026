@@ -23,6 +23,8 @@ DEFAULT_IDLE_TIMEOUT = 60 * 30
 
 SESSION_CREATED_KEY = '_staff_session_created'
 LAST_ACTIVITY_KEY = '_staff_last_activity'
+# No leading underscore: base.html reads it to skip the idle-logout timer.
+REMEMBER_ME_KEY = 'staff_remember_me'
 
 
 class StaffSessionLifetimeMiddleware:
@@ -32,6 +34,7 @@ class StaffSessionLifetimeMiddleware:
         self.get_response = get_response
         self.max_age = getattr(settings, 'STAFF_SESSION_MAX_AGE', DEFAULT_MAX_AGE)
         self.idle_timeout = getattr(settings, 'STAFF_SESSION_IDLE_TIMEOUT', DEFAULT_IDLE_TIMEOUT)
+        self.remember_max_age = getattr(settings, 'STAFF_REMEMBER_ME_MAX_AGE', self.max_age)
 
     def __call__(self, request):
         # Only enforce on authenticated staff users with a session
@@ -44,8 +47,10 @@ class StaffSessionLifetimeMiddleware:
             now = time.time()
             created = request.session.get(SESSION_CREATED_KEY)
             last_activity = request.session.get(LAST_ACTIVITY_KEY)
+            remember = request.session.get(REMEMBER_ME_KEY, False)
+            max_age = self.remember_max_age if remember else self.max_age
 
-            if last_activity is not None and now - last_activity > self.idle_timeout:
+            if not remember and last_activity is not None and now - last_activity > self.idle_timeout:
                 logger.info('Staff session idle-expired (%ds) for user %s', self.idle_timeout, request.user.username)
                 logout(request)
                 return redirect('custom_admin:login')
@@ -57,10 +62,10 @@ class StaffSessionLifetimeMiddleware:
                 # giving the user one more window instead of locking them out
                 # immediately on deploy.
                 request.session[SESSION_CREATED_KEY] = now
-            elif now - created > self.max_age:
+            elif now - created > max_age:
                 logger.info(
                     'Staff session expired (hard cap %ds) for user %s',
-                    self.max_age,
+                    max_age,
                     request.user.username,
                 )
                 logout(request)

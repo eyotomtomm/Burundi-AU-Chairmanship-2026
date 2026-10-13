@@ -11,10 +11,9 @@ export function navGroups(lang: Lang): NavGroup[] {
     {
       href: "/services", label: "Services",
       children: [
-        { href: "/services#visa", label: "Visa", hint: t(lang, "Types, fees and requirements", "Types, tarifs et pièces") },
+        { href: "/services#visa", label: "Visa", hint: t(lang, "Types and requirements", "Types et pièces") },
         { href: "/services#passport", label: t(lang, "Passport", "Passeport"), hint: t(lang, "Ordinary, service, diplomatic", "Ordinaire, de service, diplomatique") },
-        { href: "/services#laissez-passer", label: t(lang, "Laissez-passer & CEPGL card", "Laissez-passer & carte CEPGL") },
-        { href: "/services#other", label: t(lang, "Other services", "Autres services"), hint: t(lang, "Legalisation, civil status, certificates", "Légalisation, état civil, attestations") },
+        { href: "/services#laissez-passer", label: "Laissez-passer" },
       ],
     },
     {
@@ -49,7 +48,7 @@ export function navGroups(lang: Lang): NavGroup[] {
       href: "/au-2026", label: "AU 2026",
       children: [
         { href: "/au-2026", label: t(lang, "The chairmanship", "La présidence"), hint: t(lang, "Burundi at the head of the Union", "Le Burundi à la tête de l’Union") },
-        { href: "/au-2026/priorities", label: t(lang, "Priority agenda", "Agenda prioritaire"), hint: t(lang, "Water, A-RISE, peace & security", "Eau, A-RISE, paix & sécurité") },
+        { href: "/au-2026/priorities", label: t(lang, "Priority agenda", "Agenda prioritaire"), hint: t(lang, "Water, peace & security, A-RISE", "Eau, paix & sécurité, A-RISE") },
         { href: "/events", label: t(lang, "Events & Continental Dialogue", "Événements & Dialogue continental") },
         { href: "/au-2026#watch", label: t(lang, "Watch and follow", "Regarder et suivre") },
       ],

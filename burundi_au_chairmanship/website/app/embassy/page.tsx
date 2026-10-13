@@ -144,7 +144,7 @@ export default async function Embassy() {
             <span className="eyebrow">{t(lang, "Visit us", "Nous rendre visite")}</span>
             <h2 className="h2">{t(lang, "Hours and contact", "Horaires et contact")}</h2>
             <dl className="dl">
-              <dt>{t(lang, "Open", "Ouvert")}</dt><dd>{contact.hours ?? t(lang, "Monday to Friday, 7:00–16:00", "Lundi à vendredi, 7h00–16h00")}</dd>
+              <dt>{t(lang, "Open", "Ouvert")}</dt><dd>{contact.hours ?? t(lang, "Monday to Friday, 9:00–17:00", "Lundi à vendredi, 9h00–17h00")}</dd>
               <dt>{t(lang, "Address", "Adresse")}</dt><dd>{contact.address}</dd>
               <dt>{t(lang, "Phone", "Téléphone")}</dt><dd>{contact.phones.map((p, i) => <span key={p}>{i > 0 && " · "}<a href={`tel:${p.replace(/\s/g, "")}`}>{p}</a></span>)}</dd>
               <dt>Email</dt><dd><a href={`mailto:${contact.email}`}>{contact.email}</a></dd>

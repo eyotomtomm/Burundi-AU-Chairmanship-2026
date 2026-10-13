@@ -26,10 +26,9 @@ export default async function Home() {
     : "Assuring Sustainable Water Availability and Safe Sanitation Systems to Achieve the Goals of Agenda 2063";
 
   const services = [
-    { href: "/services#visa", icon: ICONS.doc, title: "Visa", body: t(lang, "Eleven visa types, from transit to permanent residence.", "Onze types de visa, du transit à la résidence permanente."), foot: t(lang, "Several free · Transit 40 USD", "Plusieurs gratuits · Transit 40 USD") },
+    { href: "/services#visa", icon: ICONS.doc, title: "Visa", body: t(lang, "Nine visa types, from EAC entry to permanent residence.", "Neuf types de visa, de l’entrée EAC à la résidence permanente."), foot: t(lang, "Types and requirements", "Types et pièces à fournir") },
     { href: "/services#passport", icon: ICONS.passport, title: t(lang, "Passport", "Passeport"), body: t(lang, "Ordinary, service and diplomatic passports.", "Passeports ordinaire, de service et diplomatique."), foot: `235,000 FBU · 10 ${t(lang, "years", "ans")}` },
     { href: "/services#laissez-passer", icon: ICONS.send, title: "Laissez-passer", body: t(lang, "For Burundians travelling within the EAC.", "Pour les Burundais voyageant dans l’EAC."), foot: `30,000 FBU · 1 ${t(lang, "year", "an")}` },
-    { href: "/services#cepgl", icon: ICONS.link, title: t(lang, "CEPGL card", "Carte CEPGL"), body: t(lang, "Travel within the Great Lakes countries.", "Circuler dans les pays des Grands Lacs."), foot: `18,000 FBU · 1 ${t(lang, "year", "an")}` },
   ];
   const places = [
     ["/img/karera-falls.jpg", "Karera Falls", "Karera waterfalls", ""],
@@ -70,7 +69,7 @@ export default async function Home() {
       <section className="sec sec--tight sec--ivory">
         <div className="wrap stack">
           <SectionHead size="h2 h2--md" eyebrow={t(lang, "Consular services", "Services consulaires")} title={t(lang, "How can we help?", "Comment pouvons-nous vous aider ?")} more={t(lang, "All services and fees", "Tous les services et tarifs")} moreHref="/services" />
-          <div className="cols cols-5">
+          <div className="cols cols-4">
             {services.map((s) => (
               <Link key={s.href} className="card svc-card" href={s.href}>
                 <span className="icon-circle"><Ico d={s.icon} /></span>
@@ -97,13 +96,13 @@ export default async function Home() {
             <span className="eyebrow">Culture</span>
             <h2 className="h2">
               {lang === "fr"
-                ? <>Les tambours comptent partout en Afrique. Au Burundi, ils sont <em className="ital">presque sacrés.</em></>
-                : <>Drums matter across Africa. In Burundi, they are <em className="ital">almost spiritual.</em></>}
+                ? <>Les tambours comptent partout en Afrique. Au Burundi, le tambour est sacré : <em className="ital">la voix même de la nation.</em></>
+                : <>Drums matter across Africa. In Burundi, the drum is sacred, <em className="ital">the voice of the nation itself.</em></>}
             </h2>
             <p className="lede lede--sm">
               {t(lang,
-                "The Royal Drummers of Burundi have performed for more than forty years on the karyenda, amashako, ibishikiso and ikiranya drums. Dance follows the drums at celebrations and family gatherings, and elders pass on stories and legends to the young.",
-                "Les Tambourinaires du Burundi jouent depuis plus de quarante ans sur les tambours karyenda, amashako, ibishikiso et ikiranya. La danse suit le tambour lors des fêtes et des réunions de famille, et les anciens transmettent contes et légendes aux plus jeunes.")}
+                "The Royal Drummers of Burundi play the karyenda, amashako, ibishikiso and ikiranya drums. Dance follows the drums at celebrations and family gatherings, and elders pass on stories and legends to the young.",
+                "Les Tambourinaires du Burundi jouent les tambours karyenda, amashako, ibishikiso et ikiranya. La danse suit le tambour lors des fêtes et des réunions de famille, et les anciens transmettent contes et légendes aux plus jeunes.")}
             </p>
             <div className="row" style={{ gap: 24 }}>
               <Link className="more arrow" href="/burundi#culture">{t(lang, "Culture & history", "Culture & histoire")}</Link>

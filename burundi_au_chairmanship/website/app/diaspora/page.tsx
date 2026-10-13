@@ -47,8 +47,8 @@ export default async function Diaspora() {
   const services = [
     ["/services#passport", t(lang, "Travel document · CGM", "Document de voyage · CGM"), t(lang, "Passport", "Passeport"), t(lang, "Ordinary, service and diplomatic passports.", "Passeports ordinaire, de service et diplomatique."), t(lang, "Ordinary 235,000 FBU", "Ordinaire 235 000 FBU")],
     ["/services#laissez-passer", t(lang, "Travel document · CGM", "Document de voyage · CGM"), "Laissez-passer", t(lang, "For travel to other EAC countries, including South Sudan.", "Pour voyager dans les autres pays de l’EAC, dont le Soudan du Sud."), t(lang, "30,000 FBU · 1 year", "30 000 FBU · 1 an")],
-    ["/services#other", t(lang, "Consular service", "Service consulaire"), t(lang, "Civil status & administrative acts", "État civil et actes administratifs"), t(lang, "Civil marriage, administrative acts and legalisation.", "Mariage civil, actes administratifs et légalisation."), t(lang, "Consular desk", "Guichet consulaire")],
-    ["/services#other", t(lang, "Consular service", "Service consulaire"), t(lang, "Nationality", "Nationalité"), t(lang, "Nationality applications.", "Demandes de nationalité."), t(lang, "Consular desk", "Guichet consulaire")],
+    ["/embassy#contact", t(lang, "Consular service", "Service consulaire"), t(lang, "Civil status & administrative acts", "État civil et actes administratifs"), t(lang, "Civil marriage, administrative acts and legalisation.", "Mariage civil, actes administratifs et légalisation."), t(lang, "Consular desk", "Guichet consulaire")],
+    ["/embassy#contact", t(lang, "Consular service", "Service consulaire"), t(lang, "Nationality", "Nationalité"), t(lang, "Nationality applications.", "Demandes de nationalité."), t(lang, "Consular desk", "Guichet consulaire")],
     ["/travel#emergency", t(lang, "Help in an emergency", "Aide en cas d’urgence"), t(lang, "Emergency assistance", "Assistance d’urgence"), t(lang, "The Embassy’s emergency line and emergency numbers in Burundi.", "La ligne d’urgence de l’Ambassade et les numéros d’urgence au Burundi."), t(lang, "Numbers to call", "Numéros à appeler")],
     ["/news", t(lang, "Notice · 21 October 2024", "Avis · 21 octobre 2024"), "Itangazo rihamagarira Abarundi kwiyandikisha ku matora y’2025", t(lang, "Notice calling on Burundians to register for the 2025 elections (in Kirundi).", "Avis appelant les Burundais à s’inscrire pour les élections de 2025 (en kirundi)."), t(lang, "Read", "Lire")],
   ];
@@ -147,7 +147,7 @@ export default async function Diaspora() {
               <span className="eyebrow">{t(lang, "Questions about the form?", "Des questions ?")}</span>
               <a className="bold" href="tel:+251114651300">+251 114 651 300</a>
               <a className="bold" href="mailto:info@burundiaddis.gov.bi">info@burundiaddis.gov.bi</a>
-              <span className="small muted">{t(lang, "Monday to Friday, 7:00–16:00", "Lundi à vendredi, 7h00–16h00")}</span>
+              <span className="small muted">{t(lang, "Monday to Friday, 9:00–17:00", "Lundi à vendredi, 9h00–17h00")}</span>
             </div>
             <figure><div className="fig fig--4x3"><img src="/img/dancers.jpg" alt="Dancers in green and red holding woven baskets" loading="lazy" /></div><figcaption className="caption">{t(lang, "Burundian dancers.", "Danseuses burundaises.")}</figcaption></figure>
           </aside>

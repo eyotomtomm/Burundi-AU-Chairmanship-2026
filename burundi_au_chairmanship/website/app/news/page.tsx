@@ -294,7 +294,7 @@ export default async function Newsroom({ searchParams }: { searchParams: Promise
             <dl className="dl" style={{ marginTop: 32, fontSize: 17 }}>
               <dt style={{ color: "#A7BFA9" }}>Email</dt><dd><a href="mailto:info@burundiaddis.gov.bi" className="bold" style={{ color: "#fff" }}>info@burundiaddis.gov.bi</a></dd>
               <dt style={{ color: "#A7BFA9" }}>{t(lang, "Phone", "Téléphone")}</dt><dd>+251 114 651 300<br />+251 114 655 547<br />+251 911 208 857</dd>
-              <dt style={{ color: "#A7BFA9" }}>{t(lang, "Hours", "Horaires")}</dt><dd>{t(lang, "Monday to Friday, 7:00–16:00", "Lundi à vendredi, 7h00–16h00")}</dd>
+              <dt style={{ color: "#A7BFA9" }}>{t(lang, "Hours", "Horaires")}</dt><dd>{t(lang, "Monday to Friday, 9:00–17:00", "Lundi à vendredi, 9h00–17h00")}</dd>
               <dt style={{ color: "#A7BFA9" }}>{t(lang, "Address", "Adresse")}</dt><dd>Bole Sub-City, Kebele 03/05, Addis Ababa</dd>
             </dl>
           </div>

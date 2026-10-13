@@ -7,7 +7,7 @@ import { Crumbs, Empty, Ico, ICONS, SectionHead } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: "AU 2026 · Priority agenda",
-  description: "The three priorities of Burundi’s AU Chairmanship: Water & Sanitation, the A-RISE Initiative, and Peace & Security. Objectives, impact areas and current initiatives.",
+  description: "The three priorities of Burundi’s AU Chairmanship: Water & Sanitation, Peace & Security, and the A-RISE Initiative. Objectives, impact areas and current initiatives.",
 };
 
 const FALLBACK_THEME = "Assuring Sustainable Water Availability and Safe Sanitation Systems to Achieve the Goals of Agenda 2063";

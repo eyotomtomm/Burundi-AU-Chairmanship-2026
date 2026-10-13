@@ -86,7 +86,7 @@ function Phone({ lang }: { lang: Lang }) {
         </div>
         <div style={{ padding: "16px 14px 8px", fontSize: 12, fontWeight: 700 }}>Priority Agendas</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: "0 12px" }}>
-          {[["01", "Water & Sanitation", "Clean water access and sanitation for all African communities", "linear-gradient(135deg,#1565C0,#0B3C7A)"], ["02", "A-RISE Initiative", "Innovation, skills and empowerment for youth and women", "linear-gradient(135deg,#B8860B,#4A3E00)"]].map(([n, title, sub, bg]) => (
+          {[["01", "Water & Sanitation", "Clean water access and sanitation for all African communities", "linear-gradient(135deg,#1565C0,#0B3C7A)"], ["02", "Peace & Security", "Conflict prevention and lasting peace across the continent", "linear-gradient(135deg,#C8102E,#5A0714)"]].map(([n, title, sub, bg]) => (
             <div key={n} style={{ height: 92, borderRadius: 14, overflow: "hidden", background: bg, padding: 11, color: "#fff", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <span style={{ alignSelf: "flex-start", background: "rgba(0,0,0,.3)", color: "#FCD116", fontSize: 7.5, fontWeight: 900, letterSpacing: 0.7, padding: "3px 7px", borderRadius: 999 }}>PRIORITY {n}</span>
               <span><b style={{ display: "block", fontSize: 13, fontWeight: 900 }}>{title}</b><span style={{ fontSize: 8.5, opacity: 0.9 }}>{sub}</span></span>

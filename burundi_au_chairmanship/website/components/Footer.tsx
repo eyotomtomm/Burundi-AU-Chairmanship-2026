@@ -30,7 +30,7 @@ export function Footer({ lang, settings, social }: { lang: Lang; settings: AppSe
             <h3>{t(lang, "Visit & contact", "Visite & contact")}</h3>
             <span>Bole Sub-City, Kebele 03/05</span>
             <span>Addis Ababa, Ethiopia</span>
-            <span>{t(lang, "Monday to Friday, 7:00–16:00", "Lundi à vendredi, 7h00–16h00")}</span>
+            <span>{t(lang, "Monday to Friday, 9:00–17:00", "Lundi à vendredi, 9h00–17h00")}</span>
             <span>+251 114 651 300</span>
             <span>+251 114 655 547</span>
             <span>+251 911 208 857</span>

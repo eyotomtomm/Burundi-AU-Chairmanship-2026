@@ -34,7 +34,7 @@ export default async function Travel() {
   };
 
   const checklist: Array<[string, string, string, string, string?]> = [
-    ["Visa", "Visa", "Check which visa applies to you. The visa types, their fees and validity are listed on the consular services page.", "Vérifiez quel visa vous concerne. Les types de visa, leurs frais et leur validité figurent sur la page des services consulaires.", "/services#visa"],
+    ["Visa", "Visa", "Check which visa applies to you. The visa types and their validity are listed on the consular services page.", "Vérifiez quel visa vous concerne. Les types de visa et leur validité figurent sur la page des services consulaires.", "/services#visa"],
     ["Passport validity", "Validité du passeport", "Travel with a passport valid well beyond your stay. Confirm the exact requirement with the Embassy before you book.", "Voyagez avec un passeport valable bien au-delà de votre séjour. Confirmez l’exigence exacte auprès de l’Ambassade avant de réserver."],
     ["Health requirements", "Santé", "Ask the Embassy which vaccinations and health documents are required on entry.", "Renseignez-vous auprès de l’Ambassade sur les vaccinations et documents de santé exigés à l’entrée."],
     ["Travel insurance & flights", "Assurance & vols", "Take out travel insurance, and check the direct flights between Addis Ababa and Bujumbura.", "Souscrivez une assurance voyage et vérifiez les vols directs entre Addis-Abeba et Bujumbura."],
@@ -61,7 +61,7 @@ export default async function Travel() {
               <h1 className="h1">{lang === "fr" ? <>Préparez votre voyage au <em className="hl">cœur de l’Afrique</em></> : <>Plan your trip to the <em className="hl">heart of Africa</em></>}</h1>
               <p className="lede">{t(lang, "Visas, practical facts, a few words of Kirundi and the numbers to call if something goes wrong: what to know before you travel to Burundi.", "Visas, repères pratiques, quelques mots de kirundi et les numéros à appeler en cas de problème : ce qu’il faut savoir avant de partir au Burundi.")}</p>
               <div className="row btn-row">
-                <Link className="btn btn--md" href="/services#visa">{t(lang, "Visa types and fees", "Types de visa et frais")}<Ico d={ICONS.arrow} size={18} stroke="currentColor" /></Link>
+                <Link className="btn btn--md" href="/services#visa">{t(lang, "Visa types", "Types de visa")}<Ico d={ICONS.arrow} size={18} stroke="currentColor" /></Link>
                 <a className="btn btn--outline btn--md" href="#emergency"><span className="dot dot--red" />{t(lang, "Emergency numbers", "Numéros d’urgence")}</a>
               </div>
             </div>
@@ -87,7 +87,7 @@ export default async function Travel() {
             <p className="lede lede--sm">{t(lang, "Four things to check before you fly. Start with the visa.", "Quatre points à vérifier avant le départ. Commencez par le visa.")}</p>
             <div className="panel" style={{ marginTop: 10, padding: "22px 24px" }}>
               <span className="eyebrow" style={{ fontSize: 15 }}>{t(lang, "Embassy service hours", "Horaires de l’Ambassade")}</span>
-              <span className="display" style={{ fontSize: 24 }}>{t(lang, "Monday to Friday, 7:00–16:00", "Lundi à vendredi, 7h00–16h00")}</span>
+              <span className="display" style={{ fontSize: 24 }}>{t(lang, "Monday to Friday, 9:00–17:00", "Lundi à vendredi, 9h00–17h00")}</span>
               <span className="muted small">Bole Sub-City, Kebele 03/05, Addis Ababa</span>
               <a href="tel:+251114651300" className="bold" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", alignSelf: "flex-start" }}>+251 114 651 300</a>
             </div>
@@ -100,7 +100,7 @@ export default async function Travel() {
                   <div className="stack" style={{ gap: 8 }}>
                     <h3 className="h3" style={{ fontSize: 30 }}>{t(lang, en, fr)}</h3>
                     <p className="muted">{t(lang, bodyEn, bodyFr)}</p>
-                    {href && <Link className="more arrow" href={href} style={{ minHeight: 44, display: "inline-flex", alignItems: "center", alignSelf: "flex-start" }}>{t(lang, "Visa types and fees", "Types de visa et frais")}</Link>}
+                    {href && <Link className="more arrow" href={href} style={{ minHeight: 44, display: "inline-flex", alignItems: "center", alignSelf: "flex-start" }}>{t(lang, "Visa types", "Types de visa")}</Link>}
                   </div>
                 </div>
               </li>
@@ -169,7 +169,7 @@ export default async function Travel() {
                 <a href="tel:+251911208857" className="display" style={{ fontSize: 36, minHeight: 44, display: "inline-flex", alignItems: "center", alignSelf: "flex-start", color: "var(--red-ink)" }}>+251 911 208 857</a>
                 <p className="small" style={{ color: "#6B2226" }}>{t(lang, "For Burundians in difficulty in Ethiopia, Chad, Djibouti, Eritrea, South Sudan and Israel.", "Pour les Burundais en difficulté en Éthiopie, au Tchad, à Djibouti, en Érythrée, au Soudan du Sud et en Israël.")}</p>
                 <div className="stack" style={{ gap: 2, marginTop: 8, paddingTop: 18, borderTop: "1px solid rgba(142,17,22,0.22)" }}>
-                  <span className="eyebrow" style={{ color: "var(--red-ink)", fontSize: 15, marginBottom: 4 }}>{t(lang, "Embassy phones · Monday to Friday, 7:00–16:00", "Téléphones · lundi à vendredi, 7h00–16h00")}</span>
+                  <span className="eyebrow" style={{ color: "var(--red-ink)", fontSize: 15, marginBottom: 4 }}>{t(lang, "Embassy phones · Monday to Friday, 9:00–17:00", "Téléphones · lundi à vendredi, 9h00–17h00")}</span>
                   {["+251 114 651 300", "+251 114 655 547"].map((p) => <a key={p} href={`tel:${p.replace(/\s/g, "")}`} className="bold" style={{ minHeight: 44, display: "flex", alignItems: "center", fontSize: 18, color: "#6B2226" }}>{p}</a>)}
                   <a href="mailto:info@burundiaddis.gov.bi" className="bold" style={{ minHeight: 44, display: "flex", alignItems: "center", color: "#6B2226" }}>info@burundiaddis.gov.bi</a>
                 </div>

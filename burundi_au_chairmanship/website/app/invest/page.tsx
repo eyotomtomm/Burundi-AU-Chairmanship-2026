@@ -216,7 +216,7 @@ export default async function Invest() {
               <dt>{t(lang, "Address", "Adresse")}</dt><dd>Bole Sub-City, Kebele 03/05, Addis Ababa</dd>
               <dt>{t(lang, "Phone", "Téléphone")}</dt><dd>+251 114 651 300 · +251 114 655 547 · +251 911 208 857</dd>
               <dt>Email</dt><dd><a className="bold" href="mailto:info@burundiaddis.gov.bi">info@burundiaddis.gov.bi</a></dd>
-              <dt>{t(lang, "Open", "Horaires")}</dt><dd>{t(lang, "Monday to Friday, 7:00–16:00", "Lundi à vendredi, 7h00–16h00")}</dd>
+              <dt>{t(lang, "Open", "Horaires")}</dt><dd>{t(lang, "Monday to Friday, 9:00–17:00", "Lundi à vendredi, 9h00–17h00")}</dd>
             </dl>
             <span className="sc muted">{t(lang, "Useful links", "Liens utiles")}</span>
             <div className="chips">

@@ -33,6 +33,11 @@ import 'tabs/more_tab.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  static const int exploreTab = 3;
+
+  /// Set by [DeepLinkRouter] to switch tabs from a notification or link.
+  static final ValueNotifier<int?> requestedTab = ValueNotifier(null);
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -55,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    HomeScreen.requestedTab.addListener(_openRequestedTab);
     // Check verification status and show popups after screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Any link the app was launched with is routed here, once home exists.
@@ -300,7 +306,15 @@ class _HomeScreenState extends State<HomeScreen>
     _tabAnim.dispose();
     _maintenanceTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    HomeScreen.requestedTab.removeListener(_openRequestedTab);
     super.dispose();
+  }
+
+  void _openRequestedTab() {
+    final index = HomeScreen.requestedTab.value;
+    if (index == null) return;
+    HomeScreen.requestedTab.value = null;
+    _goToTab(index);
   }
 
   /// Every tab change goes through here.

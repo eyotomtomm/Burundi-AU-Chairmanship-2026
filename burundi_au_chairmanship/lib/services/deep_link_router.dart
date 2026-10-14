@@ -11,6 +11,7 @@ import '../screens/videos/video_detail_screen.dart';
 import '../screens/gallery/album_detail_screen.dart';
 import '../screens/discussions/discussion_detail_screen.dart';
 import '../screens/feature_card/feature_card_detail_screen.dart';
+import '../screens/home/home_screen.dart';
 
 /// Central deep link router — all navigation-from-message-sources funnel
 /// through [navigate] so that push notifications, in-app messages, popups,
@@ -149,6 +150,13 @@ class DeepLinkRouter {
 
       final handled = await _navigateToDetail(navigator, section, id);
       if (handled) return;
+    }
+
+    // Explore is a tab of HomeScreen, not a route of its own.
+    if (path == '/explore') {
+      navigator.popUntil((route) => route.isFirst);
+      HomeScreen.requestedTab.value = HomeScreen.exploreTab;
+      return;
     }
 
     // Simple named route

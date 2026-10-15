@@ -758,6 +758,17 @@ class LiveFeedSerializer(serializers.ModelSerializer):
 
 
 class ResourceSerializer(serializers.ModelSerializer):
+    # The website's /files/ route streams the document from Spaces, so the
+    # app and site never show the bucket address. Installed app builds open
+    # this URL in the browser, which is why it must be on our own domain.
+    file = serializers.SerializerMethodField()
+
+    def get_file(self, obj):
+        if not obj.file:
+            return ''
+        from django.conf import settings
+        return f"{settings.SITE_URL}/files/{obj.file.name}"
+
     class Meta:
         model = Resource
         fields = ['id', 'title', 'title_fr', 'category', 'file',

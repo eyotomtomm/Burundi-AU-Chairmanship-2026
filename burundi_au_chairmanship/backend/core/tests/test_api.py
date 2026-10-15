@@ -573,3 +573,19 @@ class EmbassyLocationApiTests(TestCase):
         self.assertIsInstance(res.json(), list)
         self.assertEqual([m['city'] for m in res.json()], ['Nairobi', 'Addis Ababa'])
         self.assertEqual(res.json()[1]['phone_number'], '+251 114 651 300')
+
+
+@override_settings(SITE_URL='https://burundi4africa.com')
+class ResourceFileUrlTests(TestCase):
+    """Resource links stay on our domain; the bucket address must never reach the app."""
+
+    def test_file_url_points_at_the_site_files_route(self):
+        from django.core.files.base import ContentFile
+        from core.models import Resource
+        r = Resource(title='Act', category='reference', file_type='pdf', status='published')
+        r.file.save('act.pdf', ContentFile(b'%PDF-1.4'), save=True)
+        self.addCleanup(r.file.delete, save=False)
+        data = APIClient().get('/api/resources/').json()
+        rows = data.get('results', data) if isinstance(data, dict) else data
+        self.assertEqual(rows[0]['file'], f'https://burundi4africa.com/files/{r.file.name}')
+        self.assertNotIn('digitaloceanspaces', rows[0]['file'])

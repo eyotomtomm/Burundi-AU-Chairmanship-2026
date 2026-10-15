@@ -87,7 +87,9 @@ export const MEDIA_STORE = "https://burundi-au-media.fra1.cdn.digitaloceanspaces
 /** A document link (PDF, ZIP) that keeps the storage address out of the browser. */
 export function fileLink(url: string | null | undefined): string {
   const u = media(url);
-  return u.startsWith(`${MEDIA_STORE}/`) ? `/files/${u.slice(MEDIA_STORE.length + 1)}` : u;
+  if (u.startsWith(`${MEDIA_STORE}/`)) return `/files/${u.slice(MEDIA_STORE.length + 1)}`;
+  // The API already hands out /files/ links for resources; keep them on this host.
+  return u.replace(/^https?:\/\/[^/]+(?=\/files\/)/, "");
 }
 
 export function media(url: string | null | undefined): string {

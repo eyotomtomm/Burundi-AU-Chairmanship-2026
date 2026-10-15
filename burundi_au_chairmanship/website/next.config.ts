@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
     return [
       ...DJANGO_PREFIXES.flatMap((p) => [
         { source: `/${p}`, destination: `${backend}/${p}` },
+        // Keep Django's trailing slash: without it a POST hits APPEND_SLASH and fails.
+        { source: `/${p}/:path*/`, destination: `${backend}/${p}/:path*/` },
         { source: `/${p}/:path*`, destination: `${backend}/${p}/:path*` },
       ]),
     ];

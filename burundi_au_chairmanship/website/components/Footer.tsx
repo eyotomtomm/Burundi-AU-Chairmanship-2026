@@ -1,11 +1,14 @@
 import Link from "next/link";
 import type { AppSettings, Lang, SocialLink } from "@/lib/types";
 import { t } from "@/lib/i18n";
+import { firebaseWeb } from "@/lib/firebase-web";
+import { NotifyButton } from "./NotifyButton";
 
 export const APP_STORE = "https://apps.apple.com/app/id6740047505";
 export const PLAY_STORE = "https://play.google.com/store/apps/details?id=com.b4africa.app";
 
 export function Footer({ lang, settings, social }: { lang: Lang; settings: AppSettings | null; social: SocialLink[] }) {
+  const fb = firebaseWeb();
   const explore = [
     ["/embassy", t(lang, "The Embassy", "L’Ambassade")],
     ["/services", t(lang, "Consular services", "Services consulaires")],
@@ -57,6 +60,7 @@ export function Footer({ lang, settings, social }: { lang: Lang; settings: AppSe
             <span className="small">{t(lang, "News, events and live coverage in the B4Africa app", "Actualités, événements et direct dans l’app B4Africa")}</span>
             <a className="btn btn--ghost" href={settings?.app_store_url || APP_STORE}>App Store</a>
             <a className="btn btn--ghost" href={settings?.play_store_url || PLAY_STORE}>Google Play</a>
+            {fb && <NotifyButton lang={lang} fb={fb} />}
           </div>
           <div className="ftr-links">
             {social.map((s) => <a key={s.id} href={s.url} rel="noopener">{platformLabel(s.platform)}{s.handle ? ` · ${s.handle}` : ""}</a>)}

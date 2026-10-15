@@ -402,6 +402,18 @@ def send_push_notification(notification):
         fcm_options=messaging.APNSFCMOptions(image=image_url) if image_url else None,
     )
 
+    # Website (browser) subscribers: Firebase's service worker opens this link
+    # on click. It must be https, so external URLs pass through and everything
+    # else opens the site's home page.
+    site_url = getattr(settings, 'SITE_URL', '').rstrip('/')
+    link = site_url
+    if notification.action_type == 'url' and (notification.action_value or '').startswith('https://'):
+        link = notification.action_value
+    webpush_config = messaging.WebpushConfig(
+        notification=messaging.WebpushNotification(icon=f"{site_url}/img/seal.png"),
+        fcm_options=messaging.WebpushFCMOptions(link=link) if link.startswith('https://') else None,
+    )
+
     total_success = 0
     total_failure = 0
     stale_tokens = []
@@ -437,6 +449,7 @@ def send_push_notification(notification):
                     token=token,
                     android=android_config,
                     apns=apns_config,
+                    webpush=webpush_config,
                 )
                 for token in batch_tokens
             ]

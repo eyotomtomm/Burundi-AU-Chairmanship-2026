@@ -281,7 +281,7 @@ a.card:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(15,42,2
 .ftr .brand-title { font-family: var(--display); font-size: 34px; font-weight: 500; line-height: 1.12; color: var(--white); }
 .ftr .motto { font-family: var(--display); font-style: italic; font-size: 18px; color: var(--gold); }
 .ftr-bottom { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; padding-top: 24px; border-top: 1px solid rgba(234,242,227,0.16); }
-.ftr-bottom .row a.btn--ghost { height: 40px; padding: 0 16px; font-size: 14px; }
+.ftr-bottom .row .btn--ghost { height: 40px; padding: 0 16px; font-size: 14px; }
 .ftr-links { display: flex; gap: 22px; font-size: 14px; flex-wrap: wrap; }
 
 /* ---------- responsive ---------- */

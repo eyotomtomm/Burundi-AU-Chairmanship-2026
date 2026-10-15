@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { api, media } from "@/lib/api";
+import { api, media, fileLink } from "@/lib/api";
 import { fmtDate, getLang, t, tr } from "@/lib/i18n";
 import { Crumbs, Ico, ICONS, PlayIcon, SectionHead } from "@/components/ui";
 
@@ -132,13 +132,13 @@ export default async function ChairmanshipPage() {
           </div>
           <ul className="span-7 start-6 rule-list rule-list--strong">
             {docs.map((d) => (
-              <li key={d.id}><a href={media(d.file)} rel="noopener">
+              <li key={d.id}><a href={fileLink(d.file)} rel="noopener">
                 <span className="stack" style={{ gap: 4 }}><span className="meta">{d.file_type.toUpperCase()} · {fmtDate(d.created_at, lang)}</span><span className="h3 h3--sm">{tr(d, "title", lang)}</span></span>
                 <span className="badge-pdf">{d.file_size} ↓</span>
               </a></li>
             ))}
             {magazine && (
-              <li><a href={media(magazine.effective_pdf_url) || "/media-centre#magazine"} rel="noopener">
+              <li><a href={fileLink(magazine.effective_pdf_url) || "/media-centre#magazine"} rel="noopener">
                 <span className="stack" style={{ gap: 4 }}><span className="meta">Magazine · {fmtDate(magazine.publish_date, lang, { day: undefined })}</span><span className="h3 h3--sm">{tr(magazine, "title", lang)}</span></span>
                 <span className="badge-pdf">{t(lang, "Read", "Lire")} →</span>
               </a></li>

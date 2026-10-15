@@ -81,6 +81,15 @@ function qs(params: Record<string, string | number | undefined>) {
 }
 
 /** Absolute media URL: the API returns absolute Spaces URLs in production and /media/... locally. */
+/** Where uploaded documents live; app/files/[...path] serves them under our own domain. */
+export const MEDIA_STORE = "https://burundi-au-media.fra1.cdn.digitaloceanspaces.com/media";
+
+/** A document link (PDF, ZIP) that keeps the storage address out of the browser. */
+export function fileLink(url: string | null | undefined): string {
+  const u = media(url);
+  return u.startsWith(`${MEDIA_STORE}/`) ? `/files/${u.slice(MEDIA_STORE.length + 1)}` : u;
+}
+
 export function media(url: string | null | undefined): string {
   if (!url) return "";
   if (/^https?:\/\//.test(url)) return url;

@@ -933,8 +933,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               ),
             ),
 
-          // Floating like/comment overlay
-          AnimatedPositioned(
+          // Floating like/comment overlay (magazines only)
+          if (widget.magazineId != null) AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
             bottom: _showOverlay ? 24 : -80,

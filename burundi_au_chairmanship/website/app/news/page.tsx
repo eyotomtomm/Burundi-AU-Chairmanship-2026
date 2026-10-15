@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { api, chairshipPosts, media } from "@/lib/api";
+import { api, chairshipPosts, media, fileLink } from "@/lib/api";
 import { excerpt, fmtDate, getLang, t, tr } from "@/lib/i18n";
 import { Crumbs, Empty, PlayIcon, SectionHead } from "@/components/ui";
 import { ArticleCard, Meta } from "./ArticleCard";
@@ -205,7 +205,7 @@ export default async function Newsroom({ searchParams }: { searchParams: Promise
               <ul className="rule-list rule-list--strong cols cols-2" style={{ gap: "0 32px" }}>
                 {documents.slice(0, 8).map((d) => (
                   <li key={d.id}>
-                    <a href={media(d.file)} target="_blank" rel="noopener">
+                    <a href={fileLink(d.file)} target="_blank" rel="noopener">
                       <span className="stack" style={{ gap: 4 }}>
                         <span className="sc muted small">{t(lang, "Official document", "Document officiel")} · {fmtDate(d.created_at, lang)}</span>
                         <span className="display" style={{ fontSize: 20, lineHeight: 1.25 }}>{tr(d, "title", lang)}</span>

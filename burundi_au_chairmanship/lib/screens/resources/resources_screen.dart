@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../l10n/app_localizations.dart';
@@ -13,6 +12,7 @@ import '../../models/api_models.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/african_pattern.dart';
+import '../magazine/pdf_viewer_screen.dart';
 import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/translate_button.dart';
@@ -381,10 +381,11 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
       return;
     }
     ApiService().recordResourceView(item.id).catchError((_) => <String, dynamic>{});
-    final uri = Uri.parse(Environment.fixMediaUrl(item.file));
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      _snack('res_could_not_open_file', error: true);
-    }
+    // PDFs open in the app's own reader; never hand the storage URL to a browser.
+    if (item.fileType.toLowerCase() != 'pdf') return _download(item);
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => PdfViewerScreen(pdfUrl: item.file, title: item.getTitle(Localizations.localeOf(context).languageCode)),
+    ));
   }
 
   /// Same Dio → temp dir → OpenFilex flow as the magazine PDF viewer.

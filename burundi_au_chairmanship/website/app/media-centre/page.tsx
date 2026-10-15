@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { api, media } from "@/lib/api";
+import { api, media, fileLink } from "@/lib/api";
 import { fmtDate, getLang, t, tr } from "@/lib/i18n";
 import type { Resource } from "@/lib/types";
 import { VIDEO_CATEGORIES, categoryLabel } from "./videos";
@@ -169,7 +169,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
             {latestMag ? (
               <div className={s.cover}>
                 <span aria-hidden="true" className={s.coverShadow} />
-                <a className={s.coverLink} href={media(latestMag.effective_pdf_url) || undefined} aria-label={t(lang, "Read the latest issue of the B4Africa magazine", "Lire le dernier numéro du magazine B4Africa")} rel="noopener">
+                <a className={s.coverLink} href={fileLink(latestMag.effective_pdf_url) || undefined} aria-label={t(lang, "Read the latest issue of the B4Africa magazine", "Lire le dernier numéro du magazine B4Africa")} rel="noopener">
                   <img src={media(latestMag.medium_url || latestMag.cover_image)} alt={tr(latestMag, "title", lang)} loading="lazy" />
                   {latestMag.is_featured && <span className={s.newIssue}>{lang === "fr" ? <>NOUVEAU<br />NUMÉRO</> : <>NEW<br />ISSUE</>}</span>}
                 </a>
@@ -188,7 +188,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
             </p>
             {latestMag && (
               <div className="row" style={{ marginTop: 28 }}>
-                {latestMag.effective_pdf_url && <a className="btn btn--md" href={media(latestMag.effective_pdf_url)} rel="noopener">{t(lang, "Read now", "Lire maintenant")}</a>}
+                {latestMag.effective_pdf_url && <a className="btn btn--md" href={fileLink(latestMag.effective_pdf_url)} rel="noopener">{t(lang, "Read now", "Lire maintenant")}</a>}
                 <span className="small muted">{tr(latestMag, "title", lang)} · {fmtDate(latestMag.publish_date, lang, { day: undefined })}{latestMag.page_count ? ` · ${latestMag.page_count} ${t(lang, "pages", "pages")}` : ""}{latestMag.file_size ? ` · ${latestMag.file_size}` : ""}</span>
               </div>
             )}
@@ -197,7 +197,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
                 <span className="eyebrow">{t(lang, "Past issues", "Numéros précédents")}</span>
                 <div className={s.issues}>
                   {pastMags.map((m) => (
-                    <a key={m.id} className={`${s.issue} no-ul`} href={media(m.effective_pdf_url) || undefined} rel="noopener">
+                    <a key={m.id} className={`${s.issue} no-ul`} href={fileLink(m.effective_pdf_url) || undefined} rel="noopener">
                       <img src={media(m.medium_url || m.cover_image)} alt={tr(m, "title", lang)} loading="lazy" />
                       <span className="small"><b>{tr(m, "title", lang)}</b><br /><span className="muted">{fmtDate(m.publish_date, lang, { day: undefined })}</span></span>
                     </a>
@@ -287,7 +287,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
                     <td>{tr(r, "title", lang)}</td>
                     <td className="muted">{resourceLabel(r.category)}</td>
                     <td style={{ textTransform: "uppercase" }}>{r.file_type}</td>
-                    <td><a className="badge-pdf" href={media(r.file)} rel="noopener">{r.file_size ? `${r.file_size} ↓` : "↓"}</a></td>
+                    <td><a className="badge-pdf" href={fileLink(r.file)} rel="noopener">{r.file_size ? `${r.file_size} ↓` : "↓"}</a></td>
                   </tr>
                 ))}
               </tbody>

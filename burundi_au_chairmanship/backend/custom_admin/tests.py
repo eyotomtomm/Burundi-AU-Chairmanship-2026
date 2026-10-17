@@ -286,3 +286,25 @@ class ArticleEditPublishDateTests(TestCase):
         })
         self.article.refresh_from_db()
         self.assertEqual(timezone.localtime(self.article.publish_date).strftime('%Y-%m-%d %H:%M'), '2026-01-15 09:30')
+
+
+class MediaLibraryApiTests(TestCase):
+    """The gallery picker lists stored images by folder, with sizes."""
+
+    def test_lists_images_by_folder(self):
+        import tempfile, os
+        from django.core.files.storage import default_storage
+        with tempfile.TemporaryDirectory() as root, override_settings(MEDIA_ROOT=root):
+            os.makedirs(os.path.join(root, 'gallery', 'photos'))
+            for name in ('gallery/photos/a.jpg', 'top.png', 'doc.pdf'):
+                with open(os.path.join(root, name), 'wb') as f:
+                    f.write(b'1234')
+            staff = User.objects.create_superuser('lib', 'lib@example.com', 'x')
+            login_with_2fa(self.client, staff)
+            data = self.client.get(reverse('custom_admin:media_library_api')).json()
+            self.assertEqual(data['folder_names'], ['gallery/photos', 'root'])
+            photo = data['folders']['gallery/photos'][0]
+            self.assertEqual((photo['path'], photo['size']), ('gallery/photos/a.jpg', 4))
+            self.assertEqual(photo['url'], default_storage.url('gallery/photos/a.jpg'))
+            only = self.client.get(reverse('custom_admin:media_library_api'), {'folder': 'gallery'}).json()
+            self.assertEqual(only['folder_names'], ['gallery/photos'])

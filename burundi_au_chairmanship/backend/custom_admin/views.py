@@ -9779,50 +9779,37 @@ def media_library_api(request):
     image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
     results = {}
 
+    def _files():
+        """(path, size) for every stored file, in as few round trips as possible."""
+        if hasattr(default_storage, 'bucket'):
+            # One paginated listing carries names and sizes; a listdir/size per
+            # file was ~3,000 round trips and timed out the picker.
+            prefix = default_storage.location.strip('/') + '/' if default_storage.location else ''
+            for obj in default_storage.bucket.objects.filter(Prefix=prefix):
+                yield obj.key[len(prefix):], obj.size
+        else:
+            root = default_storage.location
+            for dirpath, _, filenames in os.walk(root):
+                for f in filenames:
+                    full = os.path.join(dirpath, f)
+                    yield os.path.relpath(full, root).replace(os.sep, '/'), os.path.getsize(full)
+
     try:
-        storage = default_storage
-
-        def _scan_directory(prefix):
-            """Recursively list files using storage.listdir (works for S3 and local)."""
-            try:
-                dirs, files = storage.listdir(prefix)
-            except Exception as e:
-                logger.warning('listdir(%s) failed: %s', prefix, e)
-                return
-
-            for filename in files:
-                ext = os.path.splitext(filename)[1].lower()
-                if ext not in image_extensions:
-                    continue
-                if search_query and search_query not in filename.lower():
-                    continue
-                rel_path = os.path.join(prefix, filename) if prefix else filename
-                folder = prefix if prefix else 'root'
-                if folder_filter and folder != folder_filter and not folder.startswith(folder_filter + '/'):
-                    continue
-                try:
-                    url = storage.url(rel_path)
-                except Exception:
-                    url = f'{settings.MEDIA_URL}{rel_path}'
-                try:
-                    size = storage.size(rel_path)
-                except Exception:
-                    size = 0
-                results.setdefault(folder, []).append({
-                    'path': rel_path,
-                    'filename': filename,
-                    'url': url,
-                    'size': size,
-                })
-
-            for d in dirs:
-                sub_prefix = os.path.join(prefix, d) if prefix else d
-                if folder_filter and not folder_filter.startswith(sub_prefix) and not sub_prefix.startswith(folder_filter):
-                    continue
-                _scan_directory(sub_prefix)
-
-        _scan_directory('')
-
+        for rel_path, size in _files():
+            folder, _, filename = rel_path.rpartition('/')
+            folder = folder or 'root'
+            if os.path.splitext(filename)[1].lower() not in image_extensions:
+                continue
+            if search_query and search_query not in filename.lower():
+                continue
+            if folder_filter and folder != folder_filter and not folder.startswith(folder_filter + '/'):
+                continue
+            results.setdefault(folder, []).append({
+                'path': rel_path,
+                'filename': filename,
+                'url': default_storage.url(rel_path),
+                'size': size,
+            })
     except Exception as e:
         logger.exception('Media library API error')
         return JsonResponse({'error': str(e)}, status=500)

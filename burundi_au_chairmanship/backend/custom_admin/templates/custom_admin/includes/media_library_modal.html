@@ -182,7 +182,7 @@
                     img.url.replace(/'/g, "\\'") + '\')">' +
                     '<div class="aspect-square bg-surface-container-high">' +
                     '<img src="' + img.url + '" alt="' + img.filename + '" class="w-full h-full object-cover" loading="lazy" ' +
-                    'onerror="this.parentElement.innerHTML=\'<div class=\\'flex items-center justify-center h-full text-on-surface-variant\\'><span class=\\'material-symbols-outlined\\'>broken_image</span></div>\'">' +
+                    'onerror="this.style.display=\'none\'">' +
                     '</div>' +
                     '<div class="p-2">' +
                     '<p class="text-xs text-on-surface font-medium truncate">' + img.filename + '</p>' +

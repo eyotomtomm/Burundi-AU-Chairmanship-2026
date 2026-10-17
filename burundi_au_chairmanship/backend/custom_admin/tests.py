@@ -242,6 +242,17 @@ class ReuseAppMediaInArticleTests(TestCase):
         self.assertEqual(media.media_type, 'image')
         self.assertEqual(media.image.name, self.path)
 
+    def test_album_picker_offers_each_albums_photos(self):
+        from core.models import GalleryAlbum, GalleryPhoto
+        album = GalleryAlbum.objects.create(title='Summit', cover_image=self.path)
+        photo = GalleryPhoto.objects.create(album=album, image=self.path)
+        if photo.image.name != self.path:  # save() re-compresses into a copy
+            self.addCleanup(photo.image.delete, save=False)
+        GalleryPhoto.objects.create(album=album, image='')  # a photo with no file must not break the page
+        login_with_2fa(self.client, User.objects.create_superuser('pick', 'pick@example.com', 'x'))
+        page = self.client.get(reverse('custom_admin:article_create')).content.decode()
+        self.assertIn(f'value="{photo.image.url} ">Summit (1 photo)', page)
+
     def test_video_file_becomes_a_playable_link(self):
         url = 'https://cdn.example.com/media/videos/files/speech.mp4'
         self._post(url)

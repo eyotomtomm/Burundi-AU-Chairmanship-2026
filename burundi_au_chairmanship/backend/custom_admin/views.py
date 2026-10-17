@@ -15,7 +15,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User as AuthUser
 from django.contrib import messages
-from django.db.models import Count, Q, Sum, Value
+from django.db.models import Count, Prefetch, Q, Sum, Value
 from django.db.models.functions import Replace
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, StreamingHttpResponse
 from django.urls import reverse
@@ -251,6 +251,13 @@ _VIDEO_EXTS = ('.mp4', '.mov', '.m4v', '.webm')
 def _playable_videos():
     """The video library, for the article form's picker."""
     return Video.objects.exclude(video_url='', video_file='').order_by('-publish_date')[:200]
+
+
+def _gallery_albums():
+    """Albums with their photos, for the article form's picker."""
+    photos = GalleryPhoto.objects.exclude(image='')
+    return GalleryAlbum.objects.filter(photos__in=photos).distinct() \
+        .prefetch_related(Prefetch('photos', queryset=photos)).order_by('-created_at')[:200]
 
 
 def _own_media_path(url):
@@ -1014,7 +1021,7 @@ def article_create(request):
     return render(request, 'custom_admin/articles/form.html', {
         'categories': categories, 'action': 'Create',
         'prefill_date': request.GET.get('date', ''),
-        'videos': _playable_videos(),
+        'videos': _playable_videos(), 'albums': _gallery_albums(),
     })
 
 
@@ -1088,7 +1095,7 @@ def article_edit(request, pk):
         return redirect('custom_admin:articles_list')
     return render(request, 'custom_admin/articles/form.html', {
         'article': article, 'categories': categories, 'action': 'Edit',
-        'videos': _playable_videos(),
+        'videos': _playable_videos(), 'albums': _gallery_albums(),
     })
 
 
